@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出荷検品システム - モックアップ</title>
+    
+    <!-- キャッシュ制御メタタグ（iOS Safari対応） -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .inspection-header {
+            background: linear-gradient(135deg, #0d6efd, #4dabf7);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .inspection-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+        }
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d1e7dd; color: #0a3622; }
+        .status-rejected { background-color: #f8d7da; color: #721c24; }
+        .priority-high { background-color: #dc3545; color: white; }
+        .priority-normal { background-color: #0dcaf0; color: white; }
+        .inspection-item {
+            border-left: 4px solid #0d6efd;
+            padding: 1rem;
+            background-color: white;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+        .quantity-display {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .passed { color: #198754; }
+        .failed { color: #dc3545; }
+        .inspection-actions {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 1rem;
+            border-top: 1px solid #dee2e6;
+            box-shadow: 0 -0.5rem 1rem rgba(0,0,0,0.1);
+        }
+        .barcode-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            background-color: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px dashed #6c757d;
+        }
+        .qr-scanner-area {
+            border: 2px dashed #0d6efd;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+            background-color: #000;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .qr-video-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .qr-video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0.5rem;
+        }
+        .qr-scan-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 2px solid rgba(96, 165, 250, 0.8);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .qr-scan-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #60a5fa;
+        }
+        .qr-scan-corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+        .qr-scan-corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+        .qr-scan-corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+        .qr-scan-corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+        @keyframes scan-line {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+        .qr-scan-line {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+            animation: scan-line 2s ease-in-out infinite;
+            z-index: 11;
+        }
+        .qr-status-overlay {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            z-index: 12;
+            max-width: 90%;
+            text-align: center;
+        }
+        .qr-item-card {
+            border-left: 4px solid #ffc107;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        .qr-item-card.scanned {
+            border-left-color: #198754;
+            background-color: #d1e7dd;
+        }
+        .qr-status-icon {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+        .qr-pending { color: #ffc107; }
+        .qr-scanned { color: #198754; }
+        .inventory-info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        /* 詳細印刷用スタイル */
+        .print-detail-document {
+            display: none;
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+            }
+            .inspection-header,
+            .inspection-actions,
+            .btn,
+            .navbar,
+            .col-lg-4,
+            #shipment-loading {
+                display: none !important;
+            }
+            
+            /* 詳細印刷時は他の要素を非表示 */
+            body.printing-detail .modal,
+            body.printing-detail .modal-backdrop,
+            body.printing-detail .container,
+            body.printing-detail .inspection-header {
+                display: none !important;
+            }
+            
+            body.printing-detail .print-detail-document {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20mm;
+            }
+            .container {
+                max-width: 100%;
+                padding: 0;
+            }
+            .col-lg-8 {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+            .inspection-card {
+                page-break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid #dee2e6;
+                margin-bottom: 0.3rem;
+                border-radius: 0.25rem;
+                font-size: 0.75rem;
+            }
+            .card-header {
+                background-color: #f8f9fa !important;
+                color: black !important;
+                padding: 0.3rem 0.5rem;
+            }
+            .card-header h5 {
+                font-size: 0.9rem;
+                margin-bottom: 0;
+            }
+            .card-body {
+                padding: 0.3rem 0.5rem;
+            }
+            .card-body p {
+                margin-bottom: 0.15rem;
+                font-size: 0.7rem;
+                line-height: 1.3;
+            }
+            .card-body .row {
+                margin-left: 0;
+                margin-right: 0;
+            }
+            .card-body .col-md-8,
+            .card-body .col-md-4 {
+                padding-left: 0.25rem;
+                padding-right: 0.25rem;
+            }
+            .qr-code-section {
+                position: absolute;
+                top: 50%;
+                transform: translateY(-50%);
+                right: 0.5rem;
+                width: auto !important;
+                flex: none !important;
+            }
+            .qr-code-section p {
+                font-size: 0.6rem;
+                margin-bottom: 0.1rem;
+            }
+            .qr-code-section #qrcode-1,
+            .qr-code-section #qrcode-2,
+            .qr-code-section #qrcode-3,
+            .qr-code-section #qrcode-4,
+            .qr-code-section #qrcode-5,
+            .qr-code-section div[id^="qrcode-"] {
+                width: 60px !important;
+                height: 60px !important;
+            }
+            .qr-code-section img,
+            .qr-code-section canvas {
+                width: 60px !important;
+                height: 60px !important;
+            }
+            
+            /* 詳細印刷用スタイル */
+            @page {
+                size: A4 portrait;
+                margin: 15mm;
+            }
+            
+            .print-detail-header {
+                text-align: center;
+                border-bottom: 2px solid #000;
+                padding-bottom: 3mm;
+                margin-bottom: 5mm;
+            }
+            
+            .print-detail-title {
+                font-size: 18pt;
+                font-weight: bold;
+                margin-bottom: 2mm;
+            }
+            
+            .print-detail-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 4mm;
+            }
+            
+            .print-detail-table th,
+            .print-detail-table td {
+                padding: 2mm 3mm;
+                border: 1px solid #000;
+                text-align: left;
+                font-size: 9pt;
+                line-height: 1.3;
+            }
+            
+            .print-detail-table th {
+                background-color: #e0e0e0;
+                font-weight: bold;
+                width: 30%;
+            }
+            
+            .print-detail-section {
+                margin-bottom: 4mm;
+            }
+            
+            .print-detail-section-title {
+                font-size: 11pt;
+                font-weight: bold;
+                border-bottom: 1.5px solid #333;
+                padding-bottom: 1mm;
+                margin-bottom: 2mm;
+            }
+            
+            .print-detail-notes {
+                border: 1px solid #ccc;
+                padding: 3mm;
+                min-height: 20mm;
+                margin-top: 4mm;
+                font-size: 9pt;
+            }
+            
+            .print-detail-footer {
+                margin-top: 8mm;
+                padding-top: 3mm;
+                border-top: 1px solid #000;
+                font-size: 9pt;
+            }
+            .col-md-8 {
+                flex: 0 0 75%;
+                max-width: 75%;
+            }
+            .status-badge {
+                font-size: 0.6rem;
+                padding: 0.15rem 0.4rem;
+            }
+            .quantity-display {
+                font-size: 0.75rem;
+            }
+            h3 {
+                margin-top: 0;
+                padding-top: 0;
+                font-size: 1.1rem;
+            }
+            /* A4縦で最大化 */
+            @page {
+                size: A4 portrait;
+                margin: 0.8cm 1cm;
+            }
+            .shipment-list {
+                display: flex;
+                flex-direction: column;
+            }
+            .print-header {
+                display: block !important;
+                text-align: center;
+                margin-bottom: 0.3rem;
+                padding-bottom: 0.3rem;
+                border-bottom: 2px solid #000;
+            }
+            .print-title {
+                font-size: 1.3rem;
+                font-weight: bold;
+                margin-bottom: 0.1rem;
+            }
+            .print-date {
+                text-align: right;
+                font-size: 0.65rem;
+                margin-bottom: 0.1rem;
+            }
+        }
+        .print-header {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <div class="inspection-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1 class="mb-0">
+                        <i class="fas fa-search me-3"></i>出荷検品システム
+                    </h1>
+                    <p class="mb-0 mt-2">品質管理・出荷前最終検査</p>
+                </div>
+                <div class="col-auto text-end">
+                    <div id="app-build-info" class="text-white-50 small mb-2">コード修正日時: 読み込み中...</div>
+                    <button class="btn btn-light btn-lg me-2" onclick="printPendingShipments()">
+                        <i class="fas fa-print me-2"></i>印刷
+                    </button>
+                    <button class="btn btn-primary btn-lg me-2" onclick="window.open('qr-inspection3.html', '_blank')">
+                        <i class="fas fa-qrcode me-2"></i>QRコード読み取り
+                    </button>
+                    <a class="btn btn-success btn-lg me-2" href="pps.html">
+                        <i class="fas fa-boxes me-2"></i>PPS フロー
+                    </a>
+                    <a class="btn btn-warning btn-lg" href="maintenance.html">
+                        <i class="fas fa-tools me-2"></i>メンテナンス
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 印刷用ヘッダー（印刷時のみ表示） -->
+        <div class="print-header">
+            <div class="print-title">検品待ち出荷指示一覧</div>
+            <div class="print-date">印刷日時: <span id="print-datetime"></span></div>
+        </div>
+
+        <!-- 検品対象一覧 -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center">
+                        <h3 class="mb-0 me-3">
+                            <i class="fas fa-clipboard-list me-2"></i>検品待ち出荷指示
+                        </h3>
+                        <span class="badge bg-secondary" id="pending-count">0件</span>
+                    </div>
+                </div>
+
+                <div id="shipment-list" class="shipment-list">
+                    <div class="text-center text-muted py-5" id="shipment-loading">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div>出荷指示データを読み込み中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- サイドバー -->
+            <div class="col-lg-4">
+                <div class="inspection-card card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>本日の検品実績
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h3 class="text-success" id="stat-completed">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </h3>
+                                <small class="text-muted">完了</small>
+                            </div>
+                            <div class="col-6">
+                                <h3 class="text-primary" id="stat-in-progress">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </h3>
+                                <small class="text-muted">待機中</small>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="text-center">
+                            <h4 class="text-info" id="stat-pass-rate">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </h4>
+                            <small class="text-muted">合格率</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="inspection-card card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>注意事項
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                梱包材の損傷確認
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                ラベル貼り付け位置
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                数量の最終確認
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                出荷書類の完備
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="inspection-card card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock me-2"></i>最近の検品履歴
+                        </h5>
+                    </div>
+                    <div class="card-body" id="recent-inspections-container">
+                        <div class="text-center text-muted py-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-2 small">履歴を読み込んでいます...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 検品実行モーダル -->
+    <div class="modal fade" id="inspectionModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-search me-2"></i>出荷検品実行
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="inspection-content">
+                        <!-- 検品フォームがここに動的に生成される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>キャンセル
+                    </button>
+                    <button type="button" class="btn btn-warning" id="btn-save-draft">
+                        <i class="fas fa-save me-1"></i>下書き保存
+                    </button>
+                    <button type="button" class="btn btn-success" id="btn-complete-inspection">
+                        <i class="fas fa-check me-1"></i>検品完了
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細表示モーダル -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>出荷指示詳細
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="detail-content">
+                        <!-- 詳細情報がここに表示される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                    <button type="button" class="btn btn-primary" id="btn-print-details">
+                        <i class="fas fa-print me-1"></i>印刷
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細印刷用の非表示エリア -->
+    <div class="print-detail-document" id="printDetailArea">
+        <!-- 印刷内容がJavaScriptで動的に生成される -->
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- QRコード生成ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- QrScanner UMD版（iOS Safari対応） -->
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    <!-- キャッシュバスティング: バージョン番号でキャッシュを回避 -->
+    <script type="module" src="js/index-app.js?v=20251016-0930"></script>
+    <script type="module" src="js/qr-scanner.js?v=20251016-0930"></script>
+</body>
+</html>

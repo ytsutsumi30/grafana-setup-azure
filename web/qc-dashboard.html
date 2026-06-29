@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QC七つ道具ダッシュボード</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .tool-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            transition: transform 0.3s ease;
+        }
+        .tool-card:hover {
+            transform: translateY(-5px);
+        }
+        .tool-icon {
+            font-size: 2rem;
+            margin-right: 0.5rem;
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            padding: 1rem;
+        }
+        .nav-pills .nav-link {
+            border-radius: 0.5rem;
+            margin: 0 0.25rem;
+        }
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        .stat-card {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            margin-bottom: 1rem;
+        }
+        .fishbone-container {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            min-height: 400px;
+        }
+        .checksheet-table {
+            font-size: 0.9rem;
+        }
+        .badge-tool {
+            font-size: 0.75rem;
+            padding: 0.35rem 0.65rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- ページヘッダー -->
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1><i class="fas fa-chart-line me-3"></i>QC七つ道具ダッシュボード</h1>
+                    <p class="mb-0">品質管理・データ分析ツール</p>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-success btn-lg me-2" id="btn-generate-sample-data">
+                        <i class="fas fa-database me-2"></i>サンプルデータ生成
+                    </button>
+                    <a href="index.html" class="btn btn-light btn-lg me-2">
+                        <i class="fas fa-arrow-left me-2"></i>検品システムに戻る
+                    </a>
+                    <a href="qc-analysis.html" class="btn btn-warning btn-lg">
+                        <i class="fas fa-project-diagram me-2"></i>新QC七つ道具
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container-fluid">
+        <!-- ツール選択タブ -->
+        <ul class="nav nav-pills mb-4" id="qc-tools-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="pareto-tab" data-bs-toggle="pill" data-bs-target="#pareto" type="button">
+                    <i class="fas fa-chart-bar tool-icon"></i>パレート図
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="control-chart-tab" data-bs-toggle="pill" data-bs-target="#control-chart" type="button">
+                    <i class="fas fa-chart-line tool-icon"></i>管理図
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="histogram-tab" data-bs-toggle="pill" data-bs-target="#histogram" type="button">
+                    <i class="fas fa-chart-column tool-icon"></i>ヒストグラム
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="scatter-tab" data-bs-toggle="pill" data-bs-target="#scatter" type="button">
+                    <i class="fas fa-braille tool-icon"></i>散布図
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="fishbone-tab" data-bs-toggle="pill" data-bs-target="#fishbone" type="button">
+                    <i class="fas fa-fish tool-icon"></i>特性要因図
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="checksheet-tab" data-bs-toggle="pill" data-bs-target="#checksheet" type="button">
+                    <i class="fas fa-table tool-icon"></i>チェックシート
+                </button>
+            </li>
+        </ul>
+
+        <!-- タブコンテンツ -->
+        <div class="tab-content" id="qc-tools-content">
+            <!-- パレート図 -->
+            <div class="tab-pane fade show active" id="pareto" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-9">
+                        <div class="tool-card card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-bar text-primary me-2"></i>パレート図 - 不良原因分析
+                                    <span class="badge bg-secondary ms-2">重点指向</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="paretoChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="stat-card">
+                            <h6 class="text-muted">分析期間</h6>
+                            <select class="form-select form-select-sm mb-3" id="pareto-period">
+                                <option value="today">本日</option>
+                                <option value="week" selected>今週</option>
+                                <option value="month">今月</option>
+                                <option value="quarter">四半期</option>
+                            </select>
+
+                            <h6 class="text-muted mt-3">統計サマリー</h6>
+                            <div class="mb-2">
+                                <small class="text-muted">総不良数</small>
+                                <h4 class="mb-0" id="pareto-total">-</h4>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">上位3項目の割合</small>
+                                <h4 class="mb-0 text-danger" id="pareto-top3">-</h4>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">80%ライン項目数</small>
+                                <h4 class="mb-0 text-warning" id="pareto-80">-</h4>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <h6 class="text-muted">推奨アクション</h6>
+                            <div id="pareto-recommendations">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理図 -->
+            <div class="tab-pane fade" id="control-chart" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-9">
+                        <div class="tool-card card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-line text-success me-2"></i>管理図 - 工程管理
+                                    <span class="badge bg-success ms-2">異常検知</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="controlChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="stat-card">
+                            <h6 class="text-muted">管理項目</h6>
+                            <select class="form-select form-select-sm mb-3" id="control-metric">
+                                <option value="defect_rate" selected>不良率 (%)</option>
+                                <option value="pass_quantity">合格数量</option>
+                                <option value="inspection_time">検品時間</option>
+                            </select>
+
+                            <h6 class="text-muted mt-3">管理限界</h6>
+                            <div class="mb-2">
+                                <small class="text-muted">UCL (上方管理限界)</small>
+                                <h5 class="mb-0 text-danger" id="control-ucl">-</h5>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">CL (中心線)</small>
+                                <h5 class="mb-0 text-primary" id="control-cl">-</h5>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">LCL (下方管理限界)</small>
+                                <h5 class="mb-0 text-warning" id="control-lcl">-</h5>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <h6 class="text-muted">工程状態</h6>
+                            <div id="control-status">
+                                <span class="badge bg-success">管理内</span>
+                            </div>
+                            <div class="mt-2" id="control-alerts"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ヒストグラム -->
+            <div class="tab-pane fade" id="histogram" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-9">
+                        <div class="tool-card card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-column text-info me-2"></i>ヒストグラム - データ分布
+                                    <span class="badge bg-info ms-2">ばらつき分析</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="histogramChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="stat-card">
+                            <h6 class="text-muted">データ項目</h6>
+                            <select class="form-select form-select-sm mb-3" id="histogram-metric">
+                                <option value="inspection_time" selected>検品時間 (分)</option>
+                                <option value="defect_count">不良個数</option>
+                                <option value="quantity">検品数量</option>
+                            </select>
+
+                            <h6 class="text-muted mt-3">統計量</h6>
+                            <div class="mb-2">
+                                <small class="text-muted">平均値</small>
+                                <h5 class="mb-0" id="histogram-mean">-</h5>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">標準偏差</small>
+                                <h5 class="mb-0" id="histogram-std">-</h5>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">範囲 (R)</small>
+                                <h5 class="mb-0" id="histogram-range">-</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 散布図 -->
+            <div class="tab-pane fade" id="scatter" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-9">
+                        <div class="tool-card card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-braille text-warning me-2"></i>散布図 - 相関分析
+                                    <span class="badge bg-warning text-dark ms-2">因果関係</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="scatterChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3">
+                        <div class="stat-card">
+                            <h6 class="text-muted">X軸</h6>
+                            <select class="form-select form-select-sm mb-2" id="scatter-x">
+                                <option value="inspection_time" selected>検品時間</option>
+                                <option value="quantity">検品数量</option>
+                                <option value="components">部品点数</option>
+                            </select>
+
+                            <h6 class="text-muted mt-3">Y軸</h6>
+                            <select class="form-select form-select-sm mb-3" id="scatter-y">
+                                <option value="defect_rate" selected>不良率</option>
+                                <option value="defect_count">不良個数</option>
+                                <option value="pass_quantity">合格数</option>
+                            </select>
+
+                            <h6 class="text-muted mt-3">相関係数</h6>
+                            <div class="mb-2">
+                                <h3 class="mb-0" id="scatter-correlation">-</h3>
+                                <small class="text-muted" id="scatter-correlation-type">-</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 特性要因図 -->
+            <div class="tab-pane fade" id="fishbone" role="tabpanel">
+                <div class="tool-card card">
+                    <div class="card-header bg-white">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-fish text-danger me-2"></i>特性要因図（フィッシュボーン図）
+                                    <span class="badge bg-danger ms-2">原因分析</span>
+                                </h5>
+                            </div>
+                            <div class="col-auto">
+                                <select class="form-select form-select-sm" id="fishbone-problem">
+                                    <option value="defect" selected>不良品発生</option>
+                                    <option value="delay">納期遅延</option>
+                                    <option value="rework">手戻り発生</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="fishbone-container" id="fishbone-diagram">
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-fish fa-3x mb-3"></i>
+                                <p>フィッシュボーン図をロード中...</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <h6>4M/5M分析カテゴリ</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-primary">Man (人)</h6>
+                                            <ul class="list-unstyled small">
+                                                <li>• 作業者のスキル</li>
+                                                <li>• 訓練不足</li>
+                                                <li>• 作業ミス</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-success">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-success">Machine (機械)</h6>
+                                            <ul class="list-unstyled small">
+                                                <li>• 設備の老朽化</li>
+                                                <li>• メンテナンス不足</li>
+                                                <li>• 精度低下</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-warning">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-warning">Material (材料)</h6>
+                                            <ul class="list-unstyled small">
+                                                <li>• 材料品質</li>
+                                                <li>• 部品不良</li>
+                                                <li>• 保管状態</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-info">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-info">Method (方法)</h6>
+                                            <ul class="list-unstyled small">
+                                                <li>• 作業手順</li>
+                                                <li>• 標準作業不備</li>
+                                                <li>• プロセス設計</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- チェックシート -->
+            <div class="tab-pane fade" id="checksheet" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="tool-card card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-table text-secondary me-2"></i>チェックシート - データ収集
+                                    <span class="badge bg-secondary ms-2">記録・集計</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-bordered checksheet-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>検査項目</th>
+                                            <th>月</th>
+                                            <th>火</th>
+                                            <th>水</th>
+                                            <th>木</th>
+                                            <th>金</th>
+                                            <th>土</th>
+                                            <th>合計</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="checksheet-data">
+                                        <tr>
+                                            <td colspan="8" class="text-center text-muted">
+                                                データを読み込んでいます...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="stat-card">
+                            <h6 class="text-muted">集計期間</h6>
+                            <input type="week" class="form-control form-control-sm mb-3" id="checksheet-week">
+
+                            <h6 class="text-muted mt-3">週次サマリー</h6>
+                            <div id="checksheet-summary"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/qc-dashboard.js"></script>
+</body>
+</html>

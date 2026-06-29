@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出荷指示管理</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+        }
+        .btn-action {
+            min-width: 80px;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+        .modal-header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+        .required-field::after {
+            content: " *";
+            color: #dc3545;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <!-- ローディングオーバーレイ -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1><i class="fas fa-truck-loading me-2"></i>出荷指示管理</h1>
+                    <p class="mb-0">顧客への出荷指示管理</p>
+                </div>
+                <div class="col-auto">
+                    <a href="maintenance.html" class="btn btn-light btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>メンテナンスメニューに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container mb-5">
+        <!-- アクションボタン -->
+        <div class="row mb-4">
+            <div class="col">
+                <button class="btn btn-danger btn-lg" data-bs-toggle="modal" data-bs-target="instructionModal" onclick="openCreateModal()">
+                    <i class="fas fa-plus-circle me-2"></i>新規出荷指示登録
+                </button>
+                <button class="btn btn-outline-secondary btn-lg ms-2" onclick="loadInstructions()">
+                    <i class="fas fa-sync-alt me-2"></i>更新
+                </button>
+            </div>
+        </div>
+
+        <!-- 出荷指示一覧テーブル -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>出荷指示一覧</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>指示ID</th>
+                                <th>製品</th>
+                                <th>数量</th>
+                                <th>出荷日</th>
+                                <th>顧客名</th>
+                                <th>優先度</th>
+                                <th>ステータス</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="instructionsTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-5">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">データを読み込んでいます...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 出荷指示登録・編集モーダル -->
+    <div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="instructionModalLabel">
+                        <i class="fas fa-truck-loading me-2"></i><span id="modalTitle">新規出荷指示登録</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="instructionForm">
+                        <input type="hidden" id="instructionDbId">
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="instructionId" class="form-label required-field">出荷指示ID</label>
+                                <input type="text" class="form-control" id="instructionId" maxlength="50" required>
+                                <div class="invalid-feedback">出荷指示IDを入力してください</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="productId" class="form-label required-field">製品</label>
+                                <select class="form-select" id="productId" required>
+                                    <option value="">製品を選択してください</option>
+                                </select>
+                                <div class="invalid-feedback">製品を選択してください</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="quantity" class="form-label required-field">数量</label>
+                                <input type="number" class="form-control" id="quantity" min="1" step="1" required>
+                                <div class="invalid-feedback">1以上の数量を入力してください</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="shippingDate" class="form-label">出荷日</label>
+                                <input type="date" class="form-control" id="shippingDate">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="customerName" class="form-label">顧客名</label>
+                                <input type="text" class="form-control" id="customerName" maxlength="255">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="shippingLocationId" class="form-label">出荷元拠点</label>
+                                <select class="form-select" id="shippingLocationId">
+                                    <option value="">選択してください</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="deliveryLocationId" class="form-label">配送先拠点</label>
+                                <select class="form-select" id="deliveryLocationId">
+                                    <option value="">選択してください</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="priority" class="form-label">優先度</label>
+                                <select class="form-select" id="priority">
+                                    <option value="normal">通常</option>
+                                    <option value="high">高</option>
+                                    <option value="low">低</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="status" class="form-label">ステータス</label>
+                                <select class="form-select" id="status">
+                                    <option value="pending">未処理</option>
+                                    <option value="processing">処理中</option>
+                                    <option value="shipped">出荷済</option>
+                                    <option value="delivered">配送完了</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="trackingNumber" class="form-label">トラッキング番号</label>
+                                <input type="text" class="form-control" id="trackingNumber" maxlength="100">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">備考</label>
+                            <textarea class="form-control" id="notes" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>キャンセル
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="saveInstruction()">
+                        <i class="fas fa-save me-2"></i>保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const API_BASE_URL = '/api';
+        let currentEditingId = null;
+        let products = [];
+        let shippingLocations = [];
+        let deliveryLocations = [];
+
+        // ページ読み込み時にデータ取得
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadMasterData();
+            await loadInstructions();
+        });
+
+        // ローディング表示制御
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        // マスタデータ取得
+        async function loadMasterData() {
+            try {
+                const [productsRes, shippingRes, deliveryRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/products`),
+                    fetch(`${API_BASE_URL}/shipping-locations`),
+                    fetch(`${API_BASE_URL}/delivery-locations`)
+                ]);
+
+                if (!productsRes.ok || !shippingRes.ok || !deliveryRes.ok) {
+                    throw new Error('マスタデータの取得に失敗しました');
+                }
+
+                products = await productsRes.json();
+                shippingLocations = await shippingRes.json();
+                deliveryLocations = await deliveryRes.json();
+
+                // プルダウン更新
+                updateProductSelect();
+                updateShippingLocationSelect();
+                updateDeliveryLocationSelect();
+            } catch (error) {
+                console.error('Error loading master data:', error);
+                showError('マスタデータの取得に失敗しました');
+            }
+        }
+
+        // 製品プルダウン更新
+        function updateProductSelect() {
+            const select = document.getElementById('productId');
+            select.innerHTML = '<option value="">製品を選択してください</option>';
+            products.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product.id;
+                option.textContent = `${product.product_code} - ${product.product_name}`;
+                select.appendChild(option);
+            });
+        }
+
+        // 出荷元拠点プルダウン更新
+        function updateShippingLocationSelect() {
+            const select = document.getElementById('shippingLocationId');
+            select.innerHTML = '<option value="">選択してください</option>';
+            shippingLocations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.id;
+                option.textContent = `${location.location_code} - ${location.location_name}`;
+                select.appendChild(option);
+            });
+        }
+
+        // 配送先拠点プルダウン更新
+        function updateDeliveryLocationSelect() {
+            const select = document.getElementById('deliveryLocationId');
+            select.innerHTML = '<option value="">選択してください</option>';
+            deliveryLocations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.id;
+                option.textContent = `${location.location_code} - ${location.location_name}`;
+                select.appendChild(option);
+            });
+        }
+
+        // 出荷指示一覧取得
+        async function loadInstructions() {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/shipping-instructions`);
+                if (!response.ok) throw new Error('出荷指示一覧の取得に失敗しました');
+
+                const instructions = await response.json();
+                renderInstructionsTable(instructions);
+            } catch (error) {
+                console.error('Error loading instructions:', error);
+                showError('出荷指示一覧の取得に失敗しました');
+                document.getElementById('instructionsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-danger py-5">
+                            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                            <p>${error.message}</p>
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // テーブル描画
+        function renderInstructionsTable(instructions) {
+            const tbody = document.getElementById('instructionsTableBody');
+
+            if (instructions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>出荷指示が登録されていません</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = instructions.map(instruction => {
+                const shippingDate = instruction.shipping_date ? new Date(instruction.shipping_date).toLocaleDateString('ja-JP') : '-';
+                const priorityBadge = getPriorityBadge(instruction.priority);
+                const statusBadge = getStatusBadge(instruction.status);
+
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(instruction.instruction_id)}</strong></td>
+                        <td>${escapeHtml(instruction.product_code)}<br><small class="text-muted">${escapeHtml(instruction.product_name)}</small></td>
+                        <td><strong>${instruction.quantity}</strong></td>
+                        <td>${shippingDate}</td>
+                        <td>${instruction.customer_name ? escapeHtml(instruction.customer_name) : '<span class="text-muted">-</span>'}</td>
+                        <td>${priorityBadge}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="openEditModal(${instruction.id})" title="編集">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteInstruction(${instruction.id}, '${escapeHtml(instruction.instruction_id)}')" title="削除">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 優先度バッジ
+        function getPriorityBadge(priority) {
+            const badges = {
+                'high': '<span class="badge bg-danger">高</span>',
+                'normal': '<span class="badge bg-primary">通常</span>',
+                'low': '<span class="badge bg-secondary">低</span>'
+            };
+            return badges[priority] || `<span class="badge bg-secondary">${priority}</span>`;
+        }
+
+        // ステータスバッジ
+        function getStatusBadge(status) {
+            const badges = {
+                'pending': '<span class="badge bg-warning text-dark">未処理</span>',
+                'processing': '<span class="badge bg-info">処理中</span>',
+                'shipped': '<span class="badge bg-primary">出荷済</span>',
+                'delivered': '<span class="badge bg-success">配送完了</span>'
+            };
+            return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
+        }
+
+        // 新規登録モーダルを開く
+        function openCreateModal() {
+            currentEditingId = null;
+            document.getElementById('modalTitle').textContent = '新規出荷指示登録';
+            document.getElementById('instructionForm').reset();
+            document.getElementById('instructionForm').classList.remove('was-validated');
+            document.getElementById('instructionDbId').value = '';
+            document.getElementById('priority').value = 'normal';
+            document.getElementById('status').value = 'pending';
+
+            const modal = new bootstrap.Modal(document.getElementById('instructionModal'));
+            modal.show();
+        }
+
+        // 編集モーダルを開く
+        async function openEditModal(instructionId) {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/shipping-instructions/${instructionId}`);
+                if (!response.ok) throw new Error('出荷指示情報の取得に失敗しました');
+
+                const instruction = await response.json();
+
+                currentEditingId = instructionId;
+                document.getElementById('modalTitle').textContent = '出荷指示編集';
+                document.getElementById('instructionDbId').value = instruction.id;
+                document.getElementById('instructionId').value = instruction.instruction_id;
+                document.getElementById('productId').value = instruction.product_id || '';
+                document.getElementById('quantity').value = instruction.quantity;
+                document.getElementById('shippingDate').value = instruction.shipping_date || '';
+                document.getElementById('shippingLocationId').value = instruction.shipping_location_id || '';
+                document.getElementById('deliveryLocationId').value = instruction.delivery_location_id || '';
+                document.getElementById('customerName').value = instruction.customer_name || '';
+                document.getElementById('priority').value = instruction.priority || 'normal';
+                document.getElementById('status').value = instruction.status || 'pending';
+                document.getElementById('trackingNumber').value = instruction.tracking_number || '';
+                document.getElementById('notes').value = instruction.notes || '';
+
+                document.getElementById('instructionForm').classList.remove('was-validated');
+
+                const modal = new bootstrap.Modal(document.getElementById('instructionModal'));
+                modal.show();
+            } catch (error) {
+                console.error('Error loading instruction:', error);
+                showError('出荷指示情報の取得に失敗しました');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 出荷指示保存（新規登録・更新）
+        async function saveInstruction() {
+            const form = document.getElementById('instructionForm');
+
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+
+            const instructionData = {
+                instruction_id: document.getElementById('instructionId').value.trim(),
+                product_id: parseInt(document.getElementById('productId').value),
+                quantity: parseInt(document.getElementById('quantity').value),
+                shipping_date: document.getElementById('shippingDate').value || null,
+                shipping_location_id: document.getElementById('shippingLocationId').value ? parseInt(document.getElementById('shippingLocationId').value) : null,
+                delivery_location_id: document.getElementById('deliveryLocationId').value ? parseInt(document.getElementById('deliveryLocationId').value) : null,
+                customer_name: document.getElementById('customerName').value.trim() || null,
+                priority: document.getElementById('priority').value,
+                status: document.getElementById('status').value,
+                tracking_number: document.getElementById('trackingNumber').value.trim() || null,
+                notes: document.getElementById('notes').value.trim() || null
+            };
+
+            showLoading();
+            try {
+                const instructionId = document.getElementById('instructionDbId').value;
+                const url = instructionId ? `${API_BASE_URL}/shipping-instructions/${instructionId}` : `${API_BASE_URL}/shipping-instructions`;
+                const method = instructionId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(instructionData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '保存に失敗しました');
+                }
+
+                const savedInstruction = await response.json();
+
+                showSuccess(instructionId ? '出荷指示を更新しました' : '出荷指示を登録しました');
+
+                // モーダルを閉じる
+                const modal = bootstrap.Modal.getInstance(document.getElementById('instructionModal'));
+                modal.hide();
+
+                // 一覧を再読み込み
+                await loadInstructions();
+            } catch (error) {
+                console.error('Error saving instruction:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 出荷指示削除
+        async function deleteInstruction(instructionId, instructionIdStr) {
+            if (!confirm(`出荷指示「${instructionIdStr}」を削除してもよろしいですか？\n\n※検品データがある場合は削除できません。`)) {
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/shipping-instructions/${instructionId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '削除に失敗しました');
+                }
+
+                showSuccess('出荷指示を削除しました');
+                await loadInstructions();
+            } catch (error) {
+                console.error('Error deleting instruction:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 成功メッセージ表示
+        function showSuccess(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '10000';
+            alert.innerHTML = `
+                <i class="fas fa-check-circle me-2"></i>${escapeHtml(message)}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+
+        // エラーメッセージ表示
+        function showError(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '10000';
+            alert.innerHTML = `
+                <i class="fas fa-exclamation-circle me-2"></i>${escapeHtml(message)}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>

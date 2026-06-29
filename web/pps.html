@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>PPS フロー - 出荷管理システム</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+        .page-header {
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white; padding: 1.2rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .step-badge {
+            width: 2.2rem; height: 2.2rem; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1rem;
+        }
+        .step-card { border-left: 5px solid #dee2e6; transition: border-color .2s; }
+        .step-card.step-active  { border-left-color: #0d6efd; }
+        .step-card.step-done    { border-left-color: #198754; }
+        .step-card.step-pending { border-left-color: #6c757d; opacity: .6; }
+        .step-card.step-warning { border-left-color: #fd7e14; }
+
+        .flow-arrow { text-align: center; font-size: 1.5rem; color: #adb5bd; margin: .25rem 0; }
+
+        .status-pill {
+            font-size: .75rem; padding: .2rem .7rem;
+            border-radius: 999px; font-weight: 600;
+        }
+        .status-pending    { background:#e9ecef; color:#6c757d; }
+        .status-picking    { background:#cfe2ff; color:#084298; }
+        .status-packing    { background:#fff3cd; color:#664d03; }
+        .status-inspecting { background:#d1e7dd; color:#0a3622; }
+        .status-shipped    { background:#d0d3d4; color:#2d3436; }
+        .status-delivered  { background:#d4edda; color:#155724; }
+
+        .lot-tag {
+            display: inline-block; background: #e7f5ff; color: #1971c2;
+            border: 1px solid #a5d8ff; border-radius: 4px;
+            font-size: .8rem; padding: .1rem .5rem; margin: .1rem;
+        }
+        .scan-input-area { background: #fff; border-radius: .5rem; padding: 1rem; }
+        #scanInput {
+            font-size: 1.1rem; letter-spacing: .1em;
+            border: 2px solid #0d6efd;
+        }
+        .log-item { font-size: .85rem; border-bottom: 1px solid #f0f0f0; padding: .3rem 0; }
+        .log-item.err { color: #dc3545; }
+        .log-item.ok  { color: #198754; }
+    </style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="page-header">
+    <div class="container-fluid px-3">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3">
+                <a href="index.html" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div>
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>PPS フロー</h5>
+                    <small class="opacity-75">PICK → PACK → SHIP</small>
+                </div>
+            </div>
+            <div id="headerStatus"></div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-3 py-3">
+    <!-- 出荷指示選択 -->
+    <div class="card mb-3" id="selectCard">
+        <div class="card-body">
+            <h6 class="card-title mb-2"><i class="fas fa-search me-1"></i>出荷指示を選択</h6>
+            <div class="input-group">
+                <input type="text" id="siSearch" class="form-control" placeholder="指示番号 / 顧客名で検索">
+                <button class="btn btn-primary" onclick="loadSIList()"><i class="fas fa-search"></i></button>
+            </div>
+            <div id="siList" class="mt-2"></div>
+        </div>
+    </div>
+
+    <!-- PPS フロー -->
+    <div id="ppsFlow" class="d-none">
+
+        <!-- 出荷指示情報 -->
+        <div class="card mb-2" id="siInfoCard">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="fw-bold" id="infInstructionId"></span>
+                        <span class="ms-2" id="infStatus"></span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetFlow()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="text-muted small" id="infProduct"></div>
+                <div class="text-muted small" id="infCustomer"></div>
+            </div>
+        </div>
+
+        <!-- STEP 1: PICK -->
+        <div class="card step-card mb-2" id="stepPick">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="step-badge bg-primary text-white">1</div>
+                    <strong>PICK　ピッキング</strong>
+                    <span id="pickStatus" class="ms-auto status-pill"></span>
+                </div>
+                <div id="pickContent"></div>
+            </div>
+        </div>
+
+        <div class="flow-arrow"><i class="fas fa-chevron-down"></i></div>
+
+        <!-- STEP 2: PACK -->
+        <div class="card step-card mb-2" id="stepPack">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="step-badge bg-warning text-dark">2</div>
+                    <strong>PACK　梱包</strong>
+                    <span id="packStatus" class="ms-auto status-pill"></span>
+                </div>
+                <div id="packContent"></div>
+            </div>
+        </div>
+
+        <div class="flow-arrow"><i class="fas fa-chevron-down"></i></div>
+
+        <!-- STEP 3: SHIP (検品 → 出荷) -->
+        <div class="card step-card mb-2" id="stepShip">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="step-badge bg-success text-white">3</div>
+                    <strong>SHIP　検品 / 出荷</strong>
+                    <span id="shipStatus" class="ms-auto status-pill"></span>
+                </div>
+                <div id="shipContent"></div>
+            </div>
+        </div>
+
+    </div><!-- /ppsFlow -->
+</div><!-- /container -->
+
+<!-- モーダル: ピッキング開始 -->
+<div class="modal fade" id="pickStartModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-hand-paper me-2"></i>ピッキング開始</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">担当者名</label>
+                    <input type="text" id="pickerName" class="form-control" placeholder="例: 田中太郎">
+                </div>
+                <div id="availableLots" class="mb-2">
+                    <label class="form-label text-muted small">利用可能ロット</label>
+                    <div id="lotList" class="d-flex flex-wrap gap-1"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary w-100" onclick="startPicking()">ピッキング指示を作成</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル: QR スキャン (ピッキング) -->
+<div class="modal fade" id="pickScanModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-qrcode me-2"></i>ロット QR スキャン</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="scan-input-area mb-3">
+                    <label class="form-label">QR コード / ロット番号</label>
+                    <input type="text" id="scanInput" class="form-control" placeholder="ロット番号を入力またはスキャン"
+                        autocomplete="off" autofocus>
+                    <div class="input-group mt-2">
+                        <span class="input-group-text">数量</span>
+                        <input type="number" id="scanQty" class="form-control" value="1" min="1">
+                        <button class="btn btn-primary" onclick="submitScan()">スキャン</button>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between">
+                        <span class="small text-muted">ピッキング進捗</span>
+                        <span id="scanProgress" class="small fw-bold"></span>
+                    </div>
+                    <div class="progress mt-1">
+                        <div id="scanProgressBar" class="progress-bar" style="width:0%"></div>
+                    </div>
+                </div>
+                <div id="scanLog" style="max-height:160px;overflow-y:auto"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success w-100" id="completPickBtn" onclick="completePicking()">
+                    <i class="fas fa-check me-1"></i>ピッキング完了
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- モーダル: 梱包 -->
+<div class="modal fade" id="packModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-box me-2"></i>梱包記録</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label">梱包担当者</label>
+                        <input type="text" id="packerName" class="form-control" placeholder="例: 鈴木花子">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">梱包数量</label>
+                        <input type="number" id="packedQty" class="form-control" min="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">箱数</label>
+                        <input type="number" id="boxCount" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">総重量 (kg)</label>
+                        <input type="number" id="totalWeight" class="form-control" step="0.1" min="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">梱包形態</label>
+                        <select id="packagingType" class="form-select">
+                            <option value="段ボール">段ボール</option>
+                            <option value="パレット">パレット</option>
+                            <option value="袋">袋</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">梱包ロット番号（自動）</label>
+                        <input type="text" id="packLotNumbers" class="form-control" readonly>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">備考</label>
+                        <textarea id="packNotes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-warning w-100" onclick="completePacking()">
+                    <i class="fas fa-check me-1"></i>梱包完了
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API = '';  // same origin
+
+let state = {
+    si: null,           // shipping_instruction
+    picking: null,      // picking_instruction
+    packing: null,      // packing_record
+    qrInspection: null,
+    availableLots: [],
+    pickingId: null,    // current picking_instruction id
+    packingId: null
+};
+
+// ===== 出荷指示一覧 =====
+async function loadSIList() {
+    const q = document.getElementById('siSearch').value.trim();
+    const res = await fetch(`${API}/shipping-instructions?status=pending,picking,packing,inspecting&instruction_id=${encodeURIComponent(q)}`);
+    const list = await res.json();
+    const el = document.getElementById('siList');
+    if (list.length === 0) { el.innerHTML = '<div class="text-muted small py-2">該当する出荷指示がありません</div>'; return; }
+    el.innerHTML = list.slice(0,20).map(si => `
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom"
+             style="cursor:pointer" onclick="selectSI(${si.id})">
+            <div>
+                <span class="fw-bold">${si.instruction_id}</span>
+                <span class="text-muted small ms-2">${si.product_name || ''} × ${si.quantity}</span><br>
+                <span class="text-muted small">${si.customer_name || ''}</span>
+            </div>
+            <span class="status-pill status-${si.status}">${statusLabel(si.status)}</span>
+        </div>
+    `).join('');
+}
+
+async function selectSI(id) {
+    const res = await fetch(`${API}/shipping-instructions/${id}/pps-status`);
+    if (!res.ok) { alert('データ取得エラー'); return; }
+    const data = await res.json();
+    state.si           = data.shipping;
+    state.picking      = data.picking;
+    state.packing      = data.packing;
+    state.qrInspection = data.qr_inspection;
+    state.availableLots= data.available_lots || [];
+    renderFlow();
+    document.getElementById('ppsFlow').classList.remove('d-none');
+    document.getElementById('selectCard').classList.add('d-none');
+}
+
+function resetFlow() {
+    state = { si:null, picking:null, packing:null, qrInspection:null, availableLots:[], pickingId:null, packingId:null };
+    document.getElementById('ppsFlow').classList.add('d-none');
+    document.getElementById('selectCard').classList.remove('d-none');
+    document.getElementById('siList').innerHTML = '';
+    document.getElementById('siSearch').value = '';
+}
+
+// ===== フロー描画 =====
+function renderFlow() {
+    const si = state.si;
+    // ヘッダー
+    document.getElementById('infInstructionId').textContent = si.instruction_id;
+    document.getElementById('infStatus').innerHTML = `<span class="status-pill status-${si.status}">${statusLabel(si.status)}</span>`;
+    document.getElementById('infProduct').textContent = `${si.product_code}  ${si.product_name}  × ${si.quantity}`;
+    document.getElementById('infCustomer').textContent = `顧客: ${si.customer_name || '-'}  出荷日: ${si.shipping_date || '-'}`;
+
+    renderPickStep();
+    renderPackStep();
+    renderShipStep();
+}
+
+function renderPickStep() {
+    const p = state.picking;
+    const siStatus = state.si.status;
+    const card = document.getElementById('stepPick');
+    const content = document.getElementById('pickContent');
+    const badge = document.getElementById('pickStatus');
+
+    if (!p) {
+        card.className = 'card step-card mb-2 step-active';
+        badge.className = 'ms-auto status-pill status-pending';
+        badge.textContent = '未開始';
+        content.innerHTML = `
+            <button class="btn btn-primary btn-sm" onclick="openPickStart()">
+                <i class="fas fa-play me-1"></i>ピッキング指示を作成
+            </button>`;
+        return;
+    }
+
+    const pct = p.total_quantity > 0 ? Math.round(p.picked_quantity / p.total_quantity * 100) : 0;
+    if (p.status === 'completed') {
+        card.className = 'card step-card mb-2 step-done';
+        badge.className = 'ms-auto status-pill status-delivered';
+        badge.textContent = '完了';
+        // ピッキングされたロット番号一覧
+        const lots = (p.records || []).filter(r => r && r.status === 'picked').map(r => r.lot_number);
+        const unique = [...new Set(lots)];
+        content.innerHTML = `
+            <div class="small text-muted mb-1">担当: ${p.picker_name || '-'}　ピッキング: ${p.picked_quantity}/${p.total_quantity}</div>
+            <div>${unique.map(l => `<span class="lot-tag">${l}</span>`).join('')}</div>`;
+    } else {
+        card.className = 'card step-card mb-2 step-active';
+        badge.className = 'ms-auto status-pill status-picking';
+        badge.textContent = '進行中';
+        content.innerHTML = `
+            <div class="small mb-1">担当: ${p.picker_name || '-'}</div>
+            <div class="progress mb-2" style="height:8px">
+                <div class="progress-bar" style="width:${pct}%"></div>
+            </div>
+            <div class="d-flex justify-content-between small text-muted mb-2">
+                <span>${p.picked_quantity} / ${p.total_quantity}</span><span>${pct}%</span>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openPickScan(${p.id})">
+                <i class="fas fa-qrcode me-1"></i>QR スキャン
+            </button>`;
+    }
+}
+
+function renderPackStep() {
+    const pk = state.packing;
+    const siStatus = state.si.status;
+    const card = document.getElementById('stepPack');
+    const content = document.getElementById('packContent');
+    const badge = document.getElementById('packStatus');
+
+    if (!['packing','inspecting','shipped','delivered'].includes(siStatus) && !pk) {
+        card.className = 'card step-card mb-2 step-pending';
+        badge.className = 'ms-auto status-pill status-pending';
+        badge.textContent = '待機中';
+        content.innerHTML = '<div class="text-muted small">ピッキング完了後に開始できます</div>';
+        return;
+    }
+
+    if (!pk) {
+        card.className = 'card step-card mb-2 step-active';
+        badge.className = 'ms-auto status-pill status-packing';
+        badge.textContent = '未開始';
+        content.innerHTML = `
+            <button class="btn btn-warning btn-sm" onclick="openPack()">
+                <i class="fas fa-box me-1"></i>梱包を開始
+            </button>`;
+        return;
+    }
+
+    if (pk.status === 'completed') {
+        card.className = 'card step-card mb-2 step-done';
+        badge.className = 'ms-auto status-pill status-delivered';
+        badge.textContent = '完了';
+        content.innerHTML = `
+            <div class="small text-muted">担当: ${pk.packer_name || '-'}　${pk.packed_quantity}個　${pk.box_count}箱　${pk.total_weight_kg || '-'}kg</div>
+            <div class="small">梱包形態: ${pk.packaging_type || '-'}</div>
+            <div class="mt-1">${(pk.lot_numbers||'').split(',').filter(Boolean).map(l=>`<span class="lot-tag">${l.trim()}</span>`).join('')}</div>`;
+    } else {
+        card.className = 'card step-card mb-2 step-active';
+        badge.className = 'ms-auto status-pill status-packing';
+        badge.textContent = '進行中';
+        content.innerHTML = `
+            <button class="btn btn-warning btn-sm" onclick="openPack()">
+                <i class="fas fa-edit me-1"></i>梱包情報を入力して完了
+            </button>`;
+    }
+}
+
+function renderShipStep() {
+    const siStatus = state.si.status;
+    const card = document.getElementById('stepShip');
+    const content = document.getElementById('shipContent');
+    const badge = document.getElementById('shipStatus');
+
+    if (!['inspecting','shipped','delivered'].includes(siStatus)) {
+        card.className = 'card step-card mb-2 step-pending';
+        badge.className = 'ms-auto status-pill status-pending';
+        badge.textContent = '待機中';
+        content.innerHTML = '<div class="text-muted small">梱包完了後に検品 / 出荷ができます</div>';
+        return;
+    }
+
+    card.className = 'card step-card mb-2 step-active';
+    badge.className = `ms-auto status-pill status-${siStatus}`;
+    badge.textContent = statusLabel(siStatus);
+
+    if (siStatus === 'inspecting') {
+        content.innerHTML = `
+            <a href="qr-inspection.html?id=${state.si.id}" class="btn btn-success btn-sm">
+                <i class="fas fa-qrcode me-1"></i>QR 検品へ
+            </a>`;
+    } else if (siStatus === 'shipped' || siStatus === 'delivered') {
+        content.innerHTML = `<div class="text-muted small">出荷済み (${statusLabel(siStatus)})</div>`;
+    }
+}
+
+// ===== ピッキング開始モーダル =====
+function openPickStart() {
+    const lots = state.availableLots;
+    document.getElementById('lotList').innerHTML = lots.length
+        ? lots.map(l => `<span class="lot-tag">${l.lot_number} (${l.quantity}個 @ ${l.location||'-'})</span>`).join('')
+        : '<span class="text-muted small">利用可能ロットなし</span>';
+    document.getElementById('pickerName').value = '';
+    new bootstrap.Modal(document.getElementById('pickStartModal')).show();
+}
+
+async function startPicking() {
+    const name = document.getElementById('pickerName').value.trim();
+    const res = await fetch(`${API}/picking-instructions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipping_instruction_id: state.si.id, picker_name: name })
+    });
+    if (!res.ok) { const e = await res.json(); alert(e.error); return; }
+    const pi = await res.json();
+    bootstrap.Modal.getInstance(document.getElementById('pickStartModal')).hide();
+    await refreshState();
+}
+
+// ===== QR スキャンモーダル =====
+function openPickScan(piId) {
+    state.pickingId = piId;
+    document.getElementById('scanInput').value = '';
+    document.getElementById('scanQty').value = 1;
+    document.getElementById('scanLog').innerHTML = '';
+    updateScanProgress();
+    new bootstrap.Modal(document.getElementById('pickScanModal')).show();
+    setTimeout(() => document.getElementById('scanInput').focus(), 300);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('scanInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') submitScan();
+    });
+    loadSIList();
+});
+
+function updateScanProgress() {
+    const p = state.picking;
+    if (!p) return;
+    const pct = p.total_quantity > 0 ? Math.round(p.picked_quantity / p.total_quantity * 100) : 0;
+    document.getElementById('scanProgress').textContent = `${p.picked_quantity} / ${p.total_quantity}`;
+    document.getElementById('scanProgressBar').style.width = `${pct}%`;
+}
+
+async function submitScan() {
+    const lot = document.getElementById('scanInput').value.trim();
+    const qty = parseInt(document.getElementById('scanQty').value) || 1;
+    if (!lot) return;
+
+    const res = await fetch(`${API}/picking-instructions/${state.pickingId}/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lot_number: lot, picked_quantity: qty })
+    });
+    const data = await res.json();
+
+    const logEl = document.getElementById('scanLog');
+    const cls = data.success ? 'ok' : 'err';
+    const icon = data.success ? '✓' : '✗';
+    logEl.innerHTML = `<div class="log-item ${cls}">${icon} ${lot}  ×${qty}  ${data.message}</div>` + logEl.innerHTML;
+
+    if (data.success) {
+        if (state.picking) {
+            state.picking.picked_quantity = data.picked_quantity;
+        }
+        updateScanProgress();
+        document.getElementById('scanInput').value = '';
+        document.getElementById('scanQty').value = 1;
+    }
+    document.getElementById('scanInput').focus();
+}
+
+async function completePicking() {
+    if (!confirm('ピッキングを完了しますか？\nロット在庫が減算されます。')) return;
+    const res = await fetch(`${API}/picking-instructions/${state.pickingId}/complete`, { method: 'PATCH' });
+    if (!res.ok) { const e = await res.json(); alert(e.error); return; }
+    bootstrap.Modal.getInstance(document.getElementById('pickScanModal')).hide();
+    await refreshState();
+}
+
+// ===== 梱包モーダル =====
+function openPack() {
+    const p = state.picking;
+    // ピッキングされたロット番号を自動セット
+    const lots = p && p.records
+        ? [...new Set(p.records.filter(r=>r&&r.status==='picked').map(r=>r.lot_number))].join(', ')
+        : '';
+    document.getElementById('packLotNumbers').value = lots;
+    document.getElementById('packedQty').value = state.si.quantity;
+    document.getElementById('packerName').value = '';
+    document.getElementById('boxCount').value = 1;
+    document.getElementById('totalWeight').value = '';
+    document.getElementById('packNotes').value = '';
+    new bootstrap.Modal(document.getElementById('packModal')).show();
+}
+
+async function completePacking() {
+    const body = {
+        shipping_instruction_id: state.si.id,
+        picking_instruction_id: state.picking ? state.picking.id : null,
+        packer_name: document.getElementById('packerName').value.trim() || null,
+        packed_quantity: parseInt(document.getElementById('packedQty').value) || 0,
+        box_count: parseInt(document.getElementById('boxCount').value) || 1,
+        total_weight_kg: parseFloat(document.getElementById('totalWeight').value) || null,
+        packaging_type: document.getElementById('packagingType').value,
+        lot_numbers: document.getElementById('packLotNumbers').value,
+        notes: document.getElementById('packNotes').value.trim() || null
+    };
+
+    // まず梱包記録を作成、その後すぐ完了
+    const createRes = await fetch(`${API}/packing-records`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (!createRes.ok) { const e = await createRes.json(); alert(e.error); return; }
+    const pr = await createRes.json();
+
+    const completeRes = await fetch(`${API}/packing-records/${pr.id}/complete`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (!completeRes.ok) { const e = await completeRes.json(); alert(e.error); return; }
+
+    bootstrap.Modal.getInstance(document.getElementById('packModal')).hide();
+    await refreshState();
+}
+
+// ===== 共通 =====
+async function refreshState() {
+    const res = await fetch(`${API}/shipping-instructions/${state.si.id}/pps-status`);
+    const data = await res.json();
+    state.si           = data.shipping;
+    state.picking      = data.picking;
+    state.packing      = data.packing;
+    state.qrInspection = data.qr_inspection;
+    state.availableLots= data.available_lots || [];
+    renderFlow();
+}
+
+function statusLabel(s) {
+    return { pending:'未着手', picking:'ピッキング中', packing:'梱包中',
+             inspecting:'検品中', shipped:'出荷済', delivered:'配達済', processing:'処理中' }[s] || s;
+}
+</script>
+</body>
+</html>

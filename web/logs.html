@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>システムログ</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            border-left: 4px solid #6c757d;
+            margin-bottom: 0.5rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+        }
+        .log-entry.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .log-entry.warn {
+            border-left-color: #ffc107;
+            background: #fffbf0;
+        }
+        .log-entry.info {
+            border-left-color: #0dcaf0;
+            background: #f0faff;
+        }
+        .log-entry.debug {
+            border-left-color: #6c757d;
+            background: #f8f9fa;
+        }
+        .log-timestamp {
+            color: #6c757d;
+            font-weight: bold;
+        }
+        .log-level {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        .log-level.error {
+            background: #dc3545;
+            color: white;
+        }
+        .log-level.warn {
+            background: #ffc107;
+            color: #000;
+        }
+        .log-level.info {
+            background: #0dcaf0;
+            color: #000;
+        }
+        .log-level.debug {
+            background: #6c757d;
+            color: white;
+        }
+        .log-message {
+            margin-top: 0.5rem;
+            word-wrap: break-word;
+        }
+        .log-metadata {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.05);
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+        }
+        .file-item {
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .file-item:hover {
+            background: #f8f9fa;
+            border-left-color: #764ba2;
+        }
+        .file-item.active {
+            background: #e7f1ff;
+            border-left-color: #0d6efd;
+        }
+        #logsContent {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- ローディングオーバーレイ -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1><i class="fas fa-file-alt me-2"></i>システムログ</h1>
+                    <p class="mb-0">システムログの閲覧とフィルタリング</p>
+                </div>
+                <div class="col-auto">
+                    <a href="maintenance.html" class="btn btn-light btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>メンテナンスメニューに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container mb-5">
+        <div class="row">
+            <!-- ログファイル一覧 -->
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="mb-0"><i class="fas fa-folder-open me-2"></i>ログファイル</h5>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="loadLogFiles()">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="logFilesContainer">
+                            <div class="text-center py-5">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-3 text-muted">ログファイルを読み込んでいます...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ログ内容表示 -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="mb-0"><i class="fas fa-eye me-2"></i>ログ内容</h5>
+                            </div>
+                            <div class="col-auto">
+                                <div class="btn-group" role="group">
+                                    <input type="radio" class="btn-check" name="levelFilter" id="filterAll" value="" checked>
+                                    <label class="btn btn-outline-secondary btn-sm" for="filterAll">全て</label>
+
+                                    <input type="radio" class="btn-check" name="levelFilter" id="filterError" value="error">
+                                    <label class="btn btn-outline-danger btn-sm" for="filterError">エラー</label>
+
+                                    <input type="radio" class="btn-check" name="levelFilter" id="filterWarn" value="warn">
+                                    <label class="btn btn-outline-warning btn-sm" for="filterWarn">警告</label>
+
+                                    <input type="radio" class="btn-check" name="levelFilter" id="filterInfo" value="info">
+                                    <label class="btn btn-outline-info btn-sm" for="filterInfo">情報</label>
+                                </div>
+                                <select class="form-select form-select-sm ms-2 d-inline-block" style="width: auto;" id="limitSelect">
+                                    <option value="50">最新50件</option>
+                                    <option value="100" selected>最新100件</option>
+                                    <option value="200">最新200件</option>
+                                    <option value="500">最新500件</option>
+                                    <option value="">全件</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="loadLogContent()" title="更新">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="logsContent">
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-arrow-left fa-3x mb-3"></i>
+                                <p>左からログファイルを選択してください</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const API_BASE_URL = '/api';
+        let currentLogFile = null;
+
+        // ページ読み込み時にログファイル一覧を取得
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLogFiles();
+
+            // フィルタ変更時に再読み込み
+            document.querySelectorAll('input[name="levelFilter"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (currentLogFile) {
+                        loadLogContent();
+                    }
+                });
+            });
+
+            // 表示件数変更時に再読み込み
+            document.getElementById('limitSelect').addEventListener('change', () => {
+                if (currentLogFile) {
+                    loadLogContent();
+                }
+            });
+        });
+
+        // ローディング表示制御
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        // ログファイル一覧取得
+        async function loadLogFiles() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/logs/files`);
+                if (!response.ok) throw new Error('ログファイル一覧の取得に失敗しました');
+
+                const files = await response.json();
+                renderLogFiles(files);
+            } catch (error) {
+                console.error('Error loading log files:', error);
+                document.getElementById('logFilesContainer').innerHTML = `
+                    <div class="text-center text-danger py-5">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // ログファイル一覧表示
+        function renderLogFiles(files) {
+            const container = document.getElementById('logFilesContainer');
+
+            if (files.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>ログファイルがありません</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = files.map(file => {
+                const modified = new Date(file.modified_at).toLocaleString('ja-JP');
+                const isActive = currentLogFile === file.filename ? 'active' : '';
+                const icon = file.filename.includes('error') ? 'fa-exclamation-circle text-danger' : 'fa-file-alt text-primary';
+
+                return `
+                    <div class="card file-item mb-0 ${isActive}" onclick="selectLogFile('${escapeHtml(file.filename)}')">
+                        <div class="card-body py-3">
+                            <h6 class="mb-1">
+                                <i class="fas ${icon} me-2"></i>${escapeHtml(file.filename)}
+                            </h6>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>${modified}
+                                <span class="ms-3"><i class="fas fa-hdd me-1"></i>${escapeHtml(file.size)}</span>
+                            </small>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ログファイル選択
+        function selectLogFile(filename) {
+            currentLogFile = filename;
+
+            // アクティブ表示を更新
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+
+            loadLogContent();
+        }
+
+        // ログ内容取得
+        async function loadLogContent() {
+            if (!currentLogFile) return;
+
+            showLoading();
+            try {
+                const level = document.querySelector('input[name="levelFilter"]:checked').value;
+                const limit = document.getElementById('limitSelect').value;
+
+                let url = `${API_BASE_URL}/logs/content/${encodeURIComponent(currentLogFile)}?`;
+                if (level) url += `level=${level}&`;
+                if (limit) url += `limit=${limit}`;
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('ログ内容の取得に失敗しました');
+
+                const logs = await response.json();
+                renderLogContent(logs);
+            } catch (error) {
+                console.error('Error loading log content:', error);
+                document.getElementById('logsContent').innerHTML = `
+                    <div class="text-center text-danger py-5">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ログ内容表示
+        function renderLogContent(logs) {
+            const container = document.getElementById('logsContent');
+
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>該当するログエントリがありません</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const level = log.level || 'info';
+                const timestamp = log.timestamp || '-';
+                const message = log.message || '';
+
+                let metadataHtml = '';
+                if (log.metadata && Object.keys(log.metadata).length > 0) {
+                    metadataHtml = `
+                        <div class="log-metadata">
+                            <strong>詳細:</strong>
+                            <pre class="mb-0 mt-1">${escapeHtml(JSON.stringify(log.metadata, null, 2))}</pre>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="log-entry ${level}">
+                        <div>
+                            <span class="log-timestamp">${escapeHtml(timestamp)}</span>
+                            <span class="log-level ${level}">${level}</span>
+                        </div>
+                        <div class="log-message">${escapeHtml(message)}</div>
+                        ${metadataHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>

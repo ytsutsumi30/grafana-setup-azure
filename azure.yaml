@@ -1,0 +1,17 @@
+name: shipping-inspection-poc
+metadata:
+  template: shipping-inspection-poc@0.1.0
+infra:
+  provider: bicep
+services:
+  api:
+    project: ./api
+    host: containerapp
+    language: js
+    docker:
+      path: ./Dockerfile
+  web:
+    project: ./web
+    host: containerapp
+    docker:
+      path: ./Dockerfile

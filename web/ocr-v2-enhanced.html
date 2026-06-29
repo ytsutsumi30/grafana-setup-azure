@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>製品別 伝票チェックシステム - OCR v2</title>
+
+    <!-- キャッシュ対策 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+        }
+
+        .camera-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            max-height: 400px;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 60%;
+            border: 3px dashed rgba(96, 165, 250, 0.8);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .product-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #6c757d;
+        }
+
+        .product-card.checked {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border-left: 4px solid #10b981;
+        }
+
+        .product-card.warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid #f59e0b;
+        }
+
+        .product-card.error {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border-left: 4px solid #ef4444;
+        }
+
+        .document-preview {
+            width: 100%;
+            max-height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .badge-custom {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .comparison-table {
+            font-size: 0.85rem;
+        }
+
+        .comparison-table td {
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+        }
+
+        .match {
+            background-color: #d1fae5;
+        }
+
+        .mismatch {
+            background-color: #fee2e2;
+        }
+
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+            <div class="container py-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h1 class="h3 mb-1">
+                            <i class="fas fa-file-invoice me-2"></i>製品別 伝票チェックシステム
+                        </h1>
+                        <p class="small mb-0 opacity-75">発注伝票 ⇔ 納品伝票 照合</p>
+                    </div>
+                    <button onclick="window.close()" class="btn btn-light">
+                        <i class="fas fa-times me-2"></i>閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container py-4">
+            <!-- 製品選択セクション -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-box me-2"></i>製品選択</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <select id="product-select" class="form-select form-select-lg" onchange="selectProduct()">
+                                <option value="">製品を選択してください</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary btn-lg w-100" onclick="startCheck()" id="start-check-btn" disabled>
+                                <i class="fas fa-play me-2"></i>伝票チェック開始
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- チェック進行セクション -->
+            <div id="check-section" class="d-none">
+                <div class="row">
+                    <!-- 発注伝票 -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>発注伝票</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="order-preview" class="mb-3 text-center">
+                                    <div class="camera-container" id="order-camera-container" style="display: none;">
+                                        <video id="order-video" class="w-100 h-100" playsinline muted webkit-playsinline></video>
+                                        <div class="camera-overlay"></div>
+                                        <div class="position-absolute bottom-0 start-50 translate-middle-x mb-3">
+                                            <span class="badge bg-dark bg-opacity-75 px-3 py-2" id="order-camera-status">発注伝票を撮影してください</span>
+                                        </div>
+                                    </div>
+                                    <img id="order-preview-img" class="document-preview d-none" alt="発注伝票">
+                                    <div id="order-placeholder" class="p-5 text-muted">
+                                        <i class="fas fa-camera fa-3x mb-3"></i>
+                                        <p>発注伝票を撮影してください</p>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary" onclick="startCamera('order')" id="order-camera-btn">
+                                        <i class="fas fa-camera me-2"></i>カメラ起動
+                                    </button>
+                                    <button class="btn btn-success d-none" onclick="captureDocument('order')" id="order-capture-btn">
+                                        <i class="fas fa-check me-2"></i>撮影してOCR実行
+                                    </button>
+                                    <button class="btn btn-secondary d-none" onclick="stopCamera('order')" id="order-stop-btn">
+                                        <i class="fas fa-stop me-2"></i>カメラ停止
+                                    </button>
+                                </div>
+                                <div id="order-result" class="mt-3 d-none">
+                                    <h6 class="border-bottom pb-2">OCR結果</h6>
+                                    <div class="small">
+                                        <div class="mb-2">
+                                            <strong>伝票番号:</strong>
+                                            <input type="text" class="form-control form-control-sm mt-1" id="order-doc-number" placeholder="自動抽出">
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>金額:</strong>
+                                            <input type="text" class="form-control form-control-sm mt-1" id="order-amount" placeholder="自動抽出">
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>日付:</strong>
+                                            <input type="text" class="form-control form-control-sm mt-1" id="order-date" placeholder="自動抽出">
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>認識精度:</strong>
+                                            <div class="progress mt-1" style="height: 20px;">
+                                                <div class="progress-bar" id="order-confidence-bar" style="width: 0%">0%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 納品伝票 -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>納品伝票</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="delivery-preview" class="mb-3 text-center">
+                                    <div class="camera-container" id="delivery-camera-container" style="display: none;">
+                                        <video id="delivery-video" class="w-100 h-100" playsinline muted webkit-playsinline></video>
+                                        <div class="camera-overlay"></div>
+                                        <div class="position-absolute bottom-0 start-50 translate-middle-x mb-3">
+                                            <span class="badge bg-dark bg-opacity-75 px-3 py-2" id="delivery-camera-status">納品伝票を撮影してください</span>
+                                        </div>
+                                    </div>
+                                    <img id="delivery-preview-img" class="document-preview d-none" alt="納品伝票">
+                                    <div id="delivery-placeholder" class="p-5 text-muted">
+                                        <i class="fas fa-camera fa-3x mb-3"></i>
+                                        <p>納品伝票を撮影してください</p>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-success" onclick="startCamera('delivery')" id="delivery-camera-btn">
+                                        <i class="fas fa-camera me-2"></i>カメラ起動
+                                    </button>
+                                    <button class="btn btn-primary d-none" onclick="captureDocument('delivery')" id="delivery-capture-btn">
+                                        <i class="fas fa-check me-2"></i>撮影してOCR実行
+                                    </button>
+                                    <button class="btn btn-secondary d-none" onclick="stopCamera('delivery')" id="delivery-stop-btn">
+                                        <i class="fas fa-stop me-2"></i>カメラ停止
+                                    </button>
+                                </div>
+                                <div id="delivery-result" class="mt-3 d-none">
+                                    <h6 class="border-bottom pb-2">OCR結果</h6>
+                                    <div class="small">
+                                        <div class="mb-2">
+                                            <strong>伝票番号:</strong>
+                                            <input type="text" class="form-control form-control-sm mt-1" id="delivery-doc-number" placeholder="自動抽出">
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>金額:</strong>
+                                            <input type="text" class="form-control form-control-sm mt-1" id="delivery-amount" placeholder="自動抽出">
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>日付:</strong>
+                                            <input type="text" class="form-control form-control-sm mt-1" id="delivery-date" placeholder="自動抽出">
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>認識精度:</strong>
+                                            <div class="progress mt-1" style="height: 20px;">
+                                                <div class="progress-bar bg-success" id="delivery-confidence-bar" style="width: 0%">0%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 照合結果 -->
+                <div class="card mb-4" id="comparison-section" style="display: none;">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>照合結果</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="comparison-result">
+                            <!-- 照合結果がここに表示される -->
+                        </div>
+                        <div class="d-grid gap-2 mt-3">
+                            <button class="btn btn-primary btn-lg" onclick="saveCheckResult()" id="save-result-btn">
+                                <i class="fas fa-save me-2"></i>検査結果を保存
+                            </button>
+                            <button class="btn btn-secondary" onclick="resetCheck()">
+                                <i class="fas fa-redo me-2"></i>新しい製品をチェック
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- チェック済み製品リスト -->
+            <div class="card">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>チェック済み製品</h5>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearAllChecks()">
+                            <i class="fas fa-trash me-1"></i>すべてクリア
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="checked-products-list">
+                        <div class="text-center text-muted py-4">
+                            まだチェック済みの製品がありません
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 処理中オーバーレイ -->
+    <div id="processing-overlay" class="processing-overlay d-none">
+        <div class="bg-white rounded p-4 text-center" style="max-width: 400px;">
+            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5 id="processing-status">OCR処理中...</h5>
+            <div class="progress mt-3" style="height: 25px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" id="processing-progress" style="width: 0%">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.protocol + '//' + window.location.host + '/api';
+
+        let products = [];
+        let selectedProduct = null;
+        let currentType = null;
+        let videoStreams = { order: null, delivery: null };
+        let checkedProducts = [];
+        let ocrResults = { order: null, delivery: null };
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadProducts();
+            loadCheckedProducts();
+        });
+
+        // 製品リスト読み込み
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/products`);
+                products = await response.json();
+
+                const select = document.getElementById('product-select');
+                select.innerHTML = '<option value="">製品を選択してください</option>';
+
+                products.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.id;
+                    option.textContent = `${product.product_name} (${product.product_code})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('製品リスト読み込みエラー:', error);
+                alert('製品リストの読み込みに失敗しました');
+            }
+        }
+
+        // 製品選択
+        function selectProduct() {
+            const select = document.getElementById('product-select');
+            const productId = parseInt(select.value);
+
+            if (productId) {
+                selectedProduct = products.find(p => p.id === productId);
+                document.getElementById('start-check-btn').disabled = false;
+            } else {
+                selectedProduct = null;
+                document.getElementById('start-check-btn').disabled = true;
+            }
+        }
+
+        // チェック開始
+        function startCheck() {
+            if (!selectedProduct) return;
+
+            document.getElementById('check-section').classList.remove('d-none');
+            ocrResults = { order: null, delivery: null };
+
+            // スクロール
+            document.getElementById('check-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // カメラ起動
+        async function startCamera(type) {
+            try {
+                currentType = type;
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+
+                videoStreams[type] = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById(`${type}-video`);
+                video.srcObject = videoStreams[type];
+                await video.play();
+
+                // UI更新
+                document.getElementById(`${type}-placeholder`).style.display = 'none';
+                document.getElementById(`${type}-camera-container`).style.display = 'block';
+                document.getElementById(`${type}-camera-btn`).classList.add('d-none');
+                document.getElementById(`${type}-capture-btn`).classList.remove('d-none');
+                document.getElementById(`${type}-stop-btn`).classList.remove('d-none');
+            } catch (error) {
+                console.error('カメラ起動エラー:', error);
+                alert('カメラの起動に失敗しました: ' + error.message);
+            }
+        }
+
+        // カメラ停止
+        function stopCamera(type) {
+            if (videoStreams[type]) {
+                videoStreams[type].getTracks().forEach(track => track.stop());
+                videoStreams[type] = null;
+                document.getElementById(`${type}-video`).srcObject = null;
+            }
+
+            document.getElementById(`${type}-camera-container`).style.display = 'none';
+            document.getElementById(`${type}-placeholder`).style.display = 'block';
+            document.getElementById(`${type}-camera-btn`).classList.remove('d-none');
+            document.getElementById(`${type}-capture-btn`).classList.add('d-none');
+            document.getElementById(`${type}-stop-btn`).classList.add('d-none');
+        }
+
+        // 伝票撮影
+        async function captureDocument(type) {
+            const video = document.getElementById(`${type}-video`);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+
+            // プレビュー表示
+            const previewImg = document.getElementById(`${type}-preview-img`);
+            previewImg.src = imageData;
+            previewImg.classList.remove('d-none');
+
+            // カメラ停止
+            stopCamera(type);
+
+            // OCR実行
+            await performOCR(type, imageData);
+        }
+
+        // OCR処理
+        async function performOCR(type, imageData) {
+            const overlay = document.getElementById('processing-overlay');
+            overlay.classList.remove('d-none');
+
+            try {
+                document.getElementById('processing-status').textContent = '画像を解析中...';
+                document.getElementById('processing-progress').style.width = '10%';
+                document.getElementById('processing-progress').textContent = '10%';
+
+                // 画像前処理
+                const processedImage = await preprocessImage(imageData);
+
+                document.getElementById('processing-status').textContent = 'OCRエンジン初期化中...';
+                document.getElementById('processing-progress').style.width = '30%';
+                document.getElementById('processing-progress').textContent = '30%';
+
+                const worker = await Tesseract.createWorker(['jpn', 'eng'], 1, {
+                    logger: (m) => {
+                        if (m.status === 'recognizing text') {
+                            const progress = 30 + Math.round(m.progress * 60);
+                            document.getElementById('processing-progress').style.width = progress + '%';
+                            document.getElementById('processing-progress').textContent = progress + '%';
+                        }
+                    }
+                });
+
+                await worker.setParameters({
+                    tessedit_pageseg_mode: Tesseract.PSM.AUTO
+                });
+
+                const { data: { text, confidence } } = await worker.recognize(processedImage);
+                await worker.terminate();
+
+                document.getElementById('processing-progress').style.width = '100%';
+                document.getElementById('processing-progress').textContent = '100%';
+
+                // 結果表示
+                displayOCRResult(type, text, confidence, imageData);
+
+                // 両方完了していれば照合実行
+                if (ocrResults.order && ocrResults.delivery) {
+                    compareDocuments();
+                }
+
+            } catch (error) {
+                console.error('OCRエラー:', error);
+                alert('OCR処理でエラーが発生しました: ' + error.message);
+            } finally {
+                overlay.classList.add('d-none');
+            }
+        }
+
+        // 画像前処理
+        async function preprocessImage(imageData) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    const scale = 2;
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageDataObj.data;
+
+                    for (let i = 0; i < data.length; i += 4) {
+                        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                        const threshold = 128;
+                        const contrast = 1.5;
+                        let value = ((gray - threshold) * contrast) + threshold;
+                        value = Math.max(0, Math.min(255, value));
+                        data[i] = data[i + 1] = data[i + 2] = value;
+                    }
+
+                    ctx.putImageData(imageDataObj, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = imageData;
+            });
+        }
+
+        // OCR結果表示
+        function displayOCRResult(type, text, confidence, imageData) {
+            const extracted = extractDocumentData(text);
+
+            document.getElementById(`${type}-doc-number`).value = extracted.documentNumber || '';
+            document.getElementById(`${type}-amount`).value = extracted.amount || '';
+            document.getElementById(`${type}-date`).value = extracted.date || '';
+
+            const confidencePercent = Math.round(confidence);
+            const bar = document.getElementById(`${type}-confidence-bar`);
+            bar.style.width = confidencePercent + '%';
+            bar.textContent = confidencePercent + '%';
+
+            document.getElementById(`${type}-result`).classList.remove('d-none');
+
+            ocrResults[type] = {
+                text: text,
+                confidence: confidence,
+                imageData: imageData,
+                documentNumber: extracted.documentNumber,
+                amount: extracted.amount,
+                date: extracted.date
+            };
+        }
+
+        // データ抽出
+        function extractDocumentData(text) {
+            const result = {
+                documentNumber: null,
+                amount: null,
+                date: null
+            };
+
+            // 伝票番号
+            const docPatterns = [
+                /(?:NO\.?|番号[:：]?|注文番号[:：]?|発注番号[:：]?|納品番号[:：]?)\s*([A-Z0-9\-]+)/i,
+                /([A-Z]{2,}\d{4,})/
+            ];
+            for (const pattern of docPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.documentNumber = match[1].trim();
+                    break;
+                }
+            }
+
+            // 金額
+            const amountPatterns = [
+                /[¥￥]?\s*([\d,]+)\s*円/,
+                /金額[:：]?\s*[¥￥]?\s*([\d,]+)/,
+                /合計[:：]?\s*[¥￥]?\s*([\d,]+)/
+            ];
+            for (const pattern of amountPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.amount = match[1].replace(/,/g, '');
+                    break;
+                }
+            }
+
+            // 日付
+            const datePatterns = [
+                /(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})/,
+                /(\d{4})\.(\d{1,2})\.(\d{1,2})/
+            ];
+            for (const pattern of datePatterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    result.date = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+                    break;
+                }
+            }
+
+            return result;
+        }
+
+        // 伝票照合
+        function compareDocuments() {
+            const order = ocrResults.order;
+            const delivery = ocrResults.delivery;
+
+            const comparison = {
+                product: selectedProduct,
+                order: order,
+                delivery: delivery,
+                matches: {
+                    documentNumber: order.documentNumber === delivery.documentNumber,
+                    amount: order.amount === delivery.amount,
+                    date: order.date === delivery.date
+                },
+                status: 'checked',
+                timestamp: new Date().toISOString()
+            };
+
+            // 全て一致していればOK、いずれか不一致なら警告
+            if (comparison.matches.documentNumber && comparison.matches.amount) {
+                comparison.status = 'checked';
+            } else if (comparison.matches.documentNumber || comparison.matches.amount) {
+                comparison.status = 'warning';
+            } else {
+                comparison.status = 'error';
+            }
+
+            displayComparison(comparison);
+
+            document.getElementById('comparison-section').style.display = 'block';
+            document.getElementById('comparison-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 照合結果表示
+        function displayComparison(comparison) {
+            const statusInfo = {
+                checked: { icon: '✅', text: '照合OK', class: 'success' },
+                warning: { icon: '⚠️', text: '要確認', class: 'warning' },
+                error: { icon: '❌', text: '不一致', class: 'danger' }
+            };
+
+            const status = statusInfo[comparison.status];
+
+            const html = `
+                <div class="alert alert-${status.class} mb-3">
+                    <h5 class="mb-2">${status.icon} ${status.text}</h5>
+                    <p class="mb-0">製品: <strong>${comparison.product.product_name}</strong> (${comparison.product.product_code})</p>
+                </div>
+
+                <table class="table comparison-table">
+                    <thead>
+                        <tr>
+                            <th>項目</th>
+                            <th>発注伝票</th>
+                            <th>納品伝票</th>
+                            <th>照合</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="${comparison.matches.documentNumber ? 'match' : 'mismatch'}">
+                            <td><strong>伝票番号</strong></td>
+                            <td>${comparison.order.documentNumber || '-'}</td>
+                            <td>${comparison.delivery.documentNumber || '-'}</td>
+                            <td>${comparison.matches.documentNumber ? '✅ 一致' : '❌ 不一致'}</td>
+                        </tr>
+                        <tr class="${comparison.matches.amount ? 'match' : 'mismatch'}">
+                            <td><strong>金額</strong></td>
+                            <td>¥${comparison.order.amount ? parseInt(comparison.order.amount).toLocaleString() : '-'}</td>
+                            <td>¥${comparison.delivery.amount ? parseInt(comparison.delivery.amount).toLocaleString() : '-'}</td>
+                            <td>${comparison.matches.amount ? '✅ 一致' : '❌ 不一致'}</td>
+                        </tr>
+                        <tr class="${comparison.matches.date ? 'match' : 'mismatch'}">
+                            <td><strong>日付</strong></td>
+                            <td>${comparison.order.date || '-'}</td>
+                            <td>${comparison.delivery.date || '-'}</td>
+                            <td>${comparison.matches.date ? '✅ 一致' : '⚠️ 参考'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('comparison-result').innerHTML = html;
+
+            // グローバルに保存（保存用）
+            window.currentComparison = comparison;
+        }
+
+        // 検査結果保存
+        function saveCheckResult() {
+            if (!window.currentComparison) {
+                alert('保存するデータがありません');
+                return;
+            }
+
+            checkedProducts.push(window.currentComparison);
+            localStorage.setItem('checkedProducts', JSON.stringify(checkedProducts));
+
+            updateCheckedProductsList();
+
+            alert('検査結果を保存しました');
+            resetCheck();
+        }
+
+        // チェック済みリスト更新
+        function updateCheckedProductsList() {
+            const container = document.getElementById('checked-products-list');
+
+            if (checkedProducts.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-4">まだチェック済みの製品がありません</div>';
+                return;
+            }
+
+            container.innerHTML = checkedProducts.map((check, index) => {
+                const statusClass = check.status === 'checked' ? 'checked' : (check.status === 'warning' ? 'warning' : 'error');
+                const statusIcon = check.status === 'checked' ? '✅' : (check.status === 'warning' ? '⚠️' : '❌');
+                const statusText = check.status === 'checked' ? '照合OK' : (check.status === 'warning' ? '要確認' : '不一致');
+
+                return `
+                    <div class="card product-card ${statusClass} mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-2">${statusIcon} ${check.product.product_name} (${check.product.product_code})</h6>
+                                    <p class="small mb-1 text-muted">${new Date(check.timestamp).toLocaleString('ja-JP')}</p>
+                                    <div class="small">
+                                        <span class="badge badge-custom bg-primary">発注: ${check.order.documentNumber || '-'}</span>
+                                        <span class="badge badge-custom bg-success">納品: ${check.delivery.documentNumber || '-'}</span>
+                                        <span class="badge badge-custom ${check.status === 'checked' ? 'bg-success' : (check.status === 'warning' ? 'bg-warning' : 'bg-danger')}">${statusText}</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCheck(${index})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // チェック済みデータ読み込み
+        function loadCheckedProducts() {
+            const saved = localStorage.getItem('checkedProducts');
+            if (saved) {
+                checkedProducts = JSON.parse(saved);
+                updateCheckedProductsList();
+            }
+        }
+
+        // チェック削除
+        function deleteCheck(index) {
+            if (!confirm('この検査結果を削除しますか？')) return;
+
+            checkedProducts.splice(index, 1);
+            localStorage.setItem('checkedProducts', JSON.stringify(checkedProducts));
+            updateCheckedProductsList();
+        }
+
+        // すべてクリア
+        function clearAllChecks() {
+            if (!confirm('すべての検査結果を削除しますか？')) return;
+
+            checkedProducts = [];
+            localStorage.removeItem('checkedProducts');
+            updateCheckedProductsList();
+        }
+
+        // チェックリセット
+        function resetCheck() {
+            selectedProduct = null;
+            ocrResults = { order: null, delivery: null };
+            window.currentComparison = null;
+
+            document.getElementById('product-select').value = '';
+            document.getElementById('start-check-btn').disabled = true;
+            document.getElementById('check-section').classList.add('d-none');
+            document.getElementById('comparison-section').style.display = 'none';
+
+            // プレビュー画像リセット
+            ['order', 'delivery'].forEach(type => {
+                document.getElementById(`${type}-preview-img`).classList.add('d-none');
+                document.getElementById(`${type}-placeholder`).style.display = 'block';
+                document.getElementById(`${type}-result`).classList.add('d-none');
+            });
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

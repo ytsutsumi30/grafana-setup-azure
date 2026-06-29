@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QrScanner - 出荷検品システム</title>
+    
+    <!-- バージョン情報 -->
+    <meta name="version" content="3.0.0">
+    <meta name="build-date" content="2025-10-24">
+    <meta name="library" content="html5-qrcode">
+    
+    <!-- キャッシュ制御メタタグ（iOS Safari対応） -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .inspection-header {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .qr-scanner-area {
+            border: 2px dashed #0d6efd;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+            background-color: #000;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .qr-video-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .qr-video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0.5rem;
+        }
+        .qr-scan-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 2px solid rgba(96, 165, 250, 0.8);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .qr-scan-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #60a5fa;
+        }
+        .qr-scan-corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+        .qr-scan-corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+        .qr-scan-corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+        .qr-scan-corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+        @keyframes scan-line {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+        .qr-scan-line {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+            animation: scan-line 2s ease-in-out infinite;
+            z-index: 11;
+        }
+        .qr-status-overlay {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            z-index: 12;
+            max-width: 90%;
+            text-align: center;
+        }
+        
+        /* safari.html統合: デバッグ情報スタイル */
+        .debug-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            max-width: 280px;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.4;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 20;
+        }
+        .debug-info .debug-title {
+            color: #ffff00;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        .debug-info .debug-section {
+            margin-bottom: 8px;
+        }
+        .debug-info .debug-label {
+            color: #00ccff;
+            display: inline-block;
+            min-width: 100px;
+        }
+        .debug-info .debug-value {
+            color: #00ff00;
+        }
+        
+        /* safari.html統合: キャリブレーション表示 */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .calibrating {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        /* safari.html統合: スキャン中アニメーション */
+        @keyframes scanning {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
+        .scanning-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(180deg, transparent 0%, transparent 45%, #60a5fa 50%, transparent 55%, transparent 100%);
+            background-size: 100% 200%;
+            animation: scanning 2s linear infinite;
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 11;
+        }
+        .qr-item-card {
+            border-left: 4px solid #ffc107;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        .qr-item-card.scanned {
+            border-left-color: #198754;
+            background-color: #d1e7dd;
+        }
+        .qr-status-icon {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+        .qr-pending { color: #ffc107; }
+        .qr-scanned { color: #198754; }
+        .action-buttons {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 1rem;
+            border-top: 2px solid #dee2e6;
+            box-shadow: 0 -0.5rem 1rem rgba(0,0,0,0.1);
+            z-index: 999;
+        }
+        .progress-card {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <div class="inspection-header">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1 class="h4 mb-0">
+                        <i class="fas fa-qrcode me-2"></i>QR同梱物検品
+                    </h1>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-light btn-sm" onclick="window.close()">
+                        <i class="fas fa-times me-1"></i>閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid py-4">
+        <div class="row justify-content-center">
+            <!-- QRスキャナーエリア -->
+            <div class="col-lg-8 col-xl-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-camera me-2"></i>QRコードスキャン
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- スキャナーエリア -->
+                        <div id="qr-inspection-content">
+                            <!-- QRスキャナーUIがここに動的に生成されます -->
+                        </div>
+
+                        <!-- 操作ボタン -->
+                        <div class="mt-3 d-grid gap-2">
+                            <button type="button" class="btn btn-primary btn-lg" id="btn-start-qr-scan">
+                                <i class="fas fa-camera me-2"></i>QRスキャン開始
+                            </button>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-secondary" id="btn-manual-input">
+                                    <i class="fas fa-keyboard me-1"></i>手動入力
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- ステータス表示 -->
+                        <div id="qr-status-message" class="mt-3 alert alert-info" style="display: none;">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <span id="qr-status-text">準備完了</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- フッターボタン -->
+    <div class="action-buttons">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col">
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">
+                        <i class="fas fa-times me-2"></i>閉じる
+                    </button>
+                    <small class="text-muted ms-2" id="version-info">
+                        v<span id="app-version">3.0.0</span> 
+                        (<span id="build-date">2025-10-24</span>)
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- html5-qrcode ライブラリ（バーコード・QRコード対応） -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    
+    <script>
+    /**
+     * QR同梱物検品システム - html5-qrcode統合版
+     * バーコード（1次元）とQRコード（2次元）の両方に対応
+     */
+    
+    class Html5QRCodeInspection {
+        constructor() {
+            // バージョン情報
+            this.version = '3.0.0';
+            this.buildDate = '2025-10-24';
+            this.gitCommit = 'html5-qrcode';
+            
+            // html5-qrcode スキャナー
+            this.html5QrCode = null;
+            this.isScanning = false;
+            this.lastScannedCode = '';
+            this.lastScannedTime = 0;
+            this.scanDedupDelay = 1000; // 1秒以内の重複スキャンを無視
+            
+            // 検品システム固有プロパティ
+            this.inspectorName = '';
+            this.scannedItems = new Set();
+            this.targetItems = [];
+            
+            this.init();
+        }
+        
+        init() {
+            this.logVersionInfo();
+            this.initElements();
+            this.initEventListeners();
+            this.initPageLifecycleHandling();
+        }
+        
+        // バージョン情報をログ出力
+        logVersionInfo() {
+            console.log('%c╔════════════════════════════════════════════╗', 'color: #00a8ff; font-weight: bold;');
+            console.log('%c║  QR同梱物検品システム                      ║', 'color: #00a8ff; font-weight: bold;');
+            console.log('%c║  html5-qrcode統合版                        ║', 'color: #00a8ff; font-weight: bold;');
+            console.log('%c║  バーコード・QRコード対応                  ║', 'color: #00a8ff; font-weight: bold;');
+            console.log('%c╠════════════════════════════════════════════╣', 'color: #00a8ff; font-weight: bold;');
+            console.log('%c║  Version:    ' + this.version.padEnd(30) + '║', 'color: #0be881;');
+            console.log('%c║  Build Date: ' + this.buildDate.padEnd(30) + '║', 'color: #0be881;');
+            console.log('%c║  Library:    html5-qrcode' + ''.padEnd(19) + '║', 'color: #0be881;');
+            console.log('%c║  User Agent: ' + navigator.userAgent.substring(0, 28).padEnd(30) + '║', 'color: #ffd32a;');
+            console.log('%c╚════════════════════════════════════════════╝', 'color: #00a8ff; font-weight: bold;');
+            
+            // グローバルに公開（デバッグ用）
+            window.QR_INSPECTION_VERSION = {
+                version: this.version,
+                buildDate: this.buildDate,
+                library: 'html5-qrcode',
+                timestamp: new Date().toISOString()
+            };
+        }
+        
+        initElements() {
+            // ボタン要素
+            this.btnStartScan = document.getElementById('btn-start-qr-scan');
+            this.btnManualInput = document.getElementById('btn-manual-input');
+            
+            // 表示エリア
+            this.inspectionContent = document.getElementById('qr-inspection-content');
+            this.statusMessage = document.getElementById('qr-status-message');
+            this.statusText = document.getElementById('qr-status-text');
+        }
+        
+        initEventListeners() {
+            this.btnStartScan.addEventListener('click', () => this.handleStartScan());
+            this.btnManualInput.addEventListener('click', () => this.handleManualInput());
+        }
+        
+        // ページライフサイクル対応
+        initPageLifecycleHandling() {
+            // ページアンロード時にスキャンを停止
+            window.addEventListener('beforeunload', () => {
+                if (this.html5QrCode && this.isScanning) {
+                    try {
+                        this.html5QrCode.stop().catch(err => {
+                            console.warn('[Cleanup] Stop error:', err);
+                        });
+                    } catch (error) {
+                        console.warn('[Cleanup] Error:', error);
+                    }
+                }
+            });
+            
+            // Page Visibility API
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && this.isScanning) {
+                    console.log('[Visibility] Page hidden - pausing');
+                } else if (!document.hidden && this.isScanning) {
+                    console.log('[Visibility] Page visible - resuming');
+                }
+            });
+        }
+        
+        async handleStartScan() {
+            console.log('[Start] Starting scan');
+            
+            try {
+                await this.startScan();
+            } catch (error) {
+                this.handleError(error);
+            }
+        }
+        
+        // html5-qrcode スキャン開始（iPad Safari最適化版）
+        async startScan() {
+            if (this.isScanning) {
+                console.warn('[Start] Already scanning');
+                return;
+            }
+            
+            // カメラUI作成
+            this.createCameraUI();
+            
+            // html5-qrcode インスタンス作成
+            this.html5QrCode = new Html5Qrcode("qr-reader-container");
+            
+            // スキャン成功コールバック
+            const onScanSuccess = (decodedText, decodedResult) => {
+                const currentTime = Date.now();
+                
+                // 重複スキャン防止（1秒以内の同一コードは無視）
+                if (decodedText === this.lastScannedCode && 
+                    currentTime - this.lastScannedTime < this.scanDedupDelay) {
+                    return;
+                }
+                
+                this.lastScannedCode = decodedText;
+                this.lastScannedTime = currentTime;
+                
+                const codeType = decodedResult.result.format.formatName;
+                console.log(`[Scan] Detected ${codeType}:`, decodedText);
+                
+                this.handleQRResult(decodedText, codeType);
+            };
+            
+            // iPad Safari最適化スキャン設定
+            const config = {
+                fps: 10,  // iPad: 10回/秒に向上（高速スキャン）
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,  // 1:1比率（QR/バーコード最適）
+                disableFlip: false,  // カメラミラーリング無効化
+                videoConstraints: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1920, min: 640 },
+                    height: { ideal: 1080, min: 480 }
+                },
+                formatsToSupport: [
+                    // 1次元バーコード
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.ITF,
+                    // 2次元コード
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.DATA_MATRIX,
+                    Html5QrcodeSupportedFormats.AZTEC,
+                    Html5QrcodeSupportedFormats.PDF_417
+                ]
+            };
+            
+            try {
+                console.log('[QR Scanner] Starting camera with config:', config);
+                
+                // iPad Safari: より柔軟なカメラ起動
+                await this.html5QrCode.start(
+                    { facingMode: { ideal: "environment" } },  // idealで柔軟に
+                    config,
+                    onScanSuccess
+                );
+                
+                this.isScanning = true;
+                this.showStatus('スキャン開始しました（iPad Safari対応）', 'success');
+                console.log('[QR Scanner] Scanning started successfully on iPad Safari');
+                
+                // ボタンを停止に変更
+                this.btnStartScan.innerHTML = '<i class="fas fa-stop me-2"></i>スキャン停止';
+                this.btnStartScan.classList.remove('btn-primary');
+                this.btnStartScan.classList.add('btn-danger');
+                this.btnStartScan.onclick = () => this.stopScan();
+                
+            } catch (error) {
+                console.error('[QR Scanner] Failed to start scan:', error);
+                this.handleError(error);
+                // UI をクリーンアップ
+                this.inspectionContent.innerHTML = '<div class="text-center text-muted py-5"><p>カメラの起動に失敗しました</p></div>';
+            }
+        }
+        
+        createCameraUI() {
+            this.inspectionContent.innerHTML = `
+                <div id="qr-reader-container" style="width: 100%; border-radius: 0.5rem; overflow: hidden;"></div>
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>バーコード・QRコード対応</strong><br>
+                        <small>CODE-128, EAN-13, UPC, QRコードなど12種類に対応</small>
+                    </div>
+                </div>
+            `;
+        }
+
+        
+        // QR/バーコード検出結果処理（URL遷移専用）
+        handleQRResult(data, codeType = 'Unknown') {
+            if (!this.isScanning) return;
+            
+            console.log(`[Scan] Detected ${codeType}:`, data);
+            
+            // URL判定（http:// または https:// で始まる）
+            const isURL = /^(https?:\/\/)/.test(data.trim());
+            
+            if (isURL) {
+                // URLの場合は画面遷移
+                console.log(`[URL Detected] Redirecting to:`, data);
+                this.showStatus(`URLを検出しました。遷移します...`, 'success');
+                this.playBeep('success');
+                
+                // スキャンを停止
+                this.stopScan();
+                
+                // 少し待ってから遷移（ユーザーに通知を見せる）
+                setTimeout(() => {
+                    window.location.href = data;
+                }, 1000);
+            } else {
+                // 非URLの場合は情報表示のみ
+                this.showStatus(`読み取り結果 (${codeType}): ${data}`, 'info');
+                this.playBeep('success');
+            }
+        }
+        
+        stopScan() {
+            if (!this.isScanning) return;
+            
+            console.log('[Stop] Stopping scan...');
+            this.isScanning = false;
+            
+            // html5-qrcode スキャン停止
+            if (this.html5QrCode) {
+                this.html5QrCode.stop()
+                    .then(() => {
+                        console.log('[Stop] Scanner stopped successfully');
+                        this.html5QrCode = null;
+                    })
+                    .catch(err => {
+                        console.error('[Stop] Error stopping scanner:', err);
+                    });
+            }
+            
+            // UIリセット
+            this.inspectionContent.innerHTML = '<div class="text-center text-muted py-5"><p>スキャナーは停止しました</p></div>';
+            
+            // ボタンを開始状態に戻す
+            this.btnStartScan.innerHTML = '<i class="fas fa-camera me-2"></i>QRスキャン開始';
+            this.btnStartScan.classList.remove('btn-danger');
+            this.btnStartScan.classList.add('btn-primary');
+            this.btnStartScan.onclick = null;
+            this.btnStartScan.addEventListener('click', () => this.handleStartScan(), { once: true });
+            
+            this.showStatus('スキャンを停止しました', 'info');
+        }
+        
+        handleError(error) {
+            let message = 'カメラにアクセスできませんでした。';
+            
+            if (error.name) {
+                switch (error.name) {
+                    case 'NotAllowedError':
+                        message = 'カメラの使用が拒否されました。\n\niPad Safari: 設定 > Safari > カメラ から許可してください。';
+                        break;
+                    case 'NotFoundError':
+                        message = 'カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。';
+                        break;
+                    case 'NotSupportedError':
+                        message = 'このブラウザではカメラ機能がサポートされていません。Safari 11以降をご利用ください。';
+                        break;
+                    case 'NotReadableError':
+                        message = 'カメラが他のアプリケーションで使用中です。他のアプリを閉じてから再試行してください。';
+                        break;
+                    case 'SecurityError':
+                        message = 'セキュリティ制限によりカメラにアクセスできません。HTTPS環境が必要です。\n\n現在のURL: ' + window.location.href;
+                        break;
+                    case 'OverconstrainedError':
+                        message = 'カメラの制約が厳しすぎます。iPad Safariでは自動調整されます。再試行してください。';
+                        break;
+                }
+            } else if (error.message) {
+                message = error.message;
+            }
+
+            this.showStatus(message, 'danger');
+            console.error('[Error]', error);
+            
+            alert(message);
+        }
+        
+        handleManualInput() {
+            const input = prompt('コードを手入力してください (バーコード/QRコード):');
+            if (input && input.trim()) {
+                this.handleQRResult(input.trim(), 'Manual');
+            }
+        }
+        
+        showStatus(message, type = 'info') {
+            this.statusText.textContent = message;
+            this.statusMessage.className = `mt-3 alert alert-${type}`;
+            this.statusMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                this.statusMessage.style.display = 'none';
+            }, 3000);
+        }
+        
+        playBeep(type = 'success') {
+            // ビープ音（オプション）
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = type === 'success' ? 800 : 400;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            } catch (error) {
+                console.warn('Audio playback error:', error);
+            }
+        }
+    }
+    
+    // アプリケーション初期化
+    document.addEventListener('DOMContentLoaded', () => {
+        window.qrInspectionApp = new Html5QRCodeInspection();
+    });
+    </script>
+</body>
+</html>

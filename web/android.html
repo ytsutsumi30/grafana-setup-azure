@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRコードスキャナー - Android/Chrome最適化版</title>
+    
+    <!-- キャッシュ対策 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    <style>
+        .scan-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            border: 2px dashed rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            pointer-events: none;
+        }
+        
+        .scan-corners {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            pointer-events: none;
+        }
+        
+        .corner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #60a5fa;
+        }
+        
+        .corner-tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+        .corner-tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+        .corner-bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+        .corner-br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+        
+        @keyframes scanning {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .scanning-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            background: linear-gradient(180deg, transparent 0%, transparent 45%, #60a5fa 50%, transparent 55%, transparent 100%);
+            background-size: 100% 200%;
+            animation: scanning 2s linear infinite;
+            border-radius: 12px;
+            pointer-events: none;
+        }
+        
+        .calibrating {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+        
+        .permission-guide {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        }
+        
+        .debug-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            max-width: 280px;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.4;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .debug-info .debug-title {
+            color: #ffff00;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        
+        .debug-info .debug-section {
+            margin-bottom: 8px;
+        }
+        
+        .debug-info .debug-label {
+            color: #00ccff;
+            display: inline-block;
+            min-width: 100px;
+        }
+        
+        .debug-info .debug-value {
+            color: #00ff00;
+        }
+        
+        /* ステータスメッセージスタイル (itemqr.html統合) */
+        #qr-status-message {
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        #qr-status-message.info {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #60a5fa;
+        }
+        
+        #qr-status-message.success {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #34d399;
+        }
+        
+        #qr-status-message.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #f87171;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- ヘッダー -->
+        <div class="bg-white shadow-sm border-b border-gray-200">
+            <div class="px-4 py-4">
+                <h1 class="text-xl font-bold text-gray-900 text-center flex items-center justify-center gap-2">
+                    <span class="text-2xl">📱</span>
+                    QRスキャナー - Android/Chrome最適化版
+                </h1>
+                <div class="text-xs text-gray-500 text-center mt-1">
+                    <span id="build-version">構築日時: 2025-10-18 03:30 JST</span> | 
+                    <span id="page-loaded">読込: <span id="load-time"></span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 p-4 space-y-4">
+            <!-- 初期画面 -->
+            <div id="initial-screen" class="text-center py-8">
+                <div class="bg-white rounded-xl shadow-sm p-8 mb-6">
+                    <div class="text-6xl mb-4">📷</div>
+                    <h2 class="text-xl font-semibold mb-3 text-gray-900">QRコードをスキャン</h2>
+                    <p class="text-gray-600 mb-6 max-w-sm mx-auto">
+                        Android/Chrome向けに最適化された高速QRスキャナー
+                    </p>
+                    <button id="start-scan" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        📷 スキャン開始
+                    </button>
+                </div>
+                
+                <!-- Android/Chrome 推奨事項 -->
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm p-6 text-left max-w-md mx-auto">
+                    <h3 class="font-semibold text-emerald-800 mb-3">🤖 Android/Chrome 推奨設定</h3>
+                    <ul class="text-sm text-emerald-700 space-y-1">
+                        <li>• ブラウザのカメラ許可を「許可」に設定</li>
+                        <li>• 明るい場所でQRコードを画面中央に合わせる</li>
+                        <li>• 画面回転ロックをONにすると安定します</li>
+                        <li>• 失敗時は「再調整」ボタンを押してください</li>
+                    </ul>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カメラ画面 -->
+            <div id="camera-screen" class="hidden">
+                <div class="video-container mb-4">
+                    <video id="camera-video" class="w-full h-full object-cover" playsinline muted webkit-playsinline></video>
+                    <div class="scan-guide"></div>
+                    <div class="scan-corners">
+                        <div class="corner corner-tl"></div>
+                        <div class="corner corner-tr"></div>
+                        <div class="corner corner-bl"></div>
+                        <div class="corner corner-br"></div>
+                    </div>
+                    <div id="scanning-animation" class="scanning-line hidden"></div>
+                    
+                    <!-- キャリブレーション表示 -->
+                    <div id="calibration-indicator" class="hidden absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                        <div class="bg-white rounded-lg p-6 text-center calibrating">
+                            <div class="text-4xl mb-2">⚙️</div>
+                            <div class="text-lg font-semibold mb-1">キャリブレーション中</div>
+                            <div class="text-sm text-gray-600">カメラを調整しています...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- デバッグ情報（Phase 2拡張版） -->
+                    <div id="debug-info" class="debug-info hidden">
+                        <div class="debug-title">🐛 Debug Info</div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">📹 Camera:</div>
+                            <div class="debug-value" id="debug-camera">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">📐 Resolution:</div>
+                            <div class="debug-value" id="debug-resolution">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">🎬 ReadyState:</div>
+                            <div class="debug-value" id="debug-ready">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">📡 Stream:</div>
+                            <div class="debug-value" id="debug-stream">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">🔍 Detection:</div>
+                            <div class="debug-value" id="debug-detection">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">🔢 Frames:</div>
+                            <div class="debug-value" id="debug-frames">0</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">📊 Scan Rate:</div>
+                            <div class="debug-value" id="debug-scanrate">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">⚡ Method:</div>
+                            <div class="debug-value" id="debug-method">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">🤖 Platform:</div>
+                            <div class="debug-value" id="debug-platform">-</div>
+                        </div>
+                        
+                        <div class="debug-section">
+                            <div class="debug-label">⏱️ Uptime:</div>
+                            <div class="debug-value" id="debug-uptime">0s</div>
+                        </div>
+                    </div>
+                    
+                    <!-- ステータス表示 -->
+                    <div id="scan-status" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-full text-sm font-medium">
+                        初期化中...
+                    </div>
+                </div>
+                
+                <!-- ステータスメッセージ（itemqr.html統合） -->
+                <div id="qr-status-message" class="hidden mb-4 p-3 rounded-lg text-center font-medium"></div>
+                
+                <div class="text-center space-y-4">
+                    <p class="text-gray-600">QRコードを画面中央の枠内に合わせてください</p>
+                    <div class="flex gap-3 justify-center flex-wrap">
+                        <button id="calibrate-camera" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors">
+                            ⚙️ 再調整
+                        </button>
+                        <button id="switch-camera" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors">
+                            🔄 カメラ切替
+                        </button>
+                        <button id="manual-input" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                            ✍️ 手動入力
+                        </button>
+                        <button id="toggle-debug" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                            🐛 Debug
+                        </button>
+                        <button id="stop-scan" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            ⏹️ 停止
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 結果画面 -->
+            <div id="result-screen" class="hidden text-center">
+                <div class="bg-white rounded-xl shadow-sm p-8 mb-6">
+                    <div class="text-6xl mb-4">✅</div>
+                    <h2 class="text-xl font-semibold mb-4 text-gray-900">スキャン完了</h2>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <h3 class="font-medium text-gray-700 mb-3">📄 読み取り結果</h3>
+                        <div class="bg-white border rounded-lg p-4 text-left">
+                            <pre id="scan-result" class="whitespace-pre-wrap text-sm text-gray-800 break-all max-h-40 overflow-y-auto"></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <button id="copy-result" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors w-full font-medium">
+                            📋 クリップボードにコピー
+                        </button>
+                        <div class="flex gap-3">
+                            <button id="rescan" class="bg-gray-600 text-white px-4 py-3 rounded-xl hover:bg-gray-700 transition-colors flex-1">
+                                🔄 再スキャン
+                            </button>
+                            <button id="share-result" class="bg-green-600 text-white px-4 py-3 rounded-xl hover:bg-green-700 transition-colors flex-1">
+                                📤 共有
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- エラー画面 -->
+            <div id="error-screen" class="hidden text-center">
+                <div class="bg-white rounded-xl shadow-sm p-8 mb-6">
+                    <div class="text-6xl mb-4">❌</div>
+                    <h2 class="text-xl font-semibold mb-3 text-gray-900">アクセスエラー</h2>
+                    <p id="error-message" class="text-red-600 mb-6"></p>
+                    
+                    <div class="permission-guide rounded-xl p-6 text-left mb-6">
+                        <h3 class="font-semibold text-blue-900 mb-3">🔧 解決方法（Android/Chrome）</h3>
+                        <ol class="text-sm text-blue-800 space-y-2">
+                            <li><strong>1.</strong> Chromeブラウザの右上メニュー（︙）を開く</li>
+                            <li><strong>2.</strong> 「設定」→「サイトの設定」を選択</li>
+                            <li><strong>3.</strong> 「カメラ」を開き、このサイトを「許可」に変更</li>
+                            <li><strong>4.</strong> ページを再読み込みして再度スキャン開始</li>
+                            <li><strong>5.</strong> それでも失敗する場合はブラウザを再起動</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <button id="retry" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors w-full">
+                            🔄 再試行
+                        </button>
+                        <button onclick="window.location.reload()" class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors w-full">
+                            ♻️ ページ再読み込み
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="bg-white border-t border-gray-200 p-4 text-center">
+            <p class="text-sm text-gray-500 mb-1">🔒 HTTPS環境で安全に動作</p>
+            <p class="text-xs text-gray-400">Android/Chrome最適化版 v2.0</p>
+        </div>
+    </div>
+
+    <script>
+    class AndroidChromeQRScanner {
+            constructor() {
+                this.video = document.getElementById('camera-video');
+                this.stream = null;
+                this.isScanning = false;
+                this.qrScanner = null;
+                this.currentCamera = 'environment';
+                this.cameras = [];
+                this.cameraIndex = 0;  // Phase 2: カメラ切り替え用
+                this.calibrationAttempts = 0;
+                this.maxCalibrationAttempts = 3;
+                this.frameCount = 0;
+                this.lastDetectionAttempt = 0;
+                this.isCalibrating = false;
+                this.debugMode = false;
+                this.lastQRValue = '';  // itemqr.html統合: 最後のQR値を保持
+                this.scanStartTime = 0;  // Phase 2: パフォーマンス計測
+                this.detectionMethod = 'none';  // Phase 2: 使用中の検出方法
+                this.platform = this.detectPlatform();
+                
+                this.initElements();
+                this.initEventListeners();
+                this.initPageLifecycleHandling();
+                this.detectCameras();
+            }
+
+            detectPlatform() {
+                const ua = navigator.userAgent || '';
+                const isAndroid = /Android/i.test(ua);
+                const isChrome = /Chrome|CriOS|EdgA/i.test(ua);
+                const labelParts = [];
+                if (isAndroid) labelParts.push('Android');
+                if (isChrome) labelParts.push('Chrome');
+                return {
+                    isAndroid,
+                    isChrome,
+                    label: labelParts.length ? labelParts.join(' + ') : 'Other'
+                };
+            }
+
+            initElements() {
+                this.initialScreen = document.getElementById('initial-screen');
+                this.cameraScreen = document.getElementById('camera-screen');
+                this.resultScreen = document.getElementById('result-screen');
+                this.errorScreen = document.getElementById('error-screen');
+                this.scanStatus = document.getElementById('scan-status');
+                this.scanResult = document.getElementById('scan-result');
+                this.errorMessage = document.getElementById('error-message');
+                this.scanningAnimation = document.getElementById('scanning-animation');
+                this.calibrationIndicator = document.getElementById('calibration-indicator');
+                this.debugInfo = document.getElementById('debug-info');
+                this.qrStatusMessage = document.getElementById('qr-status-message');  // itemqr.html統合
+                
+                // Phase 2: 拡張デバッグ要素
+                this.debugElements = {
+                    camera: document.getElementById('debug-camera'),
+                    resolution: document.getElementById('debug-resolution'),
+                    ready: document.getElementById('debug-ready'),
+                    stream: document.getElementById('debug-stream'),
+                    detection: document.getElementById('debug-detection'),
+                    frames: document.getElementById('debug-frames'),
+                    scanrate: document.getElementById('debug-scanrate'),
+                    method: document.getElementById('debug-method'),
+                    platform: document.getElementById('debug-platform'),
+                    uptime: document.getElementById('debug-uptime')
+                };
+            }
+
+            initEventListeners() {
+                document.getElementById('start-scan').addEventListener('click', () => this.startScan());
+                document.getElementById('stop-scan').addEventListener('click', () => this.stopScan());
+                document.getElementById('calibrate-camera').addEventListener('click', () => this.calibrateCamera());
+                document.getElementById('switch-camera').addEventListener('click', () => this.switchCamera());  // Phase 2
+                document.getElementById('toggle-debug').addEventListener('click', () => this.toggleDebug());
+                document.getElementById('retry').addEventListener('click', () => this.resetAndStart());
+                document.getElementById('rescan').addEventListener('click', () => this.resetAndStart());
+                document.getElementById('copy-result').addEventListener('click', () => this.copyToClipboard());
+                document.getElementById('share-result').addEventListener('click', () => this.shareResult());
+                document.getElementById('manual-input').addEventListener('click', () => this.manualQRInput());  // itemqr.html統合
+            }
+
+            // ページライフサイクルイベントの処理（モバイルブラウザ向け）
+            initPageLifecycleHandling() {
+                // Page Visibility API
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        if (this.isScanning) {
+                            this.pauseScanning();
+                        }
+                    } else {
+                        if (this.isScanning) {
+                            setTimeout(() => this.resumeScanning(), 500);
+                        }
+                    }
+                });
+
+                // モバイルブラウザ向けのbeforeunload対策
+                window.addEventListener('beforeunload', () => {
+                    this.cleanupResources();
+                });
+
+                // BFCache対応: pagehide/pageshowイベント
+                window.addEventListener('pagehide', (event) => {
+                    // BFCache保存時はストリームをクリーンアップ
+                    console.log('[BFCache] pagehide - persisted:', event.persisted);
+                    this.cleanupResources();
+                    
+                    // スキャン状態を保存
+                    if (this.isScanning) {
+                        sessionStorage.setItem('qr-scanner-was-active', 'true');
+                    }
+                });
+
+                window.addEventListener('pageshow', (event) => {
+                    // BFCacheから復元された場合
+                    if (event.persisted) {
+                        console.log('[BFCache] pageshow - restored from cache');
+                        
+                        // ストリームが残っていれば完全クリーンアップ
+                        this.cleanupResources();
+                        
+                        // 前回スキャン中だった場合は自動再開
+                        const wasActive = sessionStorage.getItem('qr-scanner-was-active');
+                        if (wasActive === 'true') {
+                            sessionStorage.removeItem('qr-scanner-was-active');
+                            setTimeout(() => {
+                                this.resetAndStart();
+                            }, 300);
+                        } else {
+                            // 初期画面に戻す
+                            this.showScreen('initial-screen');
+                        }
+                    }
+                });
+
+                // freeze/resume イベント (Android Chrome対応)
+                window.addEventListener('freeze', () => {
+                    console.log('[BFCache] freeze - cleaning up');
+                    this.cleanupResources();
+                });
+
+                window.addEventListener('resume', () => {
+                    console.log('[BFCache] resume - checking state');
+                    if (this.isScanning) {
+                        this.calibrateCamera();
+                    }
+                });
+            }
+
+            async detectCameras() {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.cameras = devices.filter(device => device.kind === 'videoinput');
+                    
+                    console.log(`[Camera] Detected ${this.cameras.length} camera(s):`, this.cameras);
+                    this.updateDebug('camera', `${this.cameras.length} camera(s)`);
+                    this.updateDebug('detection', `${this.cameras.length} cameras found`);
+                    
+                    // 背面カメラを優先的に選択
+                    const backCameraIndex = this.cameras.findIndex(cam => 
+                        cam.label.toLowerCase().includes('back') || 
+                        cam.label.toLowerCase().includes('rear') ||
+                        cam.label.toLowerCase().includes('environment')
+                    );
+                    
+                    if (backCameraIndex !== -1) {
+                        this.cameraIndex = backCameraIndex;
+                        console.log(`[Camera] Found back camera at index ${backCameraIndex}`);
+                    }
+                } catch (error) {
+                    console.warn('カメラ検出エラー:', error);
+                    this.updateDebug('detection', 'Camera detection failed');
+                }
+            }
+
+            showScreen(screenName) {
+                ['initial-screen', 'camera-screen', 'result-screen', 'error-screen'].forEach(id => {
+                    document.getElementById(id).classList.add('hidden');
+                });
+                document.getElementById(screenName).classList.remove('hidden');
+            }
+
+            updateStatus(message) {
+                this.scanStatus.textContent = message;
+            }
+
+            updateDebug(type, value) {
+                if (this.debugElements[type]) {
+                    this.debugElements[type].textContent = value;
+                }
+            }
+
+            toggleDebug() {
+                this.debugMode = !this.debugMode;
+                this.debugInfo.classList.toggle('hidden', !this.debugMode);
+                
+                if (this.debugMode) {
+                    // プラットフォーム情報を表示
+                    this.updateDebug('platform', this.platform.label);
+                    
+                    // デバッグ情報の定期更新開始
+                    this.startDebugUpdateLoop();
+                } else {
+                    // デバッグループ停止
+                    if (this.debugUpdateInterval) {
+                        clearInterval(this.debugUpdateInterval);
+                        this.debugUpdateInterval = null;
+                    }
+                }
+            }
+
+            // Phase 2: デバッグ情報の定期更新
+            startDebugUpdateLoop() {
+                if (this.debugUpdateInterval) {
+                    clearInterval(this.debugUpdateInterval);
+                }
+                
+                this.debugUpdateInterval = setInterval(() => {
+                    if (!this.debugMode) return;
+                    
+                    // アップタイム計算
+                    if (this.scanStartTime > 0) {
+                        const uptime = Math.floor((Date.now() - this.scanStartTime) / 1000);
+                        this.updateDebug('uptime', `${uptime}s`);
+                    }
+                    
+                    // 解像度情報
+                    if (this.video.videoWidth > 0) {
+                        this.updateDebug('resolution', `${this.video.videoWidth}x${this.video.videoHeight}`);
+                    }
+                    
+                    // スキャンレート情報
+                    const scanRate = this.platform.isAndroid ? 8 : (this.platform.isChrome ? 10 : 6);
+                    this.updateDebug('scanrate', `${scanRate}/sec`);
+                    
+                    // 検出方法
+                    this.updateDebug('method', this.detectionMethod);
+
+                    // プラットフォーム
+                    this.updateDebug('platform', this.platform.label);
+                }, 1000);
+            }
+
+            // Phase 2: カメラ切り替え機能
+            async switchCamera() {
+                if (this.cameras.length <= 1) {
+                    this.showQRStatus('切り替え可能なカメラがありません', 'info');
+                    return;
+                }
+                
+                this.showQRStatus('カメラを切り替えています...', 'info');
+                
+                // 次のカメラへ
+                this.cameraIndex = (this.cameraIndex + 1) % this.cameras.length;
+                
+                // スキャンを停止して再開
+                const wasScanning = this.isScanning;
+                this.cleanupResources();
+                
+                if (wasScanning) {
+                    // 切り替え後に再スタート
+                    setTimeout(async () => {
+                        try {
+                            await this.initializeCamera();
+                            this.showQRStatus(`カメラ ${this.cameraIndex + 1}/${this.cameras.length} に切り替えました`, 'success');
+                        } catch (error) {
+                            this.showQRStatus('カメラ切り替えエラー', 'error');
+                            console.error('Camera switch error:', error);
+                        }
+                    }, 500);
+                }
+            }
+
+            // モバイル最適化: 段階的なカメラ初期化
+            async startScan() {
+                try {
+                    this.calibrationAttempts = 0;
+                    this.frameCount = 0;
+                    this.scanStartTime = Date.now();  // Phase 2: スキャン開始時刻を記録
+                    this.updateStatus('カメラにアクセス中...');
+                    
+                    await this.initializeCamera();
+                    
+                } catch (error) {
+                    this.handleError(error);
+                }
+            }
+
+            async initializeCamera() {
+                // Phase 2: 複数カメラ対応
+                let constraints;
+                
+                if (this.cameras.length > 0 && this.cameras[this.cameraIndex]) {
+                    // 特定のカメラIDで指定
+                    constraints = {
+                        video: {
+                            deviceId: { exact: this.cameras[this.cameraIndex].deviceId },
+                            width: { ideal: 1280, max: 1920 },
+                            height: { ideal: 720, max: 1080 },
+                            frameRate: { ideal: 30, max: 30 }
+                        }
+                    };
+                    console.log(`[Camera] Using camera ${this.cameraIndex}: ${this.cameras[this.cameraIndex].label}`);
+                } else {
+                    // facingModeで指定（フォールバック）
+                    constraints = {
+                        video: {
+                            facingMode: this.currentCamera,
+                            width: { ideal: 1280, max: 1920 },
+                            height: { ideal: 720, max: 1080 },
+                            frameRate: { ideal: 30, max: 30 }
+                        }
+                    };
+                    console.log(`[Camera] Using facingMode: ${this.currentCamera}`);
+                }
+
+                try {
+                    // ストリームを取得
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.video.srcObject = this.stream;
+                    this.updateDebug('stream', 'Connected');
+                    
+                    // カメラ情報を更新
+                    const videoTrack = this.stream.getVideoTracks()[0];
+                    const settings = videoTrack.getSettings();
+                    this.updateDebug('camera', videoTrack.label || 'Unknown');
+                    console.log('[Camera] Settings:', settings);
+
+                    // モバイルブラウザでの互換性確保
+                    this.video.setAttribute('playsinline', true);
+                    this.video.setAttribute('webkit-playsinline', true);
+                    this.video.muted = true;
+
+                    // より確実な初期化待機
+                    await this.waitForVideoReady();
+                    
+                    this.showScreen('camera-screen');
+                    this.isScanning = true;
+                    
+                    // 安定化のためのキャリブレーションを実行
+                    await this.calibrateCamera();
+                    
+                } catch (error) {
+                    console.error('[Camera] Initialization error:', error);
+                    
+                    // Phase 2: カメラフォールバック
+                    if (this.cameras.length > 1 && this.cameraIndex < this.cameras.length - 1) {
+                        console.log('[Camera] Trying next camera...');
+                        this.cameraIndex++;
+                        return this.initializeCamera();
+                    }
+                    
+                    throw error;
+                }
+            }
+
+            // モバイル最適化: より確実なビデオ準備待機
+            async waitForVideoReady() {
+                return new Promise((resolve, reject) => {
+                    let playbackStarted = false;
+
+                    const timeout = setTimeout(() => {
+                        const readyState = this.video.readyState;
+                        console.warn('[Video] Initialization timeout, evaluating readiness...', readyState);
+                        this.updateDebug('ready', readyState);
+
+                        // readyState 2 (HAVE_CURRENT_DATA) まで到達していれば続行
+                        if (readyState >= 2) {
+                            console.warn('[Video] Proceeding with forced playback after timeout');
+                            startPlayback();
+                        } else {
+                            reject(new Error('ビデオ初期化タイムアウト'));
+                        }
+                    }, 8000); // 8秒に短縮（Android向け）
+
+                    const startPlayback = () => {
+                        if (playbackStarted) {
+                            return;
+                        }
+                        playbackStarted = true;
+                        clearTimeout(timeout);
+                        this.video.play()
+                            .then(() => {
+                                console.log('[Video] Playback started successfully');
+                                this.waitForFirstFrame().then(resolve).catch(reject);
+                            })
+                            .catch(error => {
+                                console.warn('[Video] Playback error, continuing anyway:', error);
+                                this.waitForFirstFrame().then(resolve).catch(reject);
+                            });
+                    };
+
+                    const checkReady = () => {
+                        const readyState = this.video.readyState;
+                        this.updateDebug('ready', readyState);
+
+                        // readyState 2以上 AND videoWidth/Heightが存在することを確認（緩和）
+                        if (readyState >= 2 && this.video.videoWidth > 0 && this.video.videoHeight > 0) {
+                            console.log('[Video] Ready:', {
+                                readyState,
+                                size: `${this.video.videoWidth}x${this.video.videoHeight}`
+                            });
+                            startPlayback();
+                        } else {
+                            setTimeout(checkReady, 100);
+                        }
+                    };
+
+                    const onMetadataLoaded = () => {
+                        console.log('[Video] Metadata loaded');
+                        setTimeout(checkReady, 100);
+                    };
+
+                    this.video.addEventListener('loadedmetadata', onMetadataLoaded, { once: true });
+                    checkReady(); // 即座にチェック開始
+                });
+            }
+
+            // 最初のフレームが描画されるまで待機（モバイル最適化）
+            async waitForFirstFrame() {
+                return new Promise((resolve) => {
+                    let attempts = 0;
+                    const maxAttempts = 30; // 3秒間試行（Android向けに短縮）
+
+                    const checkFrame = () => {
+                        attempts++;
+                        
+                        // videoWidth/Heightが有効で、readyStateが2以上（緩和）
+                        if (this.video.readyState >= 2 && this.video.videoWidth > 0 && this.video.videoHeight > 0) {
+                            console.log(`[Video] First frame ready after ${attempts * 100}ms`);
+                            this.updateDebug('resolution', `${this.video.videoWidth}x${this.video.videoHeight}`);
+                            // さらに安定を待つ（短縮）
+                            setTimeout(resolve, 300);
+                        } else if (attempts >= maxAttempts) {
+                            console.warn('[Video] First frame timeout, proceeding anyway');
+                            resolve(); // タイムアウトしても続行
+                        } else {
+                            setTimeout(checkFrame, 100);
+                        }
+                    };
+
+                    // 即座にチェック開始
+                    setTimeout(checkFrame, 100);
+                });
+            }
+
+            // キャリブレーション機能（モバイル最適化の核心）
+            async calibrateCamera() {
+                if (this.isCalibrating || this.calibrationAttempts >= this.maxCalibrationAttempts) {
+                    return this.startQRDetection();
+                }
+
+                this.isCalibrating = true;
+                this.calibrationAttempts++;
+                
+                this.calibrationIndicator.classList.remove('hidden');
+                this.updateStatus(`キャリブレーション中... (${this.calibrationAttempts}/${this.maxCalibrationAttempts})`);
+
+                // Android/Chrome向けに短縮: 初回600ms、以降400ms
+                const calibrationDelay = this.calibrationAttempts === 1 ? 600 : 400;
+                console.log(`[Calibration] Waiting ${calibrationDelay}ms for camera stabilization...`);
+                await new Promise(resolve => setTimeout(resolve, calibrationDelay));
+
+                // ビデオストリームが完全に安定しているか確認（緩和）
+                const isFullyReady = this.video.readyState >= 2 && 
+                                    this.video.videoWidth > 0 && 
+                                    this.video.videoHeight > 0 &&
+                                    !this.video.paused;
+
+                this.calibrationIndicator.classList.add('hidden');
+                this.isCalibrating = false;
+
+                if (isFullyReady) {
+                    console.log(`[Calibration] ✅ Success on attempt ${this.calibrationAttempts} - Video: ${this.video.videoWidth}x${this.video.videoHeight}`);
+                    this.updateDebug('resolution', `${this.video.videoWidth}x${this.video.videoHeight}`);
+                    // すぐに検出開始（待機時間を削減）
+                    setTimeout(() => this.startQRDetection(), 200);
+                } else {
+                    // ビデオがまだ準備できていない場合は再キャリブレーション
+                    console.warn(`[Calibration] ❌ Not ready (readyState: ${this.video.readyState}, size: ${this.video.videoWidth}x${this.video.videoHeight}, paused: ${this.video.paused})`);
+                    if (this.calibrationAttempts < this.maxCalibrationAttempts) {
+                        setTimeout(() => this.calibrateCamera(), 500);
+                    } else {
+                        // 最大試行回数に達した場合でもQR検出を開始
+                        console.warn('[Calibration] ⚠️ Max attempts reached, starting detection anyway');
+                        this.startQRDetection();
+                    }
+                }
+            }
+
+            async startQRDetection() {
+                this.updateStatus('QRコードをスキャン中...');
+                this.scanningAnimation.classList.remove('hidden');
+                this.updateDebug('detection', 'Starting');
+
+                // Android/Chrome最適化: より高速なスキャンレート
+                const scanRate = this.platform.isAndroid ? 8 : (this.platform.isChrome ? 10 : 6);
+
+                if (typeof QrScanner !== 'undefined') {
+                    try {
+                        this.detectionMethod = 'QrScanner';
+
+                        this.qrScanner = new QrScanner(
+                            this.video,
+                            result => this.handleQRResult(result.data),
+                            {
+                                returnDetailedScanResult: true,
+                                highlightScanRegion: false,
+                                highlightCodeOutline: false,
+                                maxScansPerSecond: scanRate,
+                                preferredCamera: 'environment',
+                                calculateScanRegion: this.calculateScanRegion.bind(this)
+                            }
+                        );
+
+                        await this.qrScanner.start();
+                        this.updateDebug('detection', 'QrScanner active');
+                        this.updateDebug('method', 'QrScanner');
+                        this.showQRStatus('QRコードをスキャン中...', 'info');
+
+                        console.log(`[QR] QrScanner started (platform: ${this.platform.label}, rate: ${scanRate}/sec)`);
+
+                        this.startFrameCounter();
+
+                    } catch (error) {
+                        console.warn('QR Scanner failed, using fallback:', error);
+                        this.showQRStatus('QrScannerエラー、フォールバック中...', 'error');
+                        this.fallbackToManualDetection();
+                    }
+                } else {
+                    console.warn('QrScanner library not available, using fallback');
+                    this.showQRStatus('QrScannerライブラリ未検出、フォールバック中...', 'error');
+                    this.fallbackToManualDetection();
+                }
+            }
+
+            // Phase 2: モバイル最適化 - スキャン領域の動的計算
+            calculateScanRegion(video) {
+                const { videoWidth, videoHeight } = video;
+                
+                // 動画の向き（縦/横）に応じて調整
+                const isPortrait = videoHeight > videoWidth;
+                const baseSize = Math.min(videoWidth, videoHeight);
+                
+                // スキャン領域のサイズ（画面の60%）
+                const size = Math.round(baseSize * 0.6);
+                const x = Math.round((videoWidth - size) / 2);
+                const y = Math.round((videoHeight - size) / 2);
+                
+                const region = {
+                    x: Math.max(0, x),
+                    y: Math.max(0, y),
+                    width: Math.min(size, videoWidth),
+                    height: Math.min(size, videoHeight)
+                };
+                
+                console.log(`[Scan Region] ${region.width}x${region.height} at (${region.x}, ${region.y}) - Portrait: ${isPortrait}`);
+                return region;
+            }
+
+            // フレームカウンター（デバッグ用）
+            startFrameCounter() {
+                const countFrames = () => {
+                    if (this.isScanning) {
+                        this.frameCount++;
+                        this.updateDebug('frames', this.frameCount);
+                        requestAnimationFrame(countFrames);
+                    }
+                };
+                countFrames();
+            }
+
+            // Phase 2: フォールバック検出の強化
+            fallbackToManualDetection() {
+                if ('BarcodeDetector' in window) {
+                    this.detectionMethod = 'BarcodeDetector';  // Phase 2: 検出方法を記録
+                    
+                    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                    
+                    const detectQR = async () => {
+                        if (this.isScanning && this.video.readyState >= 2) {
+                            try {
+                                const currentTime = Date.now();
+                                // Android/Chrome最適化: 120ms間隔（約8回/秒）
+                                if (currentTime - this.lastDetectionAttempt > 120) {
+                                    const barcodes = await detector.detect(this.video);
+                                    this.lastDetectionAttempt = currentTime;
+                                    
+                                    if (barcodes.length > 0) {
+                                        console.log('[QR] Detected via BarcodeDetector:', barcodes[0].rawValue);
+                                        this.handleQRResult(barcodes[0].rawValue);
+                                        return;
+                                    }
+                                }
+                            } catch (error) {
+                                console.warn('BarcodeDetector error:', error);
+                            }
+                        }
+                        
+                        if (this.isScanning) {
+                            requestAnimationFrame(detectQR);
+                        }
+                    };
+                    
+                    detectQR();
+                    this.updateDebug('detection', 'BarcodeDetector active');
+                    this.updateDebug('method', 'BarcodeDetector');
+                    this.showQRStatus('BarcodeDetectorでスキャン中...', 'info');
+                    console.log('[QR] Fallback to BarcodeDetector');
+                    
+                } else {
+                    // Phase 2: 両方使えない場合のエラーハンドリング
+                    this.detectionMethod = 'none';
+                    this.updateDebug('method', 'None (Error)');
+                    console.error('[QR] No detection method available');
+                    this.handleError(new Error('QRコード検出機能がサポートされていません。最新のChromeブラウザをご利用ください。'));
+                }
+            }
+
+            handleQRResult(data) {
+                // 重複検出防止
+                if (!this.isScanning) return;
+                
+                this.lastQRValue = data;  // itemqr.html統合: QR値を保持
+                this.updateDebug('detection', 'QR detected!');
+                this.showQRStatus('QRコードを読み取りました', 'success');  // itemqr.html統合
+                this.showResult(data);
+            }
+
+            // itemqr.html統合: 手動QR入力機能
+            manualQRInput() {
+                const input = prompt('QRコードの内容を手入力してください:');
+                if (input && input.trim()) {
+                    this.handleQRResult(input.trim());
+                }
+            }
+
+            // itemqr.html統合: QRステータス表示（3秒自動消去）
+            showQRStatus(message, type) {
+                if (!this.qrStatusMessage) return;
+                
+                this.qrStatusMessage.className = `p-3 rounded-lg text-center font-medium ${type}`;
+                this.qrStatusMessage.textContent = message;
+                this.qrStatusMessage.classList.remove('hidden');
+                
+                // 3秒後に自動非表示
+                setTimeout(() => {
+                    this.qrStatusMessage.classList.add('hidden');
+                }, 3000);
+            }
+
+            // スキャン一時停止/再開
+            pauseScanning() {
+                if (this.qrScanner) {
+                    this.qrScanner.stop();
+                }
+                this.scanningAnimation.classList.add('hidden');
+                this.updateStatus('一時停止中...');
+            }
+
+            async resumeScanning() {
+                if (this.qrScanner && this.isScanning) {
+                    try {
+                        await this.qrScanner.start();
+                        this.scanningAnimation.classList.remove('hidden');
+                        this.updateStatus('QRコードをスキャン中...');
+                    } catch (error) {
+                        console.warn('Resume scanning failed:', error);
+                        this.calibrateCamera();
+                    }
+                }
+            }
+
+            stopScan() {
+                this.isScanning = false;
+                this.isCalibrating = false;
+                this.scanningAnimation.classList.add('hidden');
+                this.calibrationIndicator.classList.add('hidden');
+                
+                // Phase 2: デバッグループ停止
+                if (this.debugUpdateInterval) {
+                    clearInterval(this.debugUpdateInterval);
+                    this.debugUpdateInterval = null;
+                }
+                
+                this.cleanupResources();
+                this.showQRStatus('QRスキャンを停止しました', 'info');  // itemqr.html統合
+                this.showScreen('initial-screen');
+            }
+
+            cleanupResources() {
+                console.log('[Cleanup] Cleaning up resources...');
+                
+                if (this.qrScanner) {
+                    try {
+                        this.qrScanner.stop();
+                        this.qrScanner.destroy();
+                    } catch (error) {
+                        console.warn('[Cleanup] QrScanner cleanup error:', error);
+                    }
+                    this.qrScanner = null;
+                }
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => {
+                        track.stop();
+                        console.log(`[Cleanup] Stopped track: ${track.kind} - ${track.label}`);
+                    });
+                    this.stream = null;
+                }
+                
+                // ビデオ要素のクリーンアップ
+                if (this.video && this.video.srcObject) {
+                    this.video.srcObject = null;
+                }
+                
+                this.updateDebug('stream', 'Disconnected');
+                this.updateDebug('detection', 'Stopped');
+                this.updateDebug('method', '-');
+                this.detectionMethod = 'none';
+            }
+
+            showResult(data) {
+                this.stopScan();
+                this.scanResult.textContent = data;
+                this.showScreen('result-screen');
+            }
+
+            handleError(error) {
+                this.stopScan();
+                
+                let message = 'カメラにアクセスできませんでした。';
+                
+                switch (error.name) {
+                    case 'NotAllowedError':
+                        message = 'カメラの使用が拒否されました。ブラウザの設定からカメラの許可を有効にしてください。';
+                        break;
+                    case 'NotFoundError':
+                        message = 'カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。';
+                        break;
+                    case 'NotSupportedError':
+                        message = 'このブラウザではカメラ機能がサポートされていません。最新のChrome、Edge、またはFirefoxをお試しください。';
+                        break;
+                    case 'NotReadableError':
+                        message = 'カメラが他のアプリケーションで使用中です。他のアプリを閉じてから再試行してください。';
+                        break;
+                    case 'SecurityError':
+                        message = 'セキュリティ制限によりカメラにアクセスできません。HTTPS環境が必要です。';
+                        break;
+                }
+
+                if (error.message && error.message.includes('QRコード検出')) {
+                    message = 'このブラウザはQRコード検出に対応していません。最新のChrome、Edge、またはFirefoxをお試しください。';
+                }
+
+                this.errorMessage.textContent = message;
+                this.showScreen('error-screen');
+            }
+
+            resetAndStart() {
+                this.stopScan();
+                this.calibrationAttempts = 0;
+                this.frameCount = 0;
+                this.showScreen('initial-screen');
+            }
+
+            async copyToClipboard() {
+                try {
+                    await navigator.clipboard.writeText(this.scanResult.textContent);
+                    const button = document.getElementById('copy-result');
+                    const originalText = button.textContent;
+                    button.textContent = '✅ コピー完了!';
+                    button.classList.add('bg-green-600', 'hover:bg-green-700');
+                    button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    }, 2000);
+                } catch (error) {
+                    console.error('コピー失敗:', error);
+                    alert('クリップボードへのコピーに失敗しました。');
+                }
+            }
+
+            async shareResult() {
+                const text = this.scanResult.textContent;
+                
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: 'QRコード読み取り結果',
+                            text: text
+                        });
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.error('共有失敗:', error);
+                        }
+                    }
+                } else {
+                    this.copyToClipboard();
+                }
+            }
+        }
+
+        // アプリケーション初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            // ページ読み込み時刻を表示
+            const now = new Date();
+            const loadTimeStr = now.toLocaleString('ja-JP', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: false 
+            });
+            document.getElementById('load-time').textContent = loadTimeStr;
+            console.log('[Page] Loaded at:', loadTimeStr);
+            
+            new AndroidChromeQRScanner();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+secrets/
+ssl/
+*.pem
+*.key
+*.crt
+
+# Terraform local state and secrets
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+.terraform.tfstate.lock.info
+
+# Generated deployment artifacts
+infra/main.json
+
+# Backups and local output
+backups/
+backup-*/
+web-backup-*/
+supabase-project.json
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

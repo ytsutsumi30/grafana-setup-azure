@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出荷検品システム - モックアップ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .inspection-header {
+            background: linear-gradient(135deg, #0d6efd, #4dabf7);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .inspection-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+        }
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d1e7dd; color: #0a3622; }
+        .status-rejected { background-color: #f8d7da; color: #721c24; }
+        .priority-high { background-color: #dc3545; color: white; }
+        .priority-normal { background-color: #0dcaf0; color: white; }
+        .inspection-item {
+            border-left: 4px solid #0d6efd;
+            padding: 1rem;
+            background-color: white;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+        .quantity-display {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .passed { color: #198754; }
+        .failed { color: #dc3545; }
+        .inspection-actions {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 1rem;
+            border-top: 1px solid #dee2e6;
+            box-shadow: 0 -0.5rem 1rem rgba(0,0,0,0.1);
+        }
+        .barcode-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            background-color: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px dashed #6c757d;
+        }
+        .qr-scanner-area {
+            border: 2px dashed #0d6efd;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            background-color: #f8f9fa;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        .qr-item-card {
+            border-left: 4px solid #ffc107;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        .qr-item-card.scanned {
+            border-left-color: #198754;
+            background-color: #d1e7dd;
+        }
+        .qr-status-icon {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+        .qr-pending { color: #ffc107; }
+        .qr-scanned { color: #198754; }
+        .inventory-info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        @media print {
+            .inspection-actions,
+            .btn,
+            .navbar {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <div class="inspection-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1 class="mb-0">
+                        <i class="fas fa-search me-3"></i>出荷検品システム
+                    </h1>
+                    <p class="mb-0 mt-2">品質管理・出荷前最終検査</p>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-light btn-lg" onclick="window.location.href='index.html'">
+                        <i class="fas fa-home me-2"></i>メインシステム
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 検品対象一覧 -->
+        <div class="row">
+            <div class="col-lg-8">
+                <h3 class="mb-4">
+                    <i class="fas fa-clipboard-list me-2"></i>検品待ち出荷指示
+                </h3>
+
+                <!-- 出荷指示 1 -->
+                <div class="inspection-card card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">出荷指示: SHIP001</h5>
+                        <span class="status-badge priority-high">
+                            <i class="fas fa-exclamation-circle me-1"></i>高優先度
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>製品:</strong> 製品A (PROD001)</p>
+                                <p><strong>数量:</strong> <span class="quantity-display">50個</span></p>
+                                <p><strong>顧客:</strong> ABC商事</p>
+                                <p><strong>出荷日:</strong> 2025年9月23日</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>製品バーコード:</strong></p>
+                                <div class="barcode-display">|||| ||| |||| ||||| |||| PROD001</div>
+                                <p class="mt-2"><strong>配送先:</strong> 東京都</p>
+                                <p><strong>特記事項:</strong> 急行配送</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary me-2" onclick="startInspection('SHIP001')">
+                                <i class="fas fa-play me-1"></i>検品開始
+                            </button>
+                            <button class="btn btn-warning me-2" onclick="startQRInspection('SHIP001')">
+                                <i class="fas fa-qrcode me-1"></i>QR検品
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="viewDetails('SHIP001')">
+                                <i class="fas fa-eye me-1"></i>詳細表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 出荷指示 2 -->
+                <div class="inspection-card card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">出荷指示: SHIP002</h5>
+                        <span class="status-badge priority-normal">
+                            <i class="fas fa-circle me-1"></i>通常優先度
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>製品:</strong> 製品B (PROD002)</p>
+                                <p><strong>数量:</strong> <span class="quantity-display">30個</span></p>
+                                <p><strong>顧客:</strong> XYZ株式会社</p>
+                                <p><strong>出荷日:</strong> 2025年9月24日</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>製品バーコード:</strong></p>
+                                <div class="barcode-display">|||| ||| |||| ||||| |||| PROD002</div>
+                                <p class="mt-2"><strong>配送先:</strong> 大阪府</p>
+                                <p><strong>特記事項:</strong> 標準配送</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary me-2" onclick="startInspection('SHIP002')">
+                                <i class="fas fa-play me-1"></i>検品開始
+                            </button>
+                            <button class="btn btn-warning me-2" onclick="startQRInspection('SHIP002')">
+                                <i class="fas fa-qrcode me-1"></i>QR検品
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="viewDetails('SHIP002')">
+                                <i class="fas fa-eye me-1"></i>詳細表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 出荷指示 3 -->
+                <div class="inspection-card card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">出荷指示: SHIP003</h5>
+                        <span class="status-badge priority-normal">
+                            <i class="fas fa-circle me-1"></i>通常優先度
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>製品:</strong> 製品C (PROD003)</p>
+                                <p><strong>数量:</strong> <span class="quantity-display">10個</span></p>
+                                <p><strong>顧客:</strong> DEF工業</p>
+                                <p><strong>出荷日:</strong> 2025年9月25日</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>製品バーコード:</strong></p>
+                                <div class="barcode-display">|||| ||| |||| ||||| |||| PROD003</div>
+                                <p class="mt-2"><strong>配送先:</strong> 愛知県</p>
+                                <p><strong>特記事項:</strong> 梱包注意</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary me-2" onclick="startInspection('SHIP003')">
+                                <i class="fas fa-play me-1"></i>検品開始
+                            </button>
+                            <button class="btn btn-warning me-2" onclick="startQRInspection('SHIP003')">
+                                <i class="fas fa-qrcode me-1"></i>QR検品
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="viewDetails('SHIP003')">
+                                <i class="fas fa-eye me-1"></i>詳細表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- サイドバー -->
+            <div class="col-lg-4">
+                <div class="inspection-card card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>本日の検品実績
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h3 class="text-success">5</h3>
+                                <small class="text-muted">完了</small>
+                            </div>
+                            <div class="col-6">
+                                <h3 class="text-primary">3</h3>
+                                <small class="text-muted">待機中</small>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="text-center">
+                            <h4 class="text-info">98.5%</h4>
+                            <small class="text-muted">合格率</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="inspection-card card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>注意事項
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                梱包材の損傷確認
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                ラベル貼り付け位置
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                数量の最終確認
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                出荷書類の完備
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="inspection-card card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock me-2"></i>最近の検品履歴
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="inspection-item">
+                            <small class="text-muted">10:30</small>
+                            <div>SHIP004 - 田中太郎</div>
+                            <span class="status-badge status-approved">承認済み</span>
+                        </div>
+                        <div class="inspection-item">
+                            <small class="text-muted">09:45</small>
+                            <div>SHIP005 - 佐藤花子</div>
+                            <span class="status-badge status-approved">承認済み</span>
+                        </div>
+                        <div class="inspection-item">
+                            <small class="text-muted">09:15</small>
+                            <div>SHIP006 - 山田次郎</div>
+                            <span class="status-badge status-rejected">要再検品</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 検品実行モーダル -->
+    <div class="modal fade" id="inspectionModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-search me-2"></i>出荷検品実行
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="inspection-content">
+                        <!-- 検品フォームがここに動的に生成される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>キャンセル
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="saveAsDraft()">
+                        <i class="fas fa-save me-1"></i>下書き保存
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="completeInspection()">
+                        <i class="fas fa-check me-1"></i>検品完了
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細表示モーダル -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>出荷指示詳細
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="detail-content">
+                        <!-- 詳細情報がここに表示される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                    <button type="button" class="btn btn-primary" onclick="printDetails()">
+                        <i class="fas fa-print me-1"></i>印刷
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR検品モーダル -->
+    <div class="modal fade" id="qrInspectionModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="fas fa-qrcode me-2"></i>QR同梱物検品
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="qr-inspection-content">
+                        <!-- QR検品フォームがここに動的に生成される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>キャンセル
+                    </button>
+                    <button type="button" class="btn btn-info me-2" onclick="startQRScanner()">
+                        <i class="fas fa-camera me-1"></i>QRスキャン開始
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="completeQRInspection()">
+                        <i class="fas fa-check me-1"></i>QR検品完了
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // API設定
+        const API_BASE_URL = '/api';
+        
+        // 検品開始
+        function startInspection(shipmentId) {
+            const modal = new bootstrap.Modal(document.getElementById('inspectionModal'));
+            
+            // 検品フォームを生成
+            generateInspectionForm(shipmentId);
+            
+            modal.show();
+        }
+
+        // 検品フォーム生成
+        function generateInspectionForm(shipmentId) {
+            const content = document.getElementById('inspection-content');
+            
+            // サンプルデータ（実際はAPIから取得）
+            const shipmentData = {
+                'SHIP001': {
+                    id: 'SHIP001',
+                    product: '製品A (PROD001)',
+                    quantity: 50,
+                    customer: 'ABC商事'
+                },
+                'SHIP002': {
+                    id: 'SHIP002',
+                    product: '製品B (PROD002)',
+                    quantity: 30,
+                    customer: 'XYZ株式会社'
+                },
+                'SHIP003': {
+                    id: 'SHIP003',
+                    product: '製品C (PROD003)',
+                    quantity: 10,
+                    customer: 'DEF工業'
+                }
+            };
+            
+            const data = shipmentData[shipmentId];
+            
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">出荷情報</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>出荷指示:</strong> ${data.id}</p>
+                                <p><strong>製品:</strong> ${data.product}</p>
+                                <p><strong>予定数量:</strong> ${data.quantity}個</p>
+                                <p><strong>顧客:</strong> ${data.customer}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">検品情報入力</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">検品者名 *</label>
+                                    <input type="text" class="form-control" id="inspector" required>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label class="form-label">検品数量 *</label>
+                                        <input type="number" class="form-control" id="inspectedQty" value="${data.quantity}" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">合格数量 *</label>
+                                        <input type="number" class="form-control" id="passedQty" value="${data.quantity}" required>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="form-label">不合格数量</label>
+                                    <input type="number" class="form-control" id="failedQty" value="0" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">検品チェック項目</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="labelCheck">
+                                            <label class="form-check-label">ラベル確認完了</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="packagingCheck">
+                                            <label class="form-check-label">梱包状態確認</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="documentCheck">
+                                            <label class="form-check-label">出荷書類確認</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="qualityCheck">
+                                            <label class="form-check-label">品質基準適合</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="quantityCheck">
+                                            <label class="form-check-label">数量一致確認</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="finalApproval">
+                                            <label class="form-check-label"><strong>最終承認</strong></label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <label class="form-label">不具合詳細・備考</label>
+                                    <textarea class="form-control" id="notes" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 数量の自動計算
+            setupQuantityCalculation();
+        }
+
+        // 数量計算設定
+        function setupQuantityCalculation() {
+            const inspectedQty = document.getElementById('inspectedQty');
+            const passedQty = document.getElementById('passedQty');
+            const failedQty = document.getElementById('failedQty');
+            
+            function updateFailedQty() {
+                const inspected = parseInt(inspectedQty.value) || 0;
+                const passed = parseInt(passedQty.value) || 0;
+                failedQty.value = Math.max(0, inspected - passed);
+            }
+            
+            inspectedQty.addEventListener('input', updateFailedQty);
+            passedQty.addEventListener('input', updateFailedQty);
+        }
+
+        // QR検品開始
+        async function startQRInspection(shipmentId) {
+            try {
+                console.log('QR inspection start requested for:', shipmentId);
+                const modal = new bootstrap.Modal(document.getElementById('qrInspectionModal'));
+                
+                // QR検品フォームを生成
+                await generateQRInspectionForm(shipmentId);
+                
+                modal.show();
+            } catch (error) {
+                console.error('Error starting QR inspection:', error);
+                alert('QR検品の開始に失敗しました: ' + error.message);
+            }
+        }
+
+        // QR検品フォーム生成（API連携版）
+        async function generateQRInspectionForm(shipmentId) {
+            const content = document.getElementById('qr-inspection-content');
+            
+            try {
+                console.log('Starting QR inspection for:', shipmentId);
+                
+                // 出荷指示IDを実際のIDに変換（簡易実装：サンプルデータから取得）
+                const shippingInstructionId = getShippingInstructionId(shipmentId);
+                console.log('Shipping instruction ID:', shippingInstructionId);
+                
+                // 製品同梱物データをAPIから取得
+                const apiUrl = `${API_BASE_URL}/shipping-instructions/${shippingInstructionId}/components`;
+                console.log('Fetching from API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                console.log('API response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API error response:', errorText);
+                    throw new Error(`API request failed: ${response.status} - ${errorText}`);
+                }
+                
+                const components = await response.json();
+                console.log('Received components:', components);
+                
+                if (components.length === 0) {
+                    throw new Error('同梱物が見つかりませんでした');
+                }
+                
+                // 最初のコンポーネントから共通情報を取得
+                const firstComponent = components[0];
+                const data = {
+                    id: shipmentId,
+                    shippingInstructionId: shippingInstructionId,
+                    product: `${firstComponent.product_code} (${firstComponent.product_name})`,
+                    quantity: firstComponent.quantity,
+                    customer: getCustomerName(shipmentId), // サンプルデータから取得
+                    currentStock: firstComponent.current_stock || 0,
+                    items: components.map(comp => ({
+                        id: comp.id,
+                        name: comp.component_name,
+                        qrCode: comp.qr_code,
+                        type: comp.component_type,
+                        status: 'pending'
+                    }))
+                };
+                
+                window.currentQRInspection = data; // グローバルに保存
+                window.currentQRInspectionRecord = null; // API記録用
+                
+                const itemsHtml = data.items.map(item => `
+                    <div class="card qr-item-card" id="qr-item-${item.id}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <span class="qr-status-icon qr-pending" id="icon-${item.id}">
+                                            <i class="fas fa-clock"></i>
+                                        </span>
+                                        ${item.name}
+                                    </h6>
+                                    <small class="text-muted">QRコード: ${item.qrCode}</small>
+                                    <span class="badge bg-info ms-2">${item.type}</span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-warning" id="status-${item.id}">未確認</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                content.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">出荷情報</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>出荷指示:</strong> ${data.id}</p>
+                                    <p><strong>製品:</strong> ${data.product}</p>
+                                    <p><strong>予定数量:</strong> ${data.quantity}個</p>
+                                    <p><strong>顧客:</strong> ${data.customer}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="inventory-info">
+                                <h6><i class="fas fa-warehouse me-2"></i>在庫情報</h6>
+                                <p class="mb-1">
+                                    <strong>現在庫:</strong> <span id="current-stock">${data.currentStock}</span>個
+                                </p>
+                                <p class="mb-0">
+                                    <strong>検品後予定在庫:</strong> 
+                                    <span id="predicted-stock">${data.currentStock - data.quantity}</span>個
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="qr-scanner-area" id="qr-scanner-area">
+                                <i class="fas fa-qrcode fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">QRコードスキャン待機中</h5>
+                                <p class="text-muted">「QRスキャン開始」ボタンを押してください</p>
+                                <div id="qr-scan-result" style="display: none;">
+                                    <div class="alert alert-info">
+                                        <strong>スキャン結果:</strong> <span id="scanned-qr-code"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-list-check me-2"></i>同梱物チェックリスト
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    ${itemsHtml}
+                                    
+                                    <div class="mt-3">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <strong>進捗:</strong> 
+                                                <span id="qr-progress">0/${data.items.length}</span> 完了
+                                            </div>
+                                            <div class="col-6 text-end">
+                                                <strong>検品合格数:</strong> 
+                                                <span id="passed-quantity">0</span>個
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error generating QR inspection form:', error);
+                content.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5>エラー</h5>
+                        <p><strong>詳細:</strong> ${error.message}</p>
+                        <p><strong>shipmentId:</strong> ${shipmentId}</p>
+                        <p><strong>API URL:</strong> ${API_BASE_URL}/shipping-instructions/${getShippingInstructionId(shipmentId)}/components</p>
+                        <button class="btn btn-primary" onclick="location.reload()">ページを再読み込み</button>
+                    </div>
+                `;
+            }
+        }
+
+        // QRスキャナー開始（API連携版）
+        async function startQRScanner() {
+            const scannerArea = document.getElementById('qr-scanner-area');
+            const data = window.currentQRInspection;
+            
+            if (!data) {
+                alert('QR検品データが見つかりません');
+                return;
+            }
+            
+            try {
+                // QR検品記録をAPIに作成
+                if (!window.currentQRInspectionRecord) {
+                    const response = await fetch(`${API_BASE_URL}/qr-inspections`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            shipping_instruction_id: data.shippingInstructionId,
+                            inspector_name: prompt('検品者名を入力してください:') || 'システムユーザー'
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('QR検品記録の作成に失敗しました');
+                    }
+                    
+                    window.currentQRInspectionRecord = await response.json();
+                }
+                
+                scannerArea.innerHTML = `
+                    <i class="fas fa-camera fa-3x text-primary mb-3"></i>
+                    <h5 class="text-primary">QRコードスキャン中...</h5>
+                    <p class="text-muted">カメラでQRコードを読み取ってください</p>
+                    <button class="btn btn-sm btn-secondary mt-2" onclick="simulateQRScan()">
+                        <i class="fas fa-magic me-1"></i>スキャンをシミュレート
+                    </button>
+                `;
+            } catch (error) {
+                console.error('Error starting QR scanner:', error);
+                alert('QRスキャナーの開始に失敗しました: ' + error.message);
+            }
+        }
+
+        // QRスキャンシミュレーション（API連携版）
+        async function simulateQRScan() {
+            const data = window.currentQRInspection;
+            if (!data) return;
+            
+            // 未スキャンのアイテムを取得
+            const pendingItems = data.items.filter(item => item.status === 'pending');
+            if (pendingItems.length === 0) {
+                alert('すべてのアイテムがスキャン済みです。');
+                return;
+            }
+            
+            // ランダムに1つ選択
+            const randomItem = pendingItems[Math.floor(Math.random() * pendingItems.length)];
+            await processQRScan(randomItem.qrCode);
+        }
+
+        // QRスキャン処理（API連携版）
+        async function processQRScan(qrCode) {
+            const data = window.currentQRInspection;
+            const inspectionRecord = window.currentQRInspectionRecord;
+            
+            if (!data || !inspectionRecord) {
+                alert('QR検品データが見つかりません');
+                return;
+            }
+            
+            try {
+                // APIにスキャン結果を送信
+                const response = await fetch(`${API_BASE_URL}/qr-inspections/${inspectionRecord.id}/scan`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ qr_code: qrCode })
+                });
+                
+                const result = await response.json();
+                const scanResult = document.getElementById('qr-scan-result');
+                
+                if (response.ok && result.success) {
+                    // 正常なスキャン
+                    const component = result.component;
+                    const matchedItem = data.items.find(item => item.qrCode === qrCode);
+                    
+                    if (matchedItem) {
+                        matchedItem.status = 'scanned';
+                        
+                        // UIを更新
+                        const itemCard = document.getElementById(`qr-item-${component.id}`);
+                        const icon = document.getElementById(`icon-${component.id}`);
+                        const status = document.getElementById(`status-${component.id}`);
+                        
+                        if (itemCard && icon && status) {
+                            itemCard.classList.add('scanned');
+                            icon.className = 'qr-status-icon qr-scanned';
+                            icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                            status.className = 'badge bg-success';
+                            status.textContent = '確認済み';
+                        }
+                        
+                        // 進捗更新
+                        const scannedCount = data.items.filter(item => item.status === 'scanned').length;
+                        document.getElementById('qr-progress').textContent = `${scannedCount}/${data.items.length}`;
+                        
+                        // 検品合格数を更新（全アイテム確認済みの場合）
+                        if (scannedCount === data.items.length) {
+                            document.getElementById('passed-quantity').textContent = data.quantity;
+                        }
+                    }
+                    
+                    // 成功メッセージ表示
+                    scanResult.style.display = 'block';
+                    scanResult.className = 'alert alert-success';
+                    scanResult.innerHTML = `<strong>✅ ${result.message}:</strong> ${component.component_name} (${qrCode})`;
+                    
+                } else {
+                    // エラー表示
+                    scanResult.style.display = 'block';
+                    scanResult.className = 'alert alert-danger';
+                    scanResult.innerHTML = `<strong>❌ ${result.message}:</strong> ${qrCode}`;
+                }
+                
+                // 3秒後にスキャン待機状態に戻る
+                setTimeout(() => {
+                    document.getElementById('qr-scanner-area').innerHTML = `
+                        <i class="fas fa-qrcode fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">次のQRコードをスキャン</h5>
+                        <button class="btn btn-sm btn-secondary" onclick="simulateQRScan()">
+                            <i class="fas fa-magic me-1"></i>次をシミュレート
+                        </button>
+                    `;
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Error processing QR scan:', error);
+                alert('QRスキャン処理でエラーが発生しました: ' + error.message);
+            }
+        }
+
+        // QR検品完了（API連携版）
+        async function completeQRInspection() {
+            const data = window.currentQRInspection;
+            const inspectionRecord = window.currentQRInspectionRecord;
+            
+            if (!data || !inspectionRecord) {
+                alert('QR検品データが見つかりません');
+                return;
+            }
+            
+            const scannedCount = data.items.filter(item => item.status === 'scanned').length;
+            
+            if (scannedCount < data.items.length) {
+                if (!confirm(`${data.items.length - scannedCount}個のアイテムが未確認です。このまま完了しますか？`)) {
+                    return;
+                }
+            }
+            
+            try {
+                // APIで検品完了処理
+                const response = await fetch(`${API_BASE_URL}/qr-inspections/${inspectionRecord.id}/complete`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        notes: `QR検品完了 - 確認済みアイテム: ${scannedCount}/${data.items.length}`
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('検品完了処理に失敗しました');
+                }
+                
+                const result = await response.json();
+                
+                // 成功メッセージ
+                alert(`QR検品が完了しました。\n\n` +
+                      `・検品合格数: ${result.passed_quantity}個\n` +
+                      `・在庫更新: ${result.current_stock_before}個 → ${result.current_stock_after}個\n` +
+                      `・確認済みアイテム: ${scannedCount}/${data.items.length}`);
+                
+                // モーダルを閉じる
+                const modal = bootstrap.Modal.getInstance(document.getElementById('qrInspectionModal'));
+                modal.hide();
+                
+                // ページをリロード（実際は動的更新）
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error completing QR inspection:', error);
+                alert('検品完了処理でエラーが発生しました: ' + error.message);
+            }
+        }
+
+        // ヘルパー関数：出荷指示IDを取得（サンプル実装）
+        function getShippingInstructionId(shipmentId) {
+            const mapping = {
+                'SHIP001': 1,
+                'SHIP002': 2,
+                'SHIP003': 3
+            };
+            return mapping[shipmentId] || 1;
+        }
+
+        // ヘルパー関数：顧客名を取得（サンプル実装）
+        function getCustomerName(shipmentId) {
+            const mapping = {
+                'SHIP001': 'ABC商事',
+                'SHIP002': 'XYZ株式会社',
+                'SHIP003': 'DEF工業'
+            };
+            return mapping[shipmentId] || '不明な顧客';
+        }
+
+        // 詳細表示
+        function viewDetails(shipmentId) {
+            const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+            
+            // 詳細情報を生成（実際はAPIから取得）
+            generateDetailContent(shipmentId);
+            
+            modal.show();
+        }
+
+        // 詳細コンテンツ生成
+        function generateDetailContent(shipmentId) {
+            const content = document.getElementById('detail-content');
+            
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>基本情報</h6>
+                        <table class="table table-sm">
+                            <tr><td>出荷指示番号:</td><td>${shipmentId}</td></tr>
+                            <tr><td>作成日時:</td><td>2025-09-22 09:00:00</td></tr>
+                            <tr><td>作成者:</td><td>システム管理者</td></tr>
+                            <tr><td>ステータス:</td><td><span class="badge bg-warning">検品待ち</span></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>配送情報</h6>
+                        <table class="table table-sm">
+                            <tr><td>配送方法:</td><td>宅配便</td></tr>
+                            <tr><td>配送業者:</td><td>ヤマト運輸</td></tr>
+                            <tr><td>希望配達日:</td><td>2025-09-24</td></tr>
+                            <tr><td>時間指定:</td><td>午前中</td></tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h6>生産履歴</h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr><th>工程</th><th>実施日</th><th>担当者</th><th>品質グレード</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>製造</td><td>2025-09-20</td><td>田中太郎</td><td><span class="badge bg-success">A</span></td></tr>
+                            <tr><td>品質検査</td><td>2025-09-21</td><td>佐藤花子</td><td><span class="badge bg-success">A</span></td></tr>
+                            <tr><td>最終検品</td><td>-</td><td>-</td><td>-</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 下書き保存
+        function saveAsDraft() {
+            alert('下書きとして保存しました。');
+            console.log('Draft saved');
+        }
+
+        // 検品完了
+        function completeInspection() {
+            const inspector = document.getElementById('inspector').value;
+            const finalApproval = document.getElementById('finalApproval').checked;
+            
+            if (!inspector) {
+                alert('検品者名を入力してください。');
+                return;
+            }
+            
+            if (!finalApproval) {
+                if (!confirm('最終承認がチェックされていません。このまま完了しますか？')) {
+                    return;
+                }
+            }
+            
+            // 実際の実装ではAPIに送信
+            alert('検品が完了しました。');
+            
+            // モーダルを閉じる
+            const modal = bootstrap.Modal.getInstance(document.getElementById('inspectionModal'));
+            modal.hide();
+            
+            // ページをリロード（実際は動的更新）
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+
+        // 印刷
+        function printDetails() {
+            window.print();
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('出荷検品システム初期化完了');
+        });
+    </script>
+</body>
+</html>

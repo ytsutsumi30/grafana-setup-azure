@@ -1,0 +1,16 @@
+.git
+.gitignore
+node_modules
+npm-debug.log
+*.log
+.env
+.env.*
+secrets
+ssl
+backups
+backup-*
+web-backup-*
+*.pem
+*.key
+*.crt
+.DS_Store

@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出荷検品システム - 展示会用チラシ</title>
+    <style>
+        /* ====================================
+           印刷用A4両面チラシスタイル
+           ==================================== */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Meiryo', 'メイリオ', 'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+
+        /* ページコンテナ */
+        .page {
+            width: 210mm;
+            height: 297mm;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            page-break-after: always;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ====================================
+           表面（Front Page）
+           ==================================== */
+
+        .front-page {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0;
+        }
+
+        /* ヘッダーセクション */
+        .hero-section {
+            text-align: center;
+            padding: 40mm 20mm 30mm;
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 50%;
+        }
+
+        .hero-section h1 {
+            font-size: 42pt;
+            font-weight: 900;
+            margin-bottom: 8mm;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            letter-spacing: 2px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-section .subtitle {
+            font-size: 18pt;
+            margin-bottom: 6mm;
+            font-weight: 300;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-section .tagline {
+            font-size: 16pt;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8mm 15mm;
+            border-radius: 50px;
+            display: inline-block;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 機能紹介セクション */
+        .features-section {
+            padding: 15mm 15mm 10mm;
+            background: white;
+            color: #333;
+        }
+
+        .section-title {
+            font-size: 24pt;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10mm;
+            color: #0d6efd;
+            position: relative;
+            padding-bottom: 5mm;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg, #0d6efd, #0dcaf0);
+            border-radius: 2px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8mm;
+            margin-bottom: 10mm;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 6mm;
+            border: 2px solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .feature-icon {
+            font-size: 32pt;
+            margin-bottom: 3mm;
+            display: block;
+        }
+
+        .feature-card h3 {
+            font-size: 14pt;
+            font-weight: 700;
+            margin-bottom: 2mm;
+            color: #0d6efd;
+        }
+
+        .feature-card p {
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #495057;
+        }
+
+        /* 主要機能ハイライト */
+        .key-benefits {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            padding: 8mm 15mm;
+            color: white;
+            text-align: center;
+        }
+
+        .key-benefits h2 {
+            font-size: 20pt;
+            font-weight: 700;
+            margin-bottom: 6mm;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .benefits-list {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 5mm;
+        }
+
+        .benefit-item {
+            flex: 1;
+            min-width: 40mm;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4mm;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+
+        .benefit-item .number {
+            font-size: 28pt;
+            font-weight: 900;
+            display: block;
+            margin-bottom: 2mm;
+        }
+
+        .benefit-item .label {
+            font-size: 11pt;
+            font-weight: 600;
+        }
+
+        /* ====================================
+           裏面（Back Page）
+           ==================================== */
+
+        .back-page {
+            padding: 15mm;
+            background: white;
+        }
+
+        /* QRデモセクション */
+        .qr-demo-section {
+            margin-bottom: 10mm;
+        }
+
+        .demo-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 8mm;
+            border: 2px solid #dee2e6;
+        }
+
+        .demo-screen {
+            background: #000;
+            border-radius: 8px;
+            padding: 6mm;
+            margin-bottom: 5mm;
+            position: relative;
+            min-height: 60mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-scanner-mockup {
+            position: relative;
+            width: 60mm;
+            height: 60mm;
+            border: 3px dashed rgba(96, 165, 250, 0.8);
+            border-radius: 12px;
+        }
+
+        .scan-corner {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border: 3px solid #60a5fa;
+        }
+
+        .scan-corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+        .scan-corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+        .scan-corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+        .scan-corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+
+        .scan-status {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            color: #0d6efd;
+            padding: 3mm 6mm;
+            border-radius: 20px;
+            font-size: 10pt;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* 使い方セクション */
+        .how-to-use {
+            margin-bottom: 8mm;
+        }
+
+        .steps-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5mm;
+            margin-top: 5mm;
+        }
+
+        .step-card {
+            background: linear-gradient(135deg, #e7f3ff 0%, #d4e9ff 100%);
+            border-radius: 10px;
+            padding: 5mm;
+            text-align: center;
+            border: 2px solid #0d6efd;
+            position: relative;
+        }
+
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 30px;
+            background: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 12pt;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .step-card h4 {
+            font-size: 11pt;
+            font-weight: 700;
+            margin-top: 3mm;
+            margin-bottom: 2mm;
+            color: #0d6efd;
+        }
+
+        .step-card p {
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #495057;
+        }
+
+        /* 技術スタック */
+        .tech-stack {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 6mm;
+            margin-bottom: 8mm;
+        }
+
+        .tech-stack h3 {
+            font-size: 14pt;
+            font-weight: 700;
+            margin-bottom: 4mm;
+            color: #0d6efd;
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 3mm;
+        }
+
+        .tech-item {
+            background: white;
+            padding: 3mm;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            font-size: 9pt;
+        }
+
+        .tech-item strong {
+            color: #0d6efd;
+            display: block;
+            margin-bottom: 1mm;
+            font-size: 10pt;
+        }
+
+        /* 主な特徴 */
+        .key-features {
+            margin-bottom: 8mm;
+        }
+
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 3mm;
+        }
+
+        .feature-item {
+            background: white;
+            border-left: 4px solid #0d6efd;
+            padding: 3mm;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .feature-item::before {
+            content: '✓';
+            color: #198754;
+            font-weight: 900;
+            margin-right: 2mm;
+            font-size: 11pt;
+        }
+
+        .feature-item span {
+            font-size: 10pt;
+            color: #333;
+            font-weight: 600;
+        }
+
+        /* フッター */
+        .footer {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 6mm;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .footer h3 {
+            font-size: 14pt;
+            font-weight: 700;
+            margin-bottom: 3mm;
+        }
+
+        .contact-info {
+            font-size: 10pt;
+            line-height: 1.8;
+        }
+
+        .qr-code-placeholder {
+            width: 40mm;
+            height: 40mm;
+            background: white;
+            margin: 4mm auto;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9pt;
+            color: #666;
+            border: 2px dashed #ccc;
+        }
+
+        /* ====================================
+           印刷用スタイル
+           ==================================== */
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .page {
+                width: 210mm;
+                height: 297mm;
+                margin: 0;
+                box-shadow: none;
+                page-break-after: always;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+
+            .feature-card:hover,
+            .benefit-item:hover {
+                transform: none;
+            }
+
+            /* 色が正しく印刷されるように */
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                color-adjust: exact;
+            }
+        }
+
+        /* ====================================
+           画面表示用（プレビュー）
+           ==================================== */
+
+        @media screen {
+            body {
+                padding: 20px 0;
+            }
+
+            .print-button {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #0d6efd;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 14pt;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                z-index: 9999;
+                transition: all 0.3s;
+            }
+
+            .print-button:hover {
+                background: #0a58ca;
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+            }
+
+            .print-button::before {
+                content: '🖨️ ';
+            }
+        }
+
+        /* ====================================
+           レスポンシブ調整
+           ==================================== */
+
+        @media screen and (max-width: 768px) {
+            .page {
+                width: 100%;
+                height: auto;
+                margin: 10px;
+            }
+
+            .hero-section h1 {
+                font-size: 28pt;
+            }
+
+            .features-grid,
+            .steps-container,
+            .tech-grid,
+            .features-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 印刷ボタン（画面表示時のみ） -->
+    <button class="print-button" onclick="window.print()">印刷する</button>
+
+    <!-- ====================================
+         表面（Front Page）
+         ==================================== -->
+    <div class="page front-page">
+        <!-- ヒーローセクション -->
+        <div class="hero-section">
+            <h1>出荷検品システム</h1>
+            <p class="subtitle">生産管理・品質管理統合ソリューション</p>
+            <div class="tagline">QRコードで実現する、次世代の検品業務</div>
+        </div>
+
+        <!-- 機能紹介セクション -->
+        <div class="features-section">
+            <h2 class="section-title">主要機能</h2>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">📱</span>
+                    <h3>QRコード検品</h3>
+                    <p>スマートフォンやタブレットでQRコードをスキャンするだけで、簡単・正確な検品作業が可能です。</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>リアルタイム統計</h3>
+                    <p>検品実績をリアルタイムで可視化。ダッシュボードで進捗状況を一目で確認できます。</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔍</span>
+                    <h3>出荷指示管理</h3>
+                    <p>出荷指示の作成から検品完了までを一元管理。作業の抜け漏れを防ぎます。</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📦</span>
+                    <h3>在庫連動</h3>
+                    <p>検品完了と同時に在庫が自動更新。手作業での在庫管理が不要になります。</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🎯</span>
+                    <h3>iOS Safari最適化</h3>
+                    <p>iPhone・iPadでの動作を最適化。現場で使いやすいモバイルファースト設計です。</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📈</span>
+                    <h3>監視・分析機能</h3>
+                    <p>Grafana/Prometheusによる高度な監視機能（オプション）で、システムパフォーマンスを常に把握。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要機能ハイライト -->
+        <div class="key-benefits">
+            <h2>導入効果</h2>
+            <div class="benefits-list">
+                <div class="benefit-item">
+                    <span class="number">90%</span>
+                    <span class="label">作業時間削減</span>
+                </div>
+                <div class="benefit-item">
+                    <span class="number">99.9%</span>
+                    <span class="label">検品精度向上</span>
+                </div>
+                <div class="benefit-item">
+                    <span class="number">100%</span>
+                    <span class="label">ペーパーレス化</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================
+         裏面（Back Page）
+         ==================================== -->
+    <div class="page back-page">
+        <!-- QRデモセクション -->
+        <div class="qr-demo-section">
+            <h2 class="section-title">QRコード検品デモ</h2>
+
+            <div class="demo-container">
+                <div class="demo-screen">
+                    <div class="qr-scanner-mockup">
+                        <div class="scan-corner tl"></div>
+                        <div class="scan-corner tr"></div>
+                        <div class="scan-corner bl"></div>
+                        <div class="scan-corner br"></div>
+                    </div>
+                    <div class="scan-status">📷 QRコードをスキャン中...</div>
+                </div>
+
+                <p style="font-size: 10pt; text-align: center; color: #495057; line-height: 1.5;">
+                    <strong>モバイル端末でQRコードを読み取るだけ！</strong><br>
+                    専用アプリ不要。Webブラウザだけで動作します。
+                </p>
+            </div>
+        </div>
+
+        <!-- 使い方セクション -->
+        <div class="how-to-use">
+            <h2 class="section-title" style="font-size: 18pt;">簡単3ステップ</h2>
+
+            <div class="steps-container">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h4>出荷指示を選択</h4>
+                    <p>検品待ちの出荷指示一覧から対象を選択します</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h4>QRコードをスキャン</h4>
+                    <p>商品に貼付されたQRコードを順次スキャンします</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h4>検品完了</h4>
+                    <p>全ての商品をスキャン後、検品完了ボタンを押すだけ</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主な特徴 -->
+        <div class="key-features">
+            <h2 class="section-title" style="font-size: 18pt;">システムの特徴</h2>
+
+            <div class="features-list">
+                <div class="feature-item">
+                    <span>重複スキャン検知機能</span>
+                </div>
+                <div class="feature-item">
+                    <span>検品履歴の自動記録</span>
+                </div>
+                <div class="feature-item">
+                    <span>合格率のリアルタイム表示</span>
+                </div>
+                <div class="feature-item">
+                    <span>印刷機能（QRコード付き）</span>
+                </div>
+                <div class="feature-item">
+                    <span>Docker完全対応</span>
+                </div>
+                <div class="feature-item">
+                    <span>PostgreSQL高速DB</span>
+                </div>
+                <div class="feature-item">
+                    <span>SSL/TLS暗号化通信</span>
+                </div>
+                <div class="feature-item">
+                    <span>WSL2環境で動作</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 技術スタック -->
+        <div class="tech-stack">
+            <h3>技術スタック</h3>
+
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <strong>フロントエンド</strong>
+                    Vanilla JavaScript (ES6+)<br>
+                    Bootstrap 5, HTML5
+                </div>
+
+                <div class="tech-item">
+                    <strong>バックエンド</strong>
+                    Node.js 18+<br>
+                    Express, PostgreSQL 15
+                </div>
+
+                <div class="tech-item">
+                    <strong>インフラ</strong>
+                    Docker Compose<br>
+                    nginx (Reverse Proxy)
+                </div>
+
+                <div class="tech-item">
+                    <strong>監視（オプション）</strong>
+                    Grafana + Prometheus<br>
+                    リアルタイム分析
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="footer">
+            <h3>お問い合わせ</h3>
+
+            <div class="qr-code-placeholder">
+                <div style="text-align: center;">
+                    <div style="font-size: 28pt; margin-bottom: 5px;">📱</div>
+                    <div>QRコード</div>
+                    <div style="font-size: 8pt; margin-top: 3px;">(デモサイトURL)</div>
+                </div>
+            </div>
+
+            <div class="contact-info">
+                <strong>詳細はWebサイトをご覧ください</strong><br>
+                📧 Email: info@example.com<br>
+                📞 Tel: 03-XXXX-XXXX<br>
+                🌐 https://example.com
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 印刷プレビュー用のスクリプト
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('展示会用チラシが読み込まれました');
+            console.log('印刷する場合は、ブラウザの印刷機能または右上の「印刷する」ボタンをクリックしてください');
+        });
+    </script>
+</body>
+</html>

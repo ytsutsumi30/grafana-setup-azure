@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>製品マスタ管理</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #6f42c1, #9171d4);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+        }
+        .btn-action {
+            min-width: 80px;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(111, 66, 193, 0.05);
+        }
+        .badge-stock {
+            font-size: 0.9rem;
+            padding: 0.4rem 0.8rem;
+        }
+        .modal-header {
+            background: linear-gradient(135deg, #6f42c1, #9171d4);
+            color: white;
+        }
+        .required-field::after {
+            content: " *";
+            color: #dc3545;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        /* 印刷用スタイル */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printArea, #printArea * {
+                visibility: visible;
+            }
+            #printArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .page-header, .card, .btn, .modal-header, .modal-footer {
+                display: none !important;
+            }
+        }
+        
+        .print-document {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'MS Gothic', monospace;
+        }
+        
+        .print-header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .print-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .print-info-table {
+            width: 100%;
+            margin-bottom: 20px;
+            border-collapse: collapse;
+        }
+        
+        .print-info-table td {
+            padding: 8px;
+            border: 1px solid #000;
+        }
+        
+        .print-info-table .label {
+            background-color: #f0f0f0;
+            width: 150px;
+            font-weight: bold;
+        }
+        
+        .print-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        .print-items-table th,
+        .print-items-table td {
+            padding: 10px;
+            border: 1px solid #000;
+            text-align: left;
+        }
+        
+        .print-items-table th {
+            background-color: #e0e0e0;
+            font-weight: bold;
+        }
+        
+        .print-items-table .text-right {
+            text-align: right;
+        }
+        
+        .print-footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #000;
+        }
+        
+        .print-notes {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 80px;
+        }
+    </style>
+</head>
+<body>
+    <!-- ローディングオーバーレイ -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="fas fa-box-open me-2"></i>製品マスタ管理</h1>
+                    <p class="mb-0">製品情報の登録・編集・削除</p>
+                </div>
+                <div>
+                    <a href="maintenance.html" class="btn btn-light btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>メンテナンスメニューに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container mb-5">
+        <!-- アクションボタン -->
+        <div class="row mb-4">
+            <div class="col">
+                <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#productModal" onclick="openCreateModal()">
+                    <i class="fas fa-plus-circle me-2"></i>新規製品登録
+                </button>
+                <button class="btn btn-outline-secondary btn-lg ms-2" onclick="loadProducts()">
+                    <i class="fas fa-sync-alt me-2"></i>更新
+                </button>
+            </div>
+        </div>
+
+        <!-- 製品一覧テーブル -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>製品一覧</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>製品コード</th>
+                                <th>製品名</th>
+                                <th>カテゴリー</th>
+                                <th>単価</th>
+                                <th>現在庫</th>
+                                <th>利用可能在庫</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-5">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-3">データを読み込んでいます...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 製品登録・編集モーダル -->
+    <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productModalLabel">
+                        <i class="fas fa-box-open me-2"></i><span id="modalTitle">新規製品登録</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="productForm">
+                        <input type="hidden" id="productId">
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="productCode" class="form-label required-field">製品コード</label>
+                                <input type="text" class="form-control" id="productCode" maxlength="50" required>
+                                <div class="invalid-feedback">製品コードを入力してください</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="category" class="form-label">カテゴリー</label>
+                                <input type="text" class="form-control" id="category" maxlength="100">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="productName" class="form-label required-field">製品名</label>
+                            <input type="text" class="form-control" id="productName" maxlength="255" required>
+                            <div class="invalid-feedback">製品名を入力してください</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">説明</label>
+                            <textarea class="form-control" id="description" rows="3"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="unitPrice" class="form-label">単価（円）</label>
+                                <input type="number" class="form-control" id="unitPrice" min="0" step="0.01">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>キャンセル
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveProduct()">
+                        <i class="fas fa-save me-2"></i>保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 印刷モーダル -->
+    <div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="printModalLabel">
+                        <i class="fas fa-print me-2"></i><span id="printModalTitle">伝票印刷</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="printArea" class="print-document">
+                        <!-- 伝票内容がここに動的生成される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>閉じる
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="printDocument()">
+                        <i class="fas fa-print me-2"></i>印刷
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        const API_BASE_URL = '/api';
+        let currentEditingId = null;
+
+        // ページ読み込み時に製品一覧を取得
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProducts();
+        });
+
+        // ローディング表示制御
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        // 製品一覧取得
+        async function loadProducts() {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/products`);
+                if (!response.ok) throw new Error('製品一覧の取得に失敗しました');
+                
+                const products = await response.json();
+                renderProductsTable(products);
+            } catch (error) {
+                console.error('Error loading products:', error);
+                showError('製品一覧の取得に失敗しました');
+                document.getElementById('productsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-danger py-5">
+                            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                            <p>${error.message}</p>
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // テーブル描画
+        function renderProductsTable(products) {
+            const tbody = document.getElementById('productsTableBody');
+            
+            if (products.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>製品が登録されていません</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = products.map(product => `
+                <tr>
+                    <td><strong>${escapeHtml(product.product_code)}</strong></td>
+                    <td>${escapeHtml(product.product_name)}</td>
+                    <td>${product.category ? `<span class="badge bg-info">${escapeHtml(product.category)}</span>` : '<span class="text-muted">-</span>'}</td>
+                    <td>${product.unit_price !== null ? `¥${Number(product.unit_price).toLocaleString()}` : '<span class="text-muted">-</span>'}</td>
+                    <td>
+                        ${product.current_stock !== null ? 
+                            `<span class="badge badge-stock ${getStockBadgeClass(product.current_stock)}">${product.current_stock}</span>` : 
+                            '<span class="text-muted">-</span>'}
+                    </td>
+                    <td>
+                        ${product.available_stock !== null ? 
+                            `<span class="badge badge-stock ${getStockBadgeClass(product.available_stock)}">${product.available_stock}</span>` : 
+                            '<span class="text-muted">-</span>'}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="openEditModal(${product.id})" title="編集">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-success btn-action me-1" onclick="openPrintModal(${product.id}, 'delivery')" title="納品伝票">
+                            <i class="fas fa-file-invoice"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info btn-action me-1" onclick="openPrintModal(${product.id}, 'order')" title="発注伝票">
+                            <i class="fas fa-file-alt"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteProduct(${product.id}, '${escapeHtml(product.product_code)}')" title="削除">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 在庫数に応じたバッジクラスを返す
+        function getStockBadgeClass(stock) {
+            if (stock === null || stock === undefined) return 'bg-secondary';
+            if (stock === 0) return 'bg-danger';
+            if (stock < 100) return 'bg-warning text-dark';
+            return 'bg-success';
+        }
+
+        // 新規登録モーダルを開く
+        function openCreateModal() {
+            currentEditingId = null;
+            document.getElementById('modalTitle').textContent = '新規製品登録';
+            document.getElementById('productForm').reset();
+            document.getElementById('productForm').classList.remove('was-validated');
+            document.getElementById('productId').value = '';
+        }
+
+        // 編集モーダルを開く
+        async function openEditModal(productId) {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/${productId}`);
+                if (!response.ok) throw new Error('製品情報の取得に失敗しました');
+                
+                const product = await response.json();
+                
+                currentEditingId = productId;
+                document.getElementById('modalTitle').textContent = '製品編集';
+                document.getElementById('productId').value = product.id;
+                document.getElementById('productCode').value = product.product_code;
+                document.getElementById('productName').value = product.product_name;
+                document.getElementById('description').value = product.description || '';
+                document.getElementById('unitPrice').value = product.unit_price || '';
+                document.getElementById('category').value = product.category || '';
+                
+                document.getElementById('productForm').classList.remove('was-validated');
+                
+                const modal = new bootstrap.Modal(document.getElementById('productModal'));
+                modal.show();
+            } catch (error) {
+                console.error('Error loading product:', error);
+                showError('製品情報の取得に失敗しました');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 製品保存（新規登録・更新）
+        async function saveProduct() {
+            const form = document.getElementById('productForm');
+            
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+
+            const productData = {
+                product_code: document.getElementById('productCode').value.trim(),
+                product_name: document.getElementById('productName').value.trim(),
+                description: document.getElementById('description').value.trim() || null,
+                unit_price: document.getElementById('unitPrice').value ? parseFloat(document.getElementById('unitPrice').value) : null,
+                category: document.getElementById('category').value.trim() || null
+            };
+
+            showLoading();
+            try {
+                const productId = document.getElementById('productId').value;
+                const url = productId ? `${API_BASE_URL}/products/${productId}` : `${API_BASE_URL}/products`;
+                const method = productId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(productData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '保存に失敗しました');
+                }
+
+                const savedProduct = await response.json();
+                
+                showSuccess(productId ? '製品情報を更新しました' : '製品を登録しました');
+                
+                // モーダルを閉じる
+                const modal = bootstrap.Modal.getInstance(document.getElementById('productModal'));
+                modal.hide();
+                
+                // 一覧を再読み込み
+                await loadProducts();
+            } catch (error) {
+                console.error('Error saving product:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 製品削除
+        async function deleteProduct(productId, productCode) {
+            if (!confirm(`製品「${productCode}」を削除してもよろしいですか？\n\n※関連データがある場合は削除できません。`)) {
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '削除に失敗しました');
+                }
+
+                showSuccess('製品を削除しました');
+                await loadProducts();
+            } catch (error) {
+                console.error('Error deleting product:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 成功メッセージ表示
+        function showSuccess(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '10000';
+            alert.innerHTML = `
+                <i class="fas fa-check-circle me-2"></i>${escapeHtml(message)}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+
+        // エラーメッセージ表示
+        function showError(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '10000';
+            alert.innerHTML = `
+                <i class="fas fa-exclamation-circle me-2"></i>${escapeHtml(message)}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // 印刷モーダルを開く
+        async function openPrintModal(productId, documentType) {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/${productId}`);
+                if (!response.ok) throw new Error('製品情報の取得に失敗しました');
+                
+                const product = await response.json();
+                
+                // モーダルタイトル設定
+                const modalTitle = documentType === 'delivery' ? '納品伝票' : '発注伝票';
+                document.getElementById('printModalTitle').textContent = modalTitle;
+                
+                // 伝票生成
+                generateDocument(product, documentType);
+                
+                const modal = new bootstrap.Modal(document.getElementById('printModal'));
+                modal.show();
+            } catch (error) {
+                console.error('Error loading product for print:', error);
+                showError('製品情報の取得に失敗しました');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 伝票生成
+        function generateDocument(product, documentType) {
+            const today = new Date().toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            
+            const documentNumber = generateDocumentNumber(documentType);
+            const title = documentType === 'delivery' ? '納品伝票' : '発注伝票';
+            const defaultQuantity = 1;
+            const subtotal = product.unit_price ? product.unit_price * defaultQuantity : 0;
+            const tax = Math.floor(subtotal * 0.1);
+            const total = subtotal + tax;
+            
+            const html = `
+                <div class="print-header">
+                    <div class="print-title">${title}</div>
+                    <div>伝票番号: ${documentNumber}</div>
+                </div>
+                
+                <table class="print-info-table">
+                    <tr>
+                        <td class="label">発行日</td>
+                        <td>${today}</td>
+                        <td class="label">担当者</td>
+                        <td>__________________</td>
+                    </tr>
+                    <tr>
+                        <td class="label">${documentType === 'delivery' ? '納品先' : '発注先'}</td>
+                        <td colspan="3">
+                            <div>〒000-0000</div>
+                            <div>東京都○○区○○ 1-2-3</div>
+                            <div>株式会社 ○○○○</div>
+                        </td>
+                    </tr>
+                    ${documentType === 'delivery' ? `
+                    <tr>
+                        <td class="label">出荷元</td>
+                        <td colspan="3">
+                            <div>株式会社 生産管理システム</div>
+                            <div>〒100-0001 東京都千代田区○○ 1-1-1</div>
+                        </td>
+                    </tr>
+                    ` : ''}
+                </table>
+                
+                <table class="print-items-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">No.</th>
+                            <th style="width: 150px;">製品コード</th>
+                            <th>製品名</th>
+                            <th style="width: 100px;" class="text-right">数量</th>
+                            <th style="width: 120px;" class="text-right">単価</th>
+                            <th style="width: 120px;" class="text-right">金額</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-right">1</td>
+                            <td>${escapeHtml(product.product_code)}</td>
+                            <td>${escapeHtml(product.product_name)}</td>
+                            <td class="text-right">${defaultQuantity}</td>
+                            <td class="text-right">${product.unit_price !== null ? '¥' + Number(product.unit_price).toLocaleString() : '-'}</td>
+                            <td class="text-right">${product.unit_price !== null ? '¥' + Number(subtotal).toLocaleString() : '-'}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="6" style="height: 100px; border-bottom: none;"></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" class="text-right" style="font-weight: bold;">小計</td>
+                            <td class="text-right">${product.unit_price !== null ? '¥' + Number(subtotal).toLocaleString() : '-'}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" class="text-right" style="font-weight: bold;">消費税（10%）</td>
+                            <td class="text-right">${product.unit_price !== null ? '¥' + Number(tax).toLocaleString() : '-'}</td>
+                        </tr>
+                        <tr style="background-color: #f0f0f0;">
+                            <td colspan="5" class="text-right" style="font-weight: bold; font-size: 1.2em;">合計金額</td>
+                            <td class="text-right" style="font-weight: bold; font-size: 1.2em;">${product.unit_price !== null ? '¥' + Number(total).toLocaleString() : '-'}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+                
+                <div class="print-notes">
+                    <strong>備考</strong><br>
+                    ${product.description ? escapeHtml(product.description) : ''}
+                </div>
+                
+                <div class="print-footer">
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="width: 50%;">
+                                <div><strong>発行者</strong></div>
+                                <div>株式会社 生産管理システム</div>
+                                <div>TEL: 03-1234-5678</div>
+                            </td>
+                            <td style="width: 50%; text-align: right;">
+                                <div><strong>承認印</strong></div>
+                                <div style="border: 1px solid #000; width: 80px; height: 60px; display: inline-block; margin-top: 5px;"></div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            
+            document.getElementById('printArea').innerHTML = html;
+        }
+
+        // 伝票番号生成
+        function generateDocumentNumber(documentType) {
+            const prefix = documentType === 'delivery' ? 'DEL' : 'PO';
+            const date = new Date();
+            const dateStr = date.getFullYear().toString() +
+                          (date.getMonth() + 1).toString().padStart(2, '0') +
+                          date.getDate().toString().padStart(2, '0');
+            const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+            return `${prefix}-${dateStr}-${random}`;
+        }
+
+        // 印刷実行
+        function printDocument() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

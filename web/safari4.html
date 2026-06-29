@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>バーコード・QRコードスキャナー</title>
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f9f9f9;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fff;
+            min-height: 100px;
+            text-align: left;
+        }
+
+        .result-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .code-type {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .code-data {
+            word-break: break-all;
+            margin-top: 5px;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        #controls {
+            margin: 20px 0;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+            font-size: 1em;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #clear-btn {
+            background-color: #dc3545;
+        }
+
+        #clear-btn:hover {
+            background-color: #c82333;
+        }
+
+    </style>
+</head>
+<body>
+    <h1>バーコード・QRコードスキャナー</h1>
+    
+    <div id="reader"></div>
+    
+    <div id="controls">
+        <button id="start-btn">スキャン開始</button>
+        <button id="stop-btn" disabled>スキャン停止</button>
+        <button id="clear-btn">結果クリア</button>
+    </div>
+    
+    <div id="result">
+        <h2>スキャン結果</h2>
+        <div id="result-list"></div>
+    </div>
+
+    <!-- html5-qrcode ライブラリ -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const html5QrCode = new Html5Qrcode("reader");
+            let scanning = false;
+            
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const resultList = document.getElementById('result-list');
+
+            // スキャン開始ボタンのイベントリスナー
+            startBtn.addEventListener('click', function() {
+                if (scanning) return;
+                
+                const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                    const codeType = decodedResult.result.format.formatName;
+                    addResultItem(codeType, decodedText);
+                };
+                
+                const config = { 
+                    fps: 1,    // １秒間に何回スキャンするか
+                    qrbox: { width: 250, height: 250 },
+                    formatsToSupport: [
+                        // 1次元コード
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.CODE_93,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.ITF,
+                        // 2次元コード
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.DATA_MATRIX,
+                        Html5QrcodeSupportedFormats.AZTEC,
+                        Html5QrcodeSupportedFormats.PDF_417
+                    ]
+                };
+                
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config,
+                    qrCodeSuccessCallback
+                ).then(() => {
+                    scanning = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    console.log("スキャンを開始しました");
+                    
+                }).catch(err => {
+                    console.error("スキャン開始エラー:", err);
+                    alert("カメラのアクセスに失敗しました: " + err);
+                });
+            });
+            
+            // スキャン停止ボタンのイベントリスナー
+            stopBtn.addEventListener('click', function() {
+                if (!scanning) return;
+                
+                html5QrCode.stop().then(() => {
+                    scanning = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    console.log("スキャンを停止しました");
+                }).catch(err => {
+                    console.error("スキャン停止エラー:", err);
+                });
+            });
+            
+            // 結果クリアボタンのイベントリスナー
+            clearBtn.addEventListener('click', function() {
+                resultList.innerHTML = '';
+            });
+            
+            // 結果を追加する関数
+            function addResultItem(codeType, codeData) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString();
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                resultItem.innerHTML = `
+                    <div class="code-type">${codeType}</div>
+                    <div class="code-data">${codeData}</div>
+                    <div class="timestamp">${timeStr}</div>
+                `;
+                
+                resultList.insertBefore(resultItem, resultList.firstChild);
+                
+                // 読み取り音を再生（オプション）
+                playBeepSound();
+            }
+            
+            // ビープ音を鳴らす関数
+            function playBeepSound() {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                const gainNode = context.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(context.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 1000; // 周波数
+                gainNode.gain.value = 0.1; // 音量
+                
+                oscillator.start();
+                oscillator.stop(context.currentTime + 0.1);
+            }
+
+            // ページアンロード時にスキャンを停止
+            window.addEventListener('beforeunload', () => {
+                if (html5QrCode.getState() === Html5QrcodeScannerState.SCANNING) {
+                    html5QrCode.stop().then(() => {
+                        console.log("ページ離脱時にスキャンを停止しました");
+                    }).catch(err => {
+                        console.error("ページ離脱時の停止エラー:", err);
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

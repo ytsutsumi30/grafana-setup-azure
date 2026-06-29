@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=9">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- UserControl.js library -->
+    <script type="text/javascript" src="../$app/scripts/UserControl.js"></script>
+    
+    <!-- QR Scanner library -->
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    
+    <!-- Tailwind CSS CDN for responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!--Cookie test-->
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+        
+        /* iPad対応のレスポンシブデザイン */
+        @media (max-width: 768px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+            .qr-section {
+                order: 2;
+            }
+            .work-section {
+                order: 1;
+            }
+            .detail-section {
+                order: 3;
+            }
+        }
+        
+        @media (min-width: 768px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+                gap: 20px;
+            }
+            .work-section {
+                grid-column: 1;
+                grid-row: 1;
+            }
+            .qr-section {
+                grid-column: 2;
+                grid-row: 1;
+            }
+        }
+        
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .main-layout {
+            display: grid;
+            height: 100%;
+        }
+        
+        .page-title {
+            color: #374151;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 24px;
+            text-align: left;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .work-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        
+        .qr-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            background: #6062f3;
+            color: white;
+        }
+        
+        .item-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .info-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .action-button {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+        
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+        
+        .save-button {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+        }
+        
+        .save-button:hover {
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+        }
+
+        .back-button {
+            background: #6b7280;
+            margin-right: 12px;
+        }
+        
+        .back-button:hover {
+            background: #4b5563;
+        }
+        
+        .detail-table-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            min-height: 30px;
+        }
+        
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .detail-table th {
+            background: #f9fafb;
+            color: #374151;
+            font-weight: 600;
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 2px solid #e5e7eb;
+            font-size: 13px;
+            white-space: normal;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .detail-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+        
+        .detail-table tbody tr {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .detail-table tbody tr:hover {
+            background: #f8fafc;
+        }
+        
+        .detail-table tbody tr.matched {
+            background: #d1fae5;
+            border-left: 4px solid #059669;
+        }
+        
+        .detail-table tbody tr.selected {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .lot-number {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #1e293b;
+            word-break: break-all;
+        }
+        
+        .storage-location {
+            color: #6366f1;
+            font-weight: 500;
+        }
+        
+        .quantity-cell {
+            text-align: right;
+            font-weight: 600;
+            color: #059669;
+        }
+        
+        .picking-status {
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .picking-num {
+            text-align: right;
+            font-weight: 600;
+            border: 1px solid #cfcfcf;
+            width: 80%;
+            max-width: 150px;  
+            min-width: 30px;  
+        }
+        .status-pending {
+            color: #dc2626;
+        }
+        
+        .status-completed {
+            color: #059669;
+        }
+        
+        .item-id-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+            color: #475569;
+            word-break: break-all;
+        }
+        
+        .matching-cell {
+            text-align: center;
+            color: #6b7280;
+        }
+        
+        /* QRスキャン関連スタイル */
+        .qr-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        
+        .qr-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .qr-button {
+            background: rgba(255, 255, 255, 0.9);
+            color: #1e293b;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .qr-button:hover {
+            background: white;
+            transform: translateY(-1px);
+        }
+        
+        .qr-button.start {
+            background: #059669;
+            color: white;
+        }
+        
+        .qr-button.start:hover {
+            background: #047857;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            margin-bottom: 12px;
+            display: none;
+        }
+        
+        #qr-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .scan-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 180px;
+            height: 180px;
+            border: 3px dashed rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+        }
+        
+        .qr-result {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            max-height: 60px;
+            overflow-y: auto;
+        }
+        
+        .status-message {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        .success { 
+            background-color: rgba(212, 237, 218, 0.9); 
+            color: #155724; 
+            border: 1px solid rgba(195, 230, 203, 0.9); 
+        }
+        
+        .error { 
+            background-color: rgba(248, 215, 218, 0.9); 
+            color: #721c24; 
+            border: 1px solid rgba(245, 198, 203, 0.9); 
+        }
+        
+        .info { 
+            background-color: rgba(209, 236, 241, 0.9); 
+            color: #0c5460; 
+            border: 1px solid rgba(190, 229, 235, 0.9); 
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            border-radius: 12px;
+        }
+        
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-container">
+        <!-- ページタイトル -->
+        <h1 class="page-title" style="font-size:14px; margin-bottom:12px; padding:8px;">ピッキング作業</h1>
+        
+        <div class="main-layout">
+            <!-- 作業セクション -->
+            <div class="work-section">
+                <!-- ローディングオーバーレイ -->
+                <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                    <div class="loading-spinner"></div>
+                </div>
+                <!-- 品目情報ヘッダー＋QRコードスキャン 横並び -->
+                <div class="header-qr-row">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="info-group">
+                                <div class="info-label">Item Name</div>
+                                <div class="info-value" id="itemName">パネル1</div>
+                            </div>
+                            <div class="info-group">
+                                <div class="info-label">Item ID</div>
+                                <div class="info-value" id="itemId">A01</div>
+                            </div>
+                            <div class="info-group">
+                                <div class="info-label">品目数</div>
+                                <div class="info-value" id="itemQuantity">100</div>
+                            </div>
+                        </div>
+                        <div class="button-group">
+                            <button type="button" class="action-button back-button" id="matchingButton" onclick="goBack()">
+                                戻る
+                            </button>
+                            <button type="button" class="action-button save-button" id="saveButton" onclick="savePickingData()">
+                                保存
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qr-section-inline">
+                        <div id="qrStatusMessage" class="status-message" style="display: none;"></div>
+                        <div class="qr-controls">
+                            <button type="button" class="qr-button start" onclick="PickingWork.startQRScan()">
+                                開始
+                            </button>
+                            <button type="button" class="qr-button" onclick="PickingWork.stopQRScan()">
+                                停止
+                            </button>
+                            <button type="button" class="qr-button" onclick="PickingWork.manualQRInput()">
+                                手入力
+                            </button>
+                        </div>
+                        <div class="video-container" id="videoContainer">
+                            <video id="qr-video" playsinline></video>
+                            <div class="scan-overlay"></div>
+                        </div>
+                        <div class="qr-result" id="qrResult">
+                            QRコードをスキャンしてください
+                        </div>
+                    </div>
+                </div>
+    <style>
+    /* 品目情報ヘッダーとQRコードスキャン横並び用 */
+    .header-qr-row {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        flex: auto;
+        min-width: 260px;
+    }
+    .qr-section-inline {
+        background: #e0f2fe;
+        color: #1e293b;
+        border-radius: 12px;
+        padding: 20px 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        min-width: 240px;
+        flex: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .item-header {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 16px;
+        border: 2px solid #e2e8f0;
+        min-width: 240px;
+        flex: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+        
+    @media (max-width: 260px) {
+        .header-qr-row {
+            flex-direction: column;
+            gap: 12px;
+        }
+        .qr-section-inline .item-header {
+            max-width: 100%;
+            min-width: 0;
+            width: 100%;
+        }
+    }
+    </style>
+                <!-- 詳細テーブル -->
+                <div class="detail-table-container">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>選択</th>
+                                <th>ロット</th>
+                                <th>倉庫</th>
+                                <th>場所</th>
+                                <th>品目数</th>
+                                <th>ピック状況</th>
+                                <th>ピック数</th>
+                                <th>品目ID</th>
+                                <th>照合結果</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailTableBody">
+                            <!-- 詳細データがここに挿入されます -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // ピッキング作業 UserControl（QRスキャン統合）
+        var PickingWork = {
+            
+            // QRスキャナー
+            qrScanner: null,
+            lastQRValue: '',
+            
+            // 現在のデータ
+            currentData: {
+                itemName: 'パネル1',
+                itemId: 'A01',
+                itemQuantity: 100,
+                Items: []
+            },
+            
+            selectedRows: new Set(),
+            
+            // 初期化
+            init: function() {
+                console.log('Picking Work with QR Scanner initialized');
+                // 修正ST
+                // タイミングをずらす
+                setTimeout(() => {
+                    console.log('Executing after 200ms delay...');
+                    this.loadData();
+                    this.bindEvents();
+                }, 200); 
+                // 修正ED
+            },
+            
+            // データ読み込み
+            loadData: function() {
+                this.showLoading(true);
+                
+                // CSIから詳細データを取得
+                // this.callCSI('GetPickingDetails', [], function(result) {
+                //     if (result && result.success) {
+                //         PickingWork.currentData = result.data;
+                //         PickingWork.displayData(result.data);
+                //     } else {
+                //         // モックデータを使用
+                //         PickingWork.loadMockData();
+                //     }
+                //     PickingWork.showLoading(false);
+                // });
+
+                // 修正ST
+                // 初期データ
+                if (typeof WSForm !== 'undefined') {
+                    WSForm.getVarValue('vJSONResult',function(JSONResult){ 
+                        const data = JSON.parse(JSONResult);
+                        PickingWork.displayData(data); 
+                    });
+                    PickingWork.showLoading(false);
+                }
+                // 修正ED
+            
+
+                this.showLoading(false);
+            },
+            
+            // モックデータ読み込み
+            loadMockData: function() {
+                var mockData = {
+                    itemName: 'パネル1',
+                    itemId: 'A01',
+                    itemQuantity: 100,
+                    Items: [
+                        {
+                            id: 1,
+                            Lot: 'L0001',
+                            Whse: '第一倉庫',
+                            Loc: 'ST01',
+                            QtyOnHand: 200,
+                            sPickingStatus: 0,
+                            PickingNum: 1,
+                            Item: 'A01928391829841',
+                            sMatching: '',
+                            matched: false
+                        },
+                        {
+                            id: 2,
+                            Lot: 'L0002',
+                            Whse: '第一倉庫',
+                            Loc: 'ST01',
+                            QtyOnHand: 20,
+                            sPickingStatus: 0,
+                            PickingNum: 2,
+                            Item: 'A01',
+                            sMatching: '',
+                            matched: false
+                        },
+                        {
+                            id: 3,
+                            Lot: 'L0003',
+                            Whse: '第一倉庫',
+                            Loc: 'ST01',
+                            QtyOnHand: 30,
+                            sPickingStatus: 0,
+                            PickingNum: 3,
+                            Item: 'A02',
+                            sMatching: '',
+                            matched: false
+                        }
+                    ]
+                };
+                
+                this.currentData = mockData;
+                this.displayData(mockData);
+            },
+            
+            // データ表示
+            displayData: function(data) {
+                // ヘッダー情報更新
+                document.getElementById('itemName').textContent = data.itemName;
+                document.getElementById('itemId').textContent = data.itemId;
+                document.getElementById('itemQuantity').textContent = Number.parseFloat(data.itemQuantity).toLocaleString();
+                
+                // 詳細テーブル更新
+                this.displayItems(data.Items);
+            },
+            
+            // 詳細テーブル表示
+            displayItems: function(Items) {
+                var tableBody = document.getElementById('detailTableBody');
+                tableBody.innerHTML = '';
+                
+                Items.forEach(function(detail, index) {
+                    var row = document.createElement('tr');
+                    row.dataset.id = detail.id;
+                    row.onclick = function() {
+                        PickingWork.toggleRowSelection(detail.id, row);
+                    };
+                    
+                    if (detail.matched) {
+                        row.classList.add('matched');
+                    }
+                    
+                    row.innerHTML = `
+                        <td>
+                            <input type="checkbox" id="check_${detail.Lot}" onchange="PickingWork.handleCheckboxChange(${detail.Lot}, this)">
+                        </td>
+                        <td><span class="lot-number">${detail.Lot}</span></td>
+                        <td><span class="storage-location">${detail.Whse}</span></td>
+                        <td><span class="storage-location">${detail.Loc}</span></td>
+                        <td><span class="quantity-cell">${Number.parseFloat(detail.QtyOnHand).toLocaleString()}</span></td>
+                        <td><span class="picking-status ${detail.sPickingStatus === 0 ? 'status-pending' : 'status-completed'}">${detail.sPickingStatus}</span></td>
+                        <td>
+                            <input type="text" class="picking-num" value="${detail.PickingNum || '0'}" onchange="PickingWork.handlePickingNumChange(${detail.id}, this.value)"">
+                        </td>
+                        <td><span class="item-id-cell">${detail.Item}</span></td>
+                        <td><span class="matching-cell">${detail.sMatching || '-'}</span></td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                this.currentData.Items = Items;
+            },
+            
+            // 行選択切り替え
+            toggleRowSelection: function(detailId, row) {
+                var checkbox = document.getElementById('check_' + detailId);
+                checkbox.checked = !checkbox.checked;
+                this.handleCheckboxChange(detailId, checkbox);
+            },
+            
+            // チェックボックス変更処理
+            handleCheckboxChange: function(detailId, checkbox) {
+                var row = checkbox.closest('tr');
+                
+                if (checkbox.checked) {
+                    this.selectedRows.add(detailId);
+                    row.classList.add('selected');
+                } else {
+                    this.selectedRows.delete(detailId);
+                    row.classList.remove('selected');
+                }
+                
+                this.notifySelectionChange();
+            },
+            
+            // 選択変更をCSIに通知
+            notifySelectionChange: function() {
+                if (typeof WSForm !== 'undefined') {
+                    var selectedIds = Array.from(this.selectedRows);
+                    WSForm.setVarValue('SelectedDetailIds', JSON.stringify(selectedIds));
+                    WSForm.setVarValue('SelectedDetailCount', selectedIds.length);
+                    
+                    WSForm.generate('DetailSelectionChanged', function(result) {
+                        console.log('Selection change event:', result);
+                    });
+                }
+            },
+            
+            // 戻る
+            goBack: function() {
+                if (typeof WSForm !== 'undefined') {
+                    // 修正ST
+                    // 詳細画面を開くメソッドを呼び出し
+                    WSForm.generate('ReturnToDetail');
+                    // 修正ED
+                } 
+            },
+            
+            // マッチング結果適用
+            applyMatchingResults: function(matchedItems) {
+                if (!matchedItems || matchedItems.length === 0) return;
+                
+                matchedItems.forEach(function(matchedItem) {
+                    var detail = PickingWork.currentData.Items.find(function(d) {
+                        return d.id === matchedItem.id;
+                    });
+                    
+                    if (detail) {
+                        detail.sMatching = matchedItem.matchingValue;
+                        detail.matched = true;
+                    }
+                });
+                
+                // テーブル再表示
+                this.displayItems(this.currentData.Items);
+            },
+            
+            // 保存処理
+            savePickingData: function() {
+                this.showLoading(true);
+                
+                var saveData = {
+                    itemData: {
+                        itemName: this.currentData.itemName,
+                        itemId: this.currentData.itemId,
+                        itemQuantity: this.currentData.itemQuantity
+                    },
+                    Items: this.currentData.Items,
+                    qrValue: this.lastQRValue
+                };
+                
+                // CSI保存処理呼び出し
+                // this.callCSI('SavePickingData', [saveData], function(result) {
+                //     PickingWork.showLoading(false);
+                    
+                //     if (result && result.success) {
+                //         alert('ピッキングデータを保存しました。');
+                        
+                //         // 保存完了イベント生成
+                //         if (typeof WSForm !== 'undefined') {
+                //             WSForm.generate('PickingSaved', function(eventResult) {
+                //                 console.log('Picking saved event:', eventResult);
+                //             });
+                //         }
+                //     } else {
+                //         alert('保存に失敗しました: ' + (result.message || 'Unknown error'));
+                //     }
+                // });
+
+                if (typeof WSForm !== 'undefined') {
+                    // 修正ST
+                    // 詳細画面を開くメソッドを呼び出し
+                    WSForm.generate('ReturnToDetail');
+                    // 修正ED
+                } 
+            },
+            
+            // 選択クリア
+            clearSelection: function() {
+                this.selectedRows.clear();
+                var checkboxes = document.querySelectorAll('#detailTableBody input[type="checkbox"]');
+                checkboxes.forEach(function(cb) {
+                    cb.checked = false;
+                });
+                var rows = document.querySelectorAll('#detailTableBody tr');
+                rows.forEach(function(row) {
+                    row.classList.remove('selected');
+                });
+                this.notifySelectionChange();
+            },
+            
+            // QRスキャン開始
+            startQRScan: function() {
+                var videoElement = document.getElementById("qr-video");
+                var container = document.getElementById('videoContainer');
+                
+                container.style.display = 'block';
+                
+                if (typeof QrScanner !== 'undefined') {
+                    this.qrScanner = new QrScanner(
+                        videoElement,
+                        function(result) {
+                            PickingWork.handleQRResult(result.data || result);
+                        },
+                        {
+                            returnDetailedScanResult: true,
+                            highlightScanRegion: false,
+                            highlightCodeOutline: false
+                        }
+                    );
+                    
+                    this.qrScanner.start().then(function() {
+                        PickingWork.showQRStatus('QRコードをスキャン中...', 'info');
+                    }).catch(function(error) {
+                        PickingWork.showQRStatus('カメラアクセスエラー: ' + error.message, 'error');
+                    });
+                } else {
+                    this.showQRStatus('QRスキャナーライブラリが読み込まれていません', 'error');
+                }
+            },
+            
+            // QRスキャン停止
+            stopQRScan: function() {
+                if (this.qrScanner) {
+                    this.qrScanner.stop();
+                    this.qrScanner.destroy();
+                    this.qrScanner = null;
+                }
+                document.getElementById('videoContainer').style.display = 'none';
+                this.showQRStatus('QRスキャンを停止しました', 'info');
+            },
+            
+            // QR結果処理
+            handleQRResult: function(data) {
+                this.lastQRValue = data;
+                document.getElementById("qrResult").textContent = 'スキャン結果: ' + data;
+                this.stopQRScan();
+                this.showQRStatus('QRコードを読み取りました', 'success');
+                
+                // CSIに結果を通知
+                // if (typeof WSForm !== 'undefined') {
+                //     WSForm.setVarValue("HiddenValue", this.lastQRValue, function(result) {
+                //         console.log('QR value set to CSI:', result);
+                //     });
+                    
+                //     // マッチング処理を自動実行
+                //     WSForm.generate("matchGridItems", "", function(result) {
+                //         console.log('Match grid items result:', result);
+                //     });
+                // }
+
+                // 修正ST
+                // JSで照合を処理
+                this.matchItems();
+                // 修正ED
+
+            },
+            
+            // 手動QR入力
+            manualQRInput: function() {
+                var input = prompt('QRコードの内容を手入力してください:');
+                if (input && input.trim()) {
+                    this.handleQRResult(input.trim());
+                }
+            },
+            
+            // QRステータス表示
+            showQRStatus: function(message, type) {
+                var statusDiv = document.getElementById("qrStatusMessage");
+                statusDiv.className = "status-message " + type;
+                statusDiv.textContent = message;
+                statusDiv.style.display = 'block';
+                
+                setTimeout(function() {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+            },
+
+            // 照合処理
+            matchItems:function(){
+                // QRで取得したデータと品目IDと照合
+                PickingWork.currentData.Items.forEach(function(item) {
+                    if (item.Item === PickingWork.lastQRValue) {
+                        item.sMatching = '一致';
+                        item.matched = true;
+                    } else {
+                        item.sMatching = '不一致';
+                        item.matched = false;
+                    }
+                });
+
+                // 照合結果でソート
+                PickingWork.currentData.Items.sort(function(a, b) {
+                    if (a.sMatching === b.sMatching) return 0;
+                    if (a.sMatching === '一致') return -1;
+                    if (b.sMatching === '一致') return 1;
+                    return a.sMatching.localeCompare(b.sMatching);
+                });
+
+                // テーブル再表示
+                PickingWork.displayItems(PickingWork.currentData.Items);
+            },
+            
+            // CSI API呼び出し
+            callCSI: function(method, params, callback) {
+                if (typeof WSForm !== 'undefined') {
+                    WSForm.invoke.apply(window, [].concat(method, params, callback));
+                } else {
+                    // 開発用モックレスポンス
+                    setTimeout(function() {
+                        if (method === 'PerformMatching') {
+                            callback({
+                                success: true,
+                                matchedItems: [
+                                    { id: 1, matchingValue: 'QR-' + Date.now() }
+                                ]
+                            });
+                        } else if (method === 'SavePickingData') {
+                            callback({ success: true });
+                        } else {
+                            callback({ success: false });
+                        }
+                    }, 1000);
+                }
+            },
+            
+            // ローディング表示制御
+            showLoading: function(show) {
+                var overlay = document.getElementById('loadingOverlay');
+                overlay.style.display = show ? 'flex' : 'none';
+            },
+            
+            // イベントバインディング
+            bindEvents: function() {
+                // 将来の拡張用
+            }
+        };
+        
+        // グローバル関数（HTML内のonclick用）
+        function goBack() {
+            PickingWork.goBack();
+        }
+        
+        function savePickingData() {
+            PickingWork.savePickingData();
+        }
+        
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            PickingWork.init();
+        });
+        
+        // CSI統合用の外部呼び出し関数
+        if (typeof WSForm !== 'undefined') {
+            // CSIから詳細データを設定
+            window.setPickingDetail = function(data) {
+                PickingWork.currentData = data;
+                PickingWork.displayData(data);
+            };
+            
+            // CSIから選択状態をクリア
+            window.clearPickingSelection = function() {
+                PickingWork.clearSelection();
+            };
+            
+            // CSIからQRスキャンを開始
+            window.startQRScanning = function() {
+                PickingWork.startQRScan();
+            };
+            
+            // CSIからマッチング実行
+            window.executeMatching = function() {
+                PickingWork.performMatching();
+            };
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-OCR 強化版デモ</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <!-- OCR強化モジュール -->
+    <script src="js/image-preprocessing.js"></script>
+    <script src="js/ocr-engine-enhanced.js"></script>
+    
+    <style>
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl shadow-lg p-6 mb-8">
+            <h1 class="text-3xl font-bold mb-2">🚀 AI-OCR 強化版デモ</h1>
+            <p class="text-blue-100">画像前処理 + Tesseract最適化 + ハイブリッドOCR</p>
+        </div>
+
+        <!-- 画像アップロード -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">📷 画像をアップロード</h2>
+            
+            <div class="flex gap-4 items-center mb-4">
+                <input type="file" id="imageInput" accept="image/*" class="flex-1 px-4 py-2 border rounded-lg">
+                <button onclick="processImage()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                    🔍 OCR実行
+                </button>
+            </div>
+
+            <!-- オプション -->
+            <div class="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <label class="flex items-center">
+                    <input type="checkbox" id="opt-preprocessing" checked class="mr-2">
+                    <span>画像前処理</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="opt-hybrid" class="mr-2">
+                    <span>ハイブリッドOCR</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="opt-quality-check" checked class="mr-2">
+                    <span>品質チェック</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="opt-postprocess" checked class="mr-2">
+                    <span>後処理補正</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- プログレス -->
+        <div id="progress" class="hidden bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div class="flex items-center gap-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span id="progress-text" class="text-gray-700 font-medium">処理中...</span>
+            </div>
+            <div class="mt-4 bg-gray-200 rounded-full h-2">
+                <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 画質評価 -->
+        <div id="quality-section" class="hidden bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h3 class="text-lg font-bold mb-4">📊 画質評価</h3>
+            <div id="quality-content" class="comparison-grid"></div>
+        </div>
+
+        <!-- 画像比較 -->
+        <div id="image-comparison" class="hidden comparison-grid mb-6"></div>
+
+        <!-- OCR結果 -->
+        <div id="result-section" class="hidden bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h3 class="text-lg font-bold mb-4">📝 OCR結果</h3>
+            
+            <!-- メトリクス -->
+            <div id="metrics" class="comparison-grid mb-6"></div>
+            
+            <!-- テキスト -->
+            <div class="border-t pt-4">
+                <h4 class="font-semibold mb-2">抽出テキスト:</h4>
+                <pre id="ocr-text" class="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap text-sm"></pre>
+            </div>
+
+            <!-- フィードバック -->
+            <div class="border-t pt-4 mt-4">
+                <h4 class="font-semibold mb-2">💬 フィードバック (オプション):</h4>
+                <textarea id="feedback-text" class="w-full px-4 py-2 border rounded-lg mb-2" rows="3" placeholder="修正後のテキストを入力してください..."></textarea>
+                <button onclick="submitFeedback()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    ✅ フィードバック送信
+                </button>
+            </div>
+        </div>
+
+        <!-- 統計情報 -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-bold mb-4">📈 累積統計</h3>
+            <div id="stats-content" class="text-gray-600">
+                <p>フィードバックを送信すると統計が表示されます</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ocrEngine;
+        let currentResult = null;
+        let originalImage = null;
+
+        // 初期化
+        window.onload = () => {
+            ocrEngine = new OCREngineEnhanced();
+            loadStats();
+        };
+
+        // 画像処理
+        async function processImage() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('画像を選択してください');
+                return;
+            }
+
+            // プログレス表示
+            showProgress('画像読み込み中...');
+
+            // 画像読み込み
+            originalImage = await loadImage(file);
+
+            // オプション取得
+            const usePreprocessing = document.getElementById('opt-preprocessing').checked;
+            const useHybrid = document.getElementById('opt-hybrid').checked;
+            const useQualityCheck = document.getElementById('opt-quality-check').checked;
+            const usePostProcess = document.getElementById('opt-postprocess').checked;
+
+            try {
+                // 品質チェック
+                if (useQualityCheck) {
+                    showProgress('画質評価中...');
+                    const quality = ocrEngine.preprocessor.assessImageQuality(originalImage);
+                    displayQuality(quality);
+                }
+
+                // 前処理
+                let processedImage = originalImage;
+                if (usePreprocessing) {
+                    showProgress('画像前処理中...');
+                    updateProgress(20);
+                    processedImage = await ocrEngine.preprocessor.processImage(originalImage);
+                    displayImageComparison(originalImage, processedImage);
+                }
+
+                // OCR実行
+                showProgress('OCR処理中...');
+                updateProgress(40);
+
+                let result;
+                if (useHybrid) {
+                    result = await ocrEngine.hybridOCR(processedImage, ['tesseract', 'textract']);
+                } else {
+                    result = await ocrEngine.tesseractEnhanced(processedImage);
+                }
+
+                updateProgress(80);
+
+                // 後処理
+                if (usePostProcess) {
+                    showProgress('テキスト補正中...');
+                    result = ocrEngine.postProcess(result);
+                }
+
+                updateProgress(100);
+                
+                // 結果表示
+                currentResult = result;
+                displayResult(result);
+                hideProgress();
+
+            } catch (error) {
+                console.error('OCRエラー:', error);
+                alert('OCR処理でエラーが発生しました: ' + error.message);
+                hideProgress();
+            }
+        }
+
+        // 画像読み込み
+        function loadImage(file) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas);
+                };
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // 品質表示
+        function displayQuality(quality) {
+            const section = document.getElementById('quality-section');
+            const content = document.getElementById('quality-content');
+            
+            content.innerHTML = `
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">解像度</div>
+                    <div class="text-2xl font-bold">${quality.resolution.width}×${quality.resolution.height}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">明るさ</div>
+                    <div class="text-2xl font-bold">${quality.brightness}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">コントラスト</div>
+                    <div class="text-2xl font-bold">${quality.contrast}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">品質スコア</div>
+                    <div class="text-2xl font-bold">${quality.score}/100</div>
+                </div>
+            `;
+            
+            // 推奨事項
+            if (quality.recommendations.length > 0) {
+                content.innerHTML += `
+                    <div class="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <h4 class="font-semibold mb-2 text-yellow-800">💡 改善提案:</h4>
+                        <ul class="text-sm text-yellow-700 space-y-1">
+                            ${quality.recommendations.map(r => `<li>• ${r}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            section.classList.remove('hidden');
+        }
+
+        // 画像比較表示
+        function displayImageComparison(original, processed) {
+            const section = document.getElementById('image-comparison');
+            
+            section.innerHTML = `
+                <div class="bg-white rounded-xl shadow-sm p-4">
+                    <h4 class="font-semibold mb-2">元画像</h4>
+                    <img src="${original.toDataURL()}" class="w-full rounded-lg border">
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4">
+                    <h4 class="font-semibold mb-2">前処理後</h4>
+                    <img src="${processed.toDataURL()}" class="w-full rounded-lg border">
+                </div>
+            `;
+            
+            section.classList.remove('hidden');
+        }
+
+        // 結果表示
+        function displayResult(result) {
+            const section = document.getElementById('result-section');
+            const metrics = document.getElementById('metrics');
+            const text = document.getElementById('ocr-text');
+            
+            // メトリクス
+            metrics.innerHTML = `
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">信頼度</div>
+                    <div class="text-2xl font-bold">${result.confidence.toFixed(1)}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">処理時間</div>
+                    <div class="text-2xl font-bold">${(result.processingTime / 1000).toFixed(2)}秒</div>
+                </div>
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">エンジン</div>
+                    <div class="text-2xl font-bold">${result.engine}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="text-sm opacity-80">行数</div>
+                    <div class="text-2xl font-bold">${result.lines ? result.lines.length : 0}</div>
+                </div>
+            `;
+            
+            // テキスト
+            text.textContent = result.text;
+            
+            section.classList.remove('hidden');
+        }
+
+        // フィードバック送信
+        function submitFeedback() {
+            const feedbackText = document.getElementById('feedback-text').value;
+            
+            if (!feedbackText || !currentResult) {
+                alert('修正テキストを入力してください');
+                return;
+            }
+            
+            const feedback = ocrEngine.collectFeedback(currentResult, feedbackText);
+            alert(`フィードバックありがとうございます！\n精度: ${feedback.accuracy.toFixed(2)}%`);
+            
+            // 統計更新
+            loadStats();
+            
+            // クリア
+            document.getElementById('feedback-text').value = '';
+        }
+
+        // 統計読み込み
+        function loadStats() {
+            const stats = ocrEngine.getFeedbackStats();
+            const content = document.getElementById('stats-content');
+            
+            if (!stats) {
+                content.innerHTML = '<p class="text-gray-600">まだフィードバックがありません</p>';
+                return;
+            }
+            
+            let engineTable = '<table class="w-full text-sm mt-4"><thead><tr class="border-b"><th class="text-left py-2">エンジン</th><th class="text-right py-2">件数</th><th class="text-right py-2">平均精度</th></tr></thead><tbody>';
+            
+            Object.entries(stats.byEngine).forEach(([engine, data]) => {
+                engineTable += `<tr class="border-b"><td class="py-2">${engine}</td><td class="text-right">${data.count}</td><td class="text-right">${data.avgAccuracy.toFixed(2)}%</td></tr>`;
+            });
+            
+            engineTable += '</tbody></table>';
+            
+            content.innerHTML = `
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600">${stats.totalFeedbacks}</div>
+                        <div class="text-sm text-gray-600">総フィードバック数</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600">${stats.avgAccuracy}%</div>
+                        <div class="text-sm text-gray-600">平均精度</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600">${stats.avgConfidence}%</div>
+                        <div class="text-sm text-gray-600">平均信頼度</div>
+                    </div>
+                </div>
+                ${engineTable}
+            `;
+        }
+
+        // プログレス表示
+        function showProgress(text) {
+            document.getElementById('progress').classList.remove('hidden');
+            document.getElementById('progress-text').textContent = text;
+        }
+
+        function hideProgress() {
+            document.getElementById('progress').classList.add('hidden');
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progress-bar').style.width = percent + '%';
+        }
+    </script>
+</body>
+</html>

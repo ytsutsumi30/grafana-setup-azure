@@ -1,0 +1,2399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出荷指示管理 </title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- QR Scanner Library -->
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .screen {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin: 1rem 0;
+            padding: 2rem;
+            min-height: 600px;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .search-section {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #2563eb;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+
+        input, select {
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        }
+
+        /* 納入場所カード（新規追加） */
+        .delivery-locations {
+            margin-top: 2rem;
+        }
+
+        .delivery-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .delivery-card:hover {
+            border-color: #2563eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .delivery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .delivery-info h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+
+        .delivery-meta {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .item-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .summary-item {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .summary-label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        .item-list {
+            margin-top: 2rem;
+        }
+
+        .item-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .item-card:hover {
+            border-color: #2563eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .item-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+
+        .item-meta {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .camera-section {
+            text-align: center;
+            padding: 2rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .camera-area {
+            width: 100%;
+            max-width: 500px;
+            height: 300px;
+            background: #1f2937;
+            border-radius: 8px;
+            margin: 1rem auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        .picked-items {
+            margin-top: 2rem;
+        }
+
+        .picked-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .qty-input {
+            width: 100px;
+            margin-left: 1rem;
+        }
+
+        .breadcrumb {
+            background: #e5e7eb;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .breadcrumb a {
+            color: #2563eb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        /* ページネーション */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding: 1rem;
+        }
+
+        .pagination-info {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .item-header, .delivery-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .item-actions {
+                margin-top: 1rem;
+            }
+            
+            .navigation {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .item-summary {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .form-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* アニメーション効果 */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 地図機能スタイル */
+        .map-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+            margin: 1rem 0;
+        }
+        
+        .map-header {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            color: white;
+            padding: 16px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .map-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+            z-index: 1;
+        }
+        
+        .selected-location-info {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .selected-location-info.show {
+            display: block;
+        }
+        
+        .selected-location-info h4 {
+            margin: 0 0 8px 0;
+            color: #1e40af;
+            font-weight: 600;
+        }
+        
+        .selected-location-info p {
+            margin: 0;
+            color: #1e40af;
+            font-size: 14px;
+        }
+        
+        .clear-selection-btn {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            float: right;
+        }
+        
+        .clear-selection-btn:hover {
+            background: #4b5563;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* カスタムLeafletポップアップスタイル */
+        .leaflet-popup-content-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+        
+        .leaflet-popup-content {
+            margin: 16px 20px;
+            line-height: 1.4;
+            min-width: 250px;
+        }
+        
+        .popup-title {
+            margin: 0 0 12px 0;
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .popup-info {
+            margin: 6px 0;
+            font-size: 14px;
+            color: #374151;
+        }
+        
+        .popup-buttons {
+            margin-top: 16px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .popup-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-weight: 600;
+        }
+        
+        .popup-button:hover {
+            background: #2563eb;
+        }
+        
+        .popup-button.select {
+            background: #059669;
+        }
+        
+        .popup-button.select:hover {
+            background: #047857;
+        }
+        
+        /* カスタムマーカーアイコンスタイル */
+        .custom-marker-icon {
+            background: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+        }
+        
+        .custom-marker-icon.main-office {
+            background: #dc2626;
+        }
+        
+        .custom-marker-icon.selected {
+            background: #059669;
+            transform: scale(1.2);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1.2); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1.2); }
+        }
+        
+        .map-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background: #fee2e2;
+            color: #dc2626;
+            font-weight: 600;
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .delivery-tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 12px 20px;
+            background-color: #f8f9fa;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .tab-button.active {
+            background-color: #007bff;
+            color: white;
+            border-bottom-color: #0056b3;
+        }
+        
+        .tab-button:hover {
+            background-color: #e9ecef;
+        }
+        
+        .tab-button.active:hover {
+            background-color: #0056b3;
+        }
+
+        .delivery-tab-content {
+            display: none;
+        }
+        
+        .delivery-tab-content.active {
+            display: block;
+        }
+
+        /* QRスキャナー用スタイル（Safari最適化版） */
+        .qr-scan-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            border: 2px dashed rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            pointer-events: none;
+        }
+        
+        .qr-scan-corners {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            pointer-events: none;
+        }
+        
+        .qr-corner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #60a5fa;
+        }
+        
+        .qr-corner-tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+        .qr-corner-tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+        .qr-corner-bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+        .qr-corner-br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+        
+        @keyframes qr-scanning {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
+        
+        @keyframes qr-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes qr-pulse-green {
+            0%, 100% { background-color: #16a34a; }
+            50% { background-color: #22c55e; }
+        }
+        
+        .qr-scanning-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            background: linear-gradient(180deg, transparent 0%, transparent 45%, #60a5fa 50%, transparent 55%, transparent 100%);
+            background-size: 100% 200%;
+            animation: qr-scanning 2s linear infinite;
+            border-radius: 12px;
+            pointer-events: none;
+        }
+        
+        .qr-calibrating {
+            animation: qr-pulse 1s ease-in-out infinite;
+        }
+        
+        .qr-pulse-green {
+            animation: qr-pulse-green 1s ease-in-out infinite;
+        }
+        
+        .qr-video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .qr-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .qr-debug-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+            max-width: 200px;
+        }
+        
+        .qr-status {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .qr-calibration-indicator {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .qr-success-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(34, 197, 94, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 12px;
+        }
+        
+        .qr-success-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .qr-error-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(239, 68, 68, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        
+        .qr-controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .qr-result-display {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            display: none;
+        }
+        
+        .qr-result-display.show {
+            display: block;
+        }
+        
+        .qr-result-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .qr-result-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #15803d;
+        }
+        
+        .qr-result-data {
+            background: white;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚚 出荷指示管理システム </h1>
+    </div>
+
+    <div class="container">
+        <!-- 出荷指示一覧画面（納入場所別表示） -->
+        <div id="shipping-screen" class="screen active">
+            <div class="breadcrumb">
+                ホーム > 出荷管理 > <strong>出荷指示</strong>
+            </div>
+            
+            <h2>📦 出荷指示検索</h2>
+            
+            <div class="search-section">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="ship-location">出荷場所</label>
+                        <select id="ship-location">
+                            <option value="">選択してください</option>
+                            <option value="MAIN">本社倉庫</option>
+                            <option value="SUB1">第1倉庫</option>
+                            <option value="SUB2">第2倉庫</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="delivery-location">納入場所</label>
+                        <input type="text" id="delivery-location" placeholder="例：東京営業所">
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduled-date">出荷予定日</label>
+                        <input type="date" id="scheduled-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="status">出荷指示</label>
+                        <select id="status">
+                            <option value="PENDING">未済</option>
+                            <option value="COMPLETED">完了</option>
+                            <option value="ALL">すべて</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn" onclick="searchShipments()">
+                    🔍 検索
+                </button>
+            </div>
+
+            <!-- 納入場所別表示 -->
+            <div class="delivery-locations" id="delivery-locations">
+                <div class="delivery-card fade-in">
+                    <div class="delivery-header">
+                        <div class="delivery-info">
+                            <h3>🏢 東京営業所</h3>
+                            <div class="delivery-meta">
+                                住所: 東京都千代田区丸の内1-1-1 | TEL: 03-1234-5678<br>
+                                担当者: 田中様 | 出荷予定日: 2024-08-27
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-info" onclick="goToDeliveryDetail('TOKYO')">
+                                📋 納入場所詳細
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="item-summary">
+                        <div class="summary-item">
+                            <div class="summary-value">3</div>
+                            <div class="summary-label">品目数</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value">250</div>
+                            <div class="summary-label">合計数量</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value status-pending">未済</div>
+                            <div class="summary-label">状況</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="delivery-card fade-in">
+                    <div class="delivery-header">
+                        <div class="delivery-info">
+                            <h3>🏭 大阪営業所</h3>
+                            <div class="delivery-meta">
+                                住所: 大阪府大阪市北区梅田2-2-2 | TEL: 06-7890-1234<br>
+                                担当者: 佐藤様 | 出荷予定日: 2024-08-28
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-info" onclick="goToDeliveryDetail('OSAKA')">
+                                📋 納入場所詳細
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="item-summary">
+                        <div class="summary-item">
+                            <div class="summary-value">2</div>
+                            <div class="summary-label">品目数</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value">150</div>
+                            <div class="summary-label">合計数量</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value status-completed">完了</div>
+                            <div class="summary-label">状況</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="delivery-card fade-in">
+                    <div class="delivery-header">
+                        <div class="delivery-info">
+                            <h3>🏪 名古屋営業所</h3>
+                            <div class="delivery-meta">
+                                住所: 愛知県名古屋市中村区名駅3-3-3 | TEL: 052-3456-7890<br>
+                                担当者: 鈴木様 | 出荷予定日: 2024-08-29
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-info" onclick="goToDeliveryDetail('NAGOYA')">
+                                📋 納入場所詳細
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="item-summary">
+                        <div class="summary-item">
+                            <div class="summary-value">4</div>
+                            <div class="summary-label">品目数</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value">320</div>
+                            <div class="summary-label">合計数量</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value status-pending">未済</div>
+                            <div class="summary-label">状況</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ページネーション -->
+            <div class="pagination">
+                <button class="btn btn-secondary">⬅ 前へ</button>
+                <div class="pagination-info">1 / 3 ページ</div>
+                <button class="btn btn-secondary">次へ ➡</button>
+            </div>
+        </div>
+
+        <!-- 納入場所詳細画面（新規追加） -->
+        <div id="delivery-detail-screen" class="screen">
+            <div class="breadcrumb">
+                <a onclick="goToShipping()">出荷指示</a> > <strong>納入場所詳細</strong>
+            </div>
+            
+            <h2>🏢 納入場所詳細 - <span id="delivery-name">東京営業所</span></h2>
+
+            <!-- タブナビゲーション -->
+            <div class="delivery-tabs">
+                <button type="button" class="tab-button active" data-tab="info">配送先情報</button>
+                <button type="button" class="tab-button" data-tab="map">地図表示</button>
+            </div>
+
+            <!-- 配送先情報タブ -->
+            <div class="delivery-tab-content active" id="info-content">
+                <div class="delivery-card">
+                    <div class="delivery-info">
+                        <h3>📍 配送先情報</h3>
+                        <div class="delivery-meta">
+                            <strong>住所:</strong> 東京都千代田区丸の内1-1-1<br>
+                            <strong>電話番号:</strong> 03-1234-5678<br>
+                            <strong>担当者:</strong> 田中様<br>
+                            <strong>出荷予定日:</strong> 2024-08-27<br>
+                            <strong>配送方法:</strong> 宅配便
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 地図表示タブ -->
+            <div class="delivery-tab-content" id="map-content">
+                <!-- 選択された場所の情報 -->
+                <div id="selectedLocationInfo" class="selected-location-info">
+                    <button type="button" class="clear-selection-btn" onclick="DeliveryMap.clearLocationSelection()">クリア</button>
+                    <h4 id="selectedLocationTitle">選択された場所</h4>
+                    <p id="selectedLocationDetails">詳細情報</p>
+                </div>
+                
+                <div class="map-section">
+                    <!-- ローディングオーバーレイ -->
+                    <div class="loading-overlay" id="mapLoadingOverlay" style="display: none;">
+                        <div class="loading-spinner"></div>
+                    </div>
+                    
+                    <div class="map-header">
+                        <span>日本拠点地図</span>
+                        <span class="map-info" id="mapInfo">読み込み中...</span>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            
+            <div class="item-list" id="delivery-item-list">
+                <h3>📦 出荷品目一覧</h3>
+                
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">品目A-001 - 特殊部品</div>
+                            <div class="item-meta">客先注番: ORD-2024-001 | 出荷予定数: 100個</div>
+                            <div class="item-meta">品目重量: 0.5kg | 梱包サイズ: 20x15x10cm</div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-warning" onclick="goToPicking('A-001')">
+                                📋 ピッキング
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <div class="form-group">
+                            <label for="tracking-1">送り状番号</label>
+                            <input type="text" id="tracking-1" placeholder="送り状番号を入力">
+                        </div>
+                        <button class="btn btn-success">
+                            ✅ 出荷指示
+                        </button>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">品目B-002 - 標準部品</div>
+                            <div class="item-meta">客先注番: ORD-2024-002 | 出荷予定数: 75個</div>
+                            <div class="item-meta">品目重量: 0.3kg | 梱包サイズ: 15x10x8cm</div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-warning" onclick="goToPicking('B-002')">
+                                📋 ピッキング
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <div class="form-group">
+                            <label for="tracking-2">送り状番号</label>
+                            <input type="text" id="tracking-2" placeholder="送り状番号を入力">
+                        </div>
+                        <button class="btn btn-success">
+                            ✅ 出荷指示
+                        </button>
+                    </div>
+                </div>
+
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">品目C-003 - 消耗品</div>
+                            <div class="item-meta">客先注番: ORD-2024-003 | 出荷予定数: 75個</div>
+                            <div class="item-meta">品目重量: 0.1kg | 梱包サイズ: 10x8x5cm</div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-warning" onclick="goToPicking('C-003')">
+                                📋 ピッキング
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <div class="form-group">
+                            <label for="tracking-3">送り状番号</label>
+                            <input type="text" id="tracking-3" placeholder="送り状番号を入力">
+                        </div>
+                        <button class="btn btn-success">
+                            ✅ 出荷指示
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn btn-secondary" onclick="goToShipping()">
+                    ⬅ 出荷指示一覧に戻る
+                </button>
+                <div class="item-summary">
+                    <div class="summary-item">
+                        <div class="summary-value">3</div>
+                        <div class="summary-label">品目数</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">250</div>
+                        <div class="summary-label">合計数量</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ピッキング画面 -->
+        <div id="picking-screen" class="screen">
+            <div class="breadcrumb">
+                <a onclick="goToShipping()">出荷指示</a> > 
+                <a onclick="goToDeliveryDetail()">納入場所詳細</a> >
+                <strong>ピッキング</strong>
+            </div>
+            
+            <h2>📋 ピッキング作業</h2>
+            
+            <div class="item-card">
+                <div class="item-title">品目A-001 - 特殊部品</div>
+                <div class="item-meta">客先注番: ORD-2024-001 | 出荷指示数: 100個</div>
+                <div class="item-meta">納入場所: 東京営業所 | 出荷予定日: 2024-08-27</div>
+                <div style="margin: 1rem 0;">
+                    <button class="btn btn-warning" onclick="goToVerification()">
+                        🔍 照合
+                    </button>
+                    <button class="btn btn-success" onclick="savePicking()">
+                        💾 保存
+                    </button>
+                </div>
+            </div>
+
+            <div class="picked-items" id="picked-items">
+                <h3>📦 ピッキング済み品目</h3>
+                <div class="picked-item">
+                    <div>
+                        <strong>製品本体: LOT-2024-001</strong><br>
+                        保管倉庫: 本社倉庫 (A-01)
+                    </div>
+                    <div>
+                        <input type="number" class="qty-input" value="30" min="0" max="30">
+                        <span>/ 30個</span>
+                    </div>
+                </div>
+                <div class="picked-item">
+                    <div>
+                        <strong>製品マニュアル: LOT-2024-002</strong><br>
+                        保管倉庫: 本社倉庫 (A-02)
+                    </div>
+                    <div>
+                        <input type="number" class="qty-input" value="70" min="0" max="70">
+                        <span>/ 70個</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn btn-secondary" onclick="goToDeliveryDetail()">
+                    ⬅ 納入場所詳細に戻る
+                </button>
+                <div>
+                    合計: <strong>100個</strong> / 100個
+                </div>
+            </div>
+        </div>
+
+        <!-- 照合画面 -->
+        <div id="verification-screen" class="screen">
+            <div class="breadcrumb">
+                <a onclick="goToShipping()">出荷指示</a> > 
+                <a onclick="goToDeliveryDetail()">納入場所詳細</a> >
+                <a onclick="goToPicking()">ピッキング</a> > 
+                <strong>照合</strong>
+            </div>
+            
+            <h2>🔍 在庫照合（Safari最適化QRスキャナー）</h2>
+            
+            <!-- QRスキャナー設定パネル -->
+            <div class="search-section">
+                <h3>🔧 スキャン設定</h3>
+                <div class="form-grid">
+                    <label class="flex items-center gap-3">
+                        <input type="checkbox" id="auto-verify-inventory" checked>
+                        <span>在庫データと自動照合</span>
+                    </label>
+                    <label class="flex items-center gap-3">
+                        <input type="checkbox" id="enable-debug-mode">
+                        <span>デバッグモード</span>
+                    </label>
+                    <div class="form-group">
+                        <label for="scan-timeout">スキャンタイムアウト（秒）</label>
+                        <select id="scan-timeout">
+                            <option value="30">30秒</option>
+                            <option value="60" selected>60秒</option>
+                            <option value="120">120秒</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QRスキャナーメイン画面 -->
+            <div id="qr-scanner-main" class="camera-section">
+                <!-- 初期画面 -->
+                <div id="qr-initial-screen">
+                    <h3>📱 QRコードスキャン（在庫照合）</h3>
+                    <div class="qr-controls">
+                        <button id="start-qr-scan" class="btn">
+                            📷 スキャン開始
+                        </button>
+                        <button id="manual-lot-input" class="btn btn-secondary">
+                            ⌨ 手動入力
+                        </button>
+                    </div>
+                    
+                </div>
+
+                <!-- カメラスキャン画面 -->
+                <div id="qr-camera-screen" class="hidden">
+                    <div class="qr-video-container">
+                        <video id="qr-camera-video" class="qr-video" playsinline muted webkit-playsinline></video>
+                        <div class="qr-scan-guide"></div>
+                        <div class="qr-scan-corners">
+                            <div class="qr-corner qr-corner-tl"></div>
+                            <div class="qr-corner qr-corner-tr"></div>
+                            <div class="qr-corner qr-corner-bl"></div>
+                            <div class="qr-corner qr-corner-br"></div>
+                        </div>
+                        <div id="qr-scanning-animation" class="qr-scanning-line hidden"></div>
+                        
+                        <!-- キャリブレーション表示 -->
+                        <div id="qr-calibration-indicator" class="qr-calibration-indicator hidden">
+                            <div>
+                                <div style="font-size: 24px; margin-bottom: 8px;">⚙️</div>
+                                <div>カメラを調整中...</div>
+                                <div style="font-size: 12px; margin-top: 4px;">しばらくお待ちください</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 成功表示 -->
+                        <div id="qr-success-overlay" class="qr-success-overlay hidden">
+                            <div class="qr-success-icon">✅</div>
+                            <div>QRコード検出成功!</div>
+                        </div>
+                        
+                        <!-- エラー表示 -->
+                        <div id="qr-error-overlay" class="qr-error-overlay hidden">
+                            <div style="font-size: 32px; margin-bottom: 12px;">❌</div>
+                            <div id="qr-error-message">エラーが発生しました</div>
+                        </div>
+                        
+                        <!-- デバッグ情報 -->
+                        <div id="qr-debug-info" class="qr-debug-info hidden">
+                            <div>Status: <span id="debug-status">Ready</span></div>
+                            <div>Stream: <span id="debug-stream">Disconnected</span></div>
+                            <div>Detection: <span id="debug-detection">Stopped</span></div>
+                            <div>Frames: <span id="debug-frames">0</span></div>
+                        </div>
+                        
+                        <!-- ステータス表示 -->
+                        <div id="qr-scan-status" class="qr-status">
+                            カメラを準備中...
+                        </div>
+                    </div>
+                    
+                    <div class="qr-controls">
+                        <button id="stop-qr-scan" class="btn btn-secondary">
+                            🛑 スキャン停止
+                        </button>
+                        <button id="calibrate-qr-camera" class="btn btn-info">
+                            ⚙️ カメラ調整
+                        </button>
+                        <button id="toggle-qr-debug" class="btn btn-warning">
+                            🔧 デバッグ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 結果表示 -->
+                <div id="qr-result-display" class="qr-result-display">
+                    <div class="qr-result-header">
+                        <div class="qr-result-title">📦 スキャン結果</div>
+                        <button id="clear-qr-result" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">
+                            クリア
+                        </button>
+                    </div>
+                    <div id="qr-result-data" class="qr-result-data">
+                        スキャン結果がここに表示されます
+                    </div>
+                    <div style="margin-top: 12px;">
+                        <strong>照合ステータス:</strong> <span id="verification-status">待機中</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="item-list" id="verified-items">
+                <h3>✅ 照合済み品目</h3>
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">製品本体: LOT-2024-001</div>
+                            <div class="item-meta">品目A-001 - 特殊部品</div>
+                            <div class="item-meta">保管倉庫: 本社倉庫 (A-01) | 在庫数: 30個</div>
+                            <div class="status-badge status-completed">照合完了</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">製品マニュアル: LOT-2024-002</div>
+                            <div class="item-meta">品目A-001 - 特殊部品</div>
+                            <div class="item-meta">保管倉庫: 本社倉庫 (A-02) | 在庫数: 70個</div>
+                            <div class="status-badge status-completed">照合完了</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn btn-secondary" onclick="goToPicking()">
+                    ⬅ ピッキングに戻る
+                </button>
+                <button class="btn btn-success">
+                    💾 照合結果保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 現在の納入場所
+        let currentDeliveryLocation = '';
+        
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+            
+            // フェードインアニメーション
+            document.getElementById(screenId).classList.add('fade-in');
+        }
+
+        function goToShipping() {
+            showScreen('shipping-screen');
+        }
+
+        function goToDeliveryDetail(locationCode = '') {
+            if (locationCode) {
+                currentDeliveryLocation = locationCode;
+            }
+            
+            // 納入場所名を設定
+            const locationNames = {
+                'TOKYO': '東京営業所',
+                'OSAKA': '大阪営業所',
+                'NAGOYA': '名古屋営業所'
+            };
+            
+            const deliveryName = document.getElementById('delivery-name');
+            if (deliveryName && locationNames[currentDeliveryLocation]) {
+                deliveryName.textContent = locationNames[currentDeliveryLocation];
+            }
+            
+            showScreen('delivery-detail-screen');
+        }
+
+        function goToPicking(itemCode = '') {
+            showScreen('picking-screen');
+        }
+
+        function goToVerification() {
+            showScreen('verification-screen');
+        }
+
+        function searchShipments() {
+            // IDO連携での検索処理をシミュレート
+            console.log('SyteLine IDOから出荷指示データを検索中...');
+            
+            // ローディング表示
+            const deliveryLocations = document.getElementById('delivery-locations');
+            deliveryLocations.innerHTML = '<div style="text-align: center; padding: 2rem;">🔍 検索中...</div>';
+            
+            // 検索結果を模擬的に表示
+            setTimeout(() => {
+                location.reload(); // 実際の実装では検索結果を動的に更新
+            }, 1500);
+        }
+
+        function startCamera() {
+            // 新しいQRスキャナークラスで処理
+            if (window.inventoryQRScanner) {
+                window.inventoryQRScanner.startScan();
+            }
+        }
+
+        function manualInput() {
+            const lotNumber = prompt('ロット番号を入力してください:');
+            if (lotNumber) {
+                if (window.inventoryQRScanner) {
+                    window.inventoryQRScanner.handleManualInput(lotNumber);
+                } else {
+                    alert(`ロット番号 "${lotNumber}" で在庫を照合します。\n\nSyteLine在庫管理IDOと連携して照合処理を実行します。`);
+                }
+            }
+        }
+
+        function savePicking() {
+            alert('ピッキング情報をSyteLine出荷指示IDOに保存しました。\n\n・ピッキング詳細データの更新\n・在庫数量の引当処理\n・ステータスの更新');
+        }
+
+        // レスポンシブ対応の初期化
+        window.addEventListener('load', function() {
+            // タッチデバイス対応
+            if ('ontouchstart' in window) {
+                document.body.classList.add('touch-device');
+            }
+            
+            // 現在の日付をデフォルト値に設定
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('scheduled-date').value = today;
+            
+            // PWA対応の初期化
+            initializePWA();
+        });
+
+        // PWA初期化
+        function initializePWA() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => console.log('SW registered:', registration))
+                    .catch(error => console.log('SW registration failed:', error));
+            }
+            
+            // オフライン対応
+            window.addEventListener('online', () => {
+                console.log('オンラインに復帰しました');
+                syncOfflineData();
+            });
+            
+            window.addEventListener('offline', () => {
+                console.log('オフラインモードに切り替わりました');
+            });
+        }
+
+        // オフラインデータ同期
+        function syncOfflineData() {
+            // ローカルストレージからオフライン中のデータを取得して同期
+            console.log('オフラインデータをSyteLineと同期中...');
+        }
+
+        // パフォーマンス監視
+        window.addEventListener('load', () => {
+            if ('performance' in window) {
+                const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+                console.log(`Page load time: ${loadTime}ms`);
+            }
+        });
+    </script>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <script>
+        // 配送地図管理クラス (shipping_search_with_map.htmlの実装を参考)
+        var DeliveryMap = {
+            
+            // Leaflet関連
+            map: null,
+            markers: [],
+            selectedLocation: null,
+            selectedMarker: null,
+            
+            // 営業所データ（shipping_search_with_map.htmlから）
+            branchLocations: [
+                {
+                    name: "東京営業所",
+                    code: "TKY001",
+                    address: "東京都港区赤坂1-1-1",
+                    phone: "03-1234-5678",
+                    type: "main_office",
+                    capacity: 1000,
+                    coordinates: [35.6762, 139.7380]
+                },
+                {
+                    name: "相模営業所",
+                    code: "SGM001",
+                    address: "神奈川県相模原市中央区相模原1-1-1",
+                    phone: "042-123-4567",
+                    type: "branch",
+                    capacity: 500,
+                    coordinates: [35.5756, 139.3697]
+                },
+                {
+                    name: "大阪営業所",
+                    code: "OSK001",
+                    address: "大阪府大阪市北区梅田1-1-1",
+                    phone: "06-1234-5678",
+                    type: "branch",
+                    capacity: 800,
+                    coordinates: [34.7024, 135.4960]
+                },
+                {
+                    name: "名古屋営業所",
+                    code: "NGY001",
+                    address: "愛知県名古屋市中村区名駅1-1-1",
+                    phone: "052-123-4567",
+                    type: "branch",
+                    capacity: 600,
+                    coordinates: [35.1709, 136.8816]
+                },
+                {
+                    name: "福岡営業所",
+                    code: "FUK001",
+                    address: "福岡県福岡市博多区博多駅前1-1-1",
+                    phone: "092-123-4567",
+                    type: "branch",
+                    capacity: 400,
+                    coordinates: [33.5904, 130.4017]
+                }
+            ],
+            
+            // 初期化
+            init: function() {
+                console.log('Delivery Map initialized');
+                this.waitForLeaflet();
+            },
+            
+            // Leaflet読み込み待機
+            waitForLeaflet: function() {
+                var self = this;
+                var checkInterval = setInterval(function() {
+                    if (typeof L !== 'undefined') {
+                        clearInterval(checkInterval);
+                        self.initializeMap();
+                    }
+                }, 100);
+                
+                // 10秒でタイムアウト
+                setTimeout(function() {
+                    if (typeof L === 'undefined') {
+                        clearInterval(checkInterval);
+                        self.handleMapError('Leafletライブラリの読み込みに失敗しました');
+                    }
+                }, 10000);
+            },
+            
+            // Leaflet地図初期化
+            initializeMap: function() {
+                try {
+                    document.getElementById('mapLoadingOverlay').style.display = 'flex';
+                    document.getElementById('mapInfo').textContent = '地図を初期化中...';
+                    
+                    // 日本中心の地図を作成
+                    this.map = L.map('map', {
+                        center: [36.2048, 138.2529], // 日本の中心部
+                        zoom: 6,
+                        zoomControl: true,
+                        scrollWheelZoom: true,
+                        doubleClickZoom: true,
+                        dragging: true,
+                        touchZoom: true,
+                        boxZoom: true,
+                        keyboard: true
+                    });
+                    
+                    // OpenStreetMapタイルレイヤーを追加
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                        maxZoom: 18,
+                        minZoom: 3
+                    }).addTo(this.map);
+                    
+                    // 地図が完全に読み込まれた後にマーカーを配置
+                    this.map.whenReady(() => {
+                        this.loadBranchMarkers();
+                        document.getElementById('mapLoadingOverlay').style.display = 'none';
+                        document.getElementById('mapInfo').textContent = '営業所をクリックして選択';
+                        console.log('Map initialized successfully');
+                    });
+                    
+                } catch (error) {
+                    console.error('Map initialization error:', error);
+                    this.handleMapError('地図の初期化に失敗しました: ' + error.message);
+                }
+            },
+            
+            // 地図エラー処理
+            handleMapError: function(message) {
+                document.getElementById('map').innerHTML = '<div class="map-error">' + message + '<br>ページを更新してください</div>';
+                document.getElementById('mapLoadingOverlay').style.display = 'none';
+                document.getElementById('mapInfo').textContent = 'エラーが発生しました';
+            },
+            
+            // 営業所マーカー読み込み
+            loadBranchMarkers: function() {
+                var self = this;
+                
+                this.branchLocations.forEach(function(location) {
+                    var lat = location.coordinates[0];
+                    var lng = location.coordinates[1];
+                    
+                    // カスタムアイコンを作成
+                    var iconClass = location.type === 'main_office' ? 'main-office' : 'branch';
+                    var iconSize = location.type === 'main_office' ? [24, 24] : [20, 20];
+                    
+                    var customIcon = L.divIcon({
+                        className: 'custom-marker-icon ' + iconClass,
+                        iconSize: iconSize,
+                        iconAnchor: [iconSize[0]/2, iconSize[1]/2]
+                    });
+                    
+                    var marker = L.marker([lat, lng], { icon: customIcon }).addTo(self.map);
+                    
+                    // ポップアップ内容を作成
+                    var popupContent = self.createPopupContent(location);
+                    marker.bindPopup(popupContent);
+                    
+                    // マーカークリックイベント
+                    marker.on('click', function() {
+                        self.selectLocation(location, marker);
+                    });
+                    
+                    // マーカーをリストに追加
+                    self.markers.push({
+                        marker: marker,
+                        location: location
+                    });
+                });
+                
+                console.log('Loaded', this.markers.length, 'markers');
+            },
+            
+            // ポップアップ内容作成
+            createPopupContent: function(location) {
+                var typeText = location.type === 'main_office' ? '本社' : '支社';
+                
+                return `
+                    <div>
+                        <h3 class="popup-title">${location.name}</h3>
+                        <p class="popup-info"><strong>コード:</strong> ${location.code}</p>
+                        <p class="popup-info"><strong>住所:</strong> ${location.address}</p>
+                        <p class="popup-info"><strong>電話:</strong> ${location.phone}</p>
+                        <p class="popup-info"><strong>処理能力:</strong> ${location.capacity}件/日</p>
+                        <p class="popup-info"><strong>タイプ:</strong> ${typeText}</p>
+                        <div class="popup-buttons">
+                            <button class="popup-button select" onclick="DeliveryMap.selectFromPopup('${location.code}')">
+                                配送先に選択
+                            </button>
+                        </div>
+                    </div>
+                `;
+            },
+            
+            // ポップアップから選択
+            selectFromPopup: function(locationCode) {
+                var locationData = this.branchLocations.find(function(loc) {
+                    return loc.code === locationCode;
+                });
+                
+                var markerData = this.markers.find(function(item) {
+                    return item.location.code === locationCode;
+                });
+                
+                if (locationData && markerData) {
+                    this.selectLocation(locationData, markerData.marker);
+                    this.map.closePopup();
+                }
+            },
+            
+            // 場所選択
+            selectLocation: function(location, marker) {
+                console.log('Location selected:', location.name);
+                
+                // 前回選択をクリア
+                this.clearLocationSelection();
+                
+                // 新しい選択を設定
+                this.selectedLocation = location;
+                this.selectedMarker = marker;
+                
+                // マーカーをハイライト
+                var iconClass = location.type === 'main_office' ? 'main-office selected' : 'branch selected';
+                var iconSize = location.type === 'main_office' ? [30, 30] : [26, 26];
+                
+                var selectedIcon = L.divIcon({
+                    className: 'custom-marker-icon ' + iconClass,
+                    iconSize: iconSize,
+                    iconAnchor: [iconSize[0]/2, iconSize[1]/2]
+                });
+                
+                marker.setIcon(selectedIcon);
+                
+                // 地図を中央に移動・ズーム
+                this.map.setView([location.coordinates[0], location.coordinates[1]], 10);
+                
+                // 選択情報表示
+                this.showSelectedLocationInfo(location);
+                
+                // 配送先情報も更新
+                this.updateDeliveryInfo(location);
+            },
+            
+            // 選択された場所の情報表示
+            showSelectedLocationInfo: function(location) {
+                var infoDiv = document.getElementById('selectedLocationInfo');
+                var titleElement = document.getElementById('selectedLocationTitle');
+                var detailsElement = document.getElementById('selectedLocationDetails');
+                
+                titleElement.textContent = '選択中: ' + location.name;
+                detailsElement.innerHTML = `
+                    <strong>コード:</strong> ${location.code}<br>
+                    <strong>住所:</strong> ${location.address}<br>
+                    <strong>電話:</strong> ${location.phone}<br>
+                    <strong>処理能力:</strong> ${location.capacity}件/日
+                `;
+                
+                infoDiv.classList.add('show');
+            },
+            
+            // 配送先情報を更新
+            updateDeliveryInfo: function(location) {
+                var deliveryNameElement = document.getElementById('delivery-name');
+                if (deliveryNameElement) {
+                    deliveryNameElement.textContent = location.name;
+                }
+                
+                // 配送先情報タブの内容も更新
+                var deliveryMetaElements = document.querySelectorAll('.delivery-meta');
+                deliveryMetaElements.forEach(function(element) {
+                    element.innerHTML = `
+                        <strong>住所:</strong> ${location.address}<br>
+                        <strong>電話番号:</strong> ${location.phone}<br>
+                        <strong>担当者:</strong> 営業所スタッフ<br>
+                        <strong>出荷予定日:</strong> 2024-08-27<br>
+                        <strong>配送方法:</strong> 宅配便
+                    `;
+                });
+            },
+            
+            // 場所選択クリア
+            clearLocationSelection: function() {
+                if (this.selectedLocation && this.selectedMarker) {
+                    // マーカーアイコンを元に戻す
+                    var iconClass = this.selectedLocation.type === 'main_office' ? 'main-office' : 'branch';
+                    var iconSize = this.selectedLocation.type === 'main_office' ? [24, 24] : [20, 20];
+                    
+                    var originalIcon = L.divIcon({
+                        className: 'custom-marker-icon ' + iconClass,
+                        iconSize: iconSize,
+                        iconAnchor: [iconSize[0]/2, iconSize[1]/2]
+                    });
+                    
+                    this.selectedMarker.setIcon(originalIcon);
+                }
+                
+                this.selectedLocation = null;
+                this.selectedMarker = null;
+                
+                // ポップアップを閉じる
+                if (this.map) {
+                    this.map.closePopup();
+                }
+                
+                // 選択情報非表示
+                document.getElementById('selectedLocationInfo').classList.remove('show');
+                
+                // 地図を日本全体に戻す
+                if (this.map) {
+                    this.map.setView([36.2048, 138.2529], 6);
+                }
+            }
+        };
+        
+        // タブ切り替え機能を追加
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.delivery-tab-content');
+            
+            // タブクリックイベント
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const targetTab = this.getAttribute('data-tab');
+                    
+                    // タブボタンのアクティブ状態を切り替え
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // コンテンツの表示を切り替え
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(targetTab + '-content').classList.add('active');
+                    
+                    // 地図タブが選択された場合、地図を初期化
+                    if (targetTab === 'map' && !DeliveryMap.map) {
+                        DeliveryMap.init();
+                    }
+                });
+            });
+        });
+    </script>
+
+    <!-- 在庫照合用QRスキャナークラス（Safari最適化版） -->
+    <script>
+        class InventoryQRScanner {
+            constructor() {
+                this.video = document.getElementById('qr-camera-video');
+                this.stream = null;
+                this.isScanning = false;
+                this.qrScanner = null;
+                this.currentCamera = 'environment';
+                this.cameras = [];
+                this.calibrationAttempts = 0;
+                this.maxCalibrationAttempts = 3;
+                this.frameCount = 0;
+                this.lastDetectionAttempt = 0;
+                this.isCalibrating = false;
+                this.debugMode = false;
+                this.scanTimeout = null;
+                
+                // 在庫照合用のプロパティ
+                this.expectedItems = [
+                    { lotNumber: 'LOT-2024-001', itemCode: 'A-001', name: '特殊部品', location: 'A-01' },
+                    { lotNumber: 'LOT-2024-002', itemCode: 'A-001', name: '特殊部品マニュアル', location: 'A-02' },
+                    { lotNumber: 'LOT-2024-003', itemCode: 'B-002', name: '標準部品', location: 'B-01' },
+                    { lotNumber: 'LOT-2024-004', itemCode: 'C-003', name: '消耗品', location: 'C-01' }
+                ];
+                this.verifiedItems = [];
+                
+                this.initElements();
+                this.initEventListeners();
+                this.initPageLifecycleHandling();
+                this.detectCameras();
+            }
+
+            initElements() {
+                this.initialScreen = document.getElementById('qr-initial-screen');
+                this.cameraScreen = document.getElementById('qr-camera-screen');
+                this.resultDisplay = document.getElementById('qr-result-display');
+                this.scanStatus = document.getElementById('qr-scan-status');
+                this.resultData = document.getElementById('qr-result-data');
+                this.verificationStatus = document.getElementById('verification-status');
+                this.scanningAnimation = document.getElementById('qr-scanning-animation');
+                this.calibrationIndicator = document.getElementById('qr-calibration-indicator');
+                this.successOverlay = document.getElementById('qr-success-overlay');
+                this.errorOverlay = document.getElementById('qr-error-overlay');
+                this.errorMessage = document.getElementById('qr-error-message');
+                this.debugInfo = document.getElementById('qr-debug-info');
+                this.debugElements = {
+                    status: document.getElementById('debug-status'),
+                    stream: document.getElementById('debug-stream'),
+                    detection: document.getElementById('debug-detection'),
+                    frames: document.getElementById('debug-frames')
+                };
+                
+                // 設定要素
+                this.autoVerifyInventory = document.getElementById('auto-verify-inventory');
+                this.enableDebugMode = document.getElementById('enable-debug-mode');
+                this.scanTimeoutSelect = document.getElementById('scan-timeout');
+            }
+
+            initEventListeners() {
+                document.getElementById('start-qr-scan').addEventListener('click', () => this.startScan());
+                document.getElementById('stop-qr-scan').addEventListener('click', () => this.stopScan());
+                document.getElementById('calibrate-qr-camera').addEventListener('click', () => this.calibrateCamera());
+                document.getElementById('toggle-qr-debug').addEventListener('click', () => this.toggleDebug());
+                document.getElementById('clear-qr-result').addEventListener('click', () => this.clearResult());
+                document.getElementById('manual-lot-input').addEventListener('click', () => this.showManualInput());
+                
+                // 設定変更イベント
+                this.enableDebugMode.addEventListener('change', (e) => {
+                    this.debugMode = e.target.checked;
+                    this.debugInfo.classList.toggle('hidden', !this.debugMode);
+                });
+            }
+
+            // ページライフサイクルイベントの処理（Safari最適化）
+            initPageLifecycleHandling() {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.pauseScanning();
+                    } else {
+                        this.resumeScanning();
+                    }
+                });
+
+                window.addEventListener('beforeunload', () => {
+                    this.cleanupResources();
+                });
+
+                window.addEventListener('pagehide', () => {
+                    this.cleanupResources();
+                });
+
+                window.addEventListener('pageshow', (event) => {
+                    if (event.persisted) {
+                        this.resetScanner();
+                    }
+                });
+            }
+
+            async detectCameras() {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.cameras = devices.filter(device => device.kind === 'videoinput');
+                    this.updateDebug('status', `${this.cameras.length} cameras found`);
+                } catch (error) {
+                    console.warn('カメラ検出エラー:', error);
+                    this.updateDebug('status', 'Camera detection failed');
+                }
+            }
+
+            showScreen(screenName) {
+                this.initialScreen.classList.add('hidden');
+                this.cameraScreen.classList.add('hidden');
+                
+                if (screenName === 'initial') {
+                    this.initialScreen.classList.remove('hidden');
+                } else if (screenName === 'camera') {
+                    this.cameraScreen.classList.remove('hidden');
+                }
+            }
+
+            updateStatus(message) {
+                this.scanStatus.textContent = message;
+            }
+
+            updateDebug(type, value) {
+                if (this.debugElements[type]) {
+                    this.debugElements[type].textContent = value;
+                }
+            }
+
+            toggleDebug() {
+                this.debugMode = !this.debugMode;
+                this.debugInfo.classList.toggle('hidden', !this.debugMode);
+                this.enableDebugMode.checked = this.debugMode;
+            }
+
+            // Safari最適化: 段階的なカメラ初期化
+            async startScan() {
+                try {
+                    this.showScreen('camera');
+                    this.hideAllOverlays();
+                    await this.initializeCamera();
+                    this.setupScanTimeout();
+                } catch (error) {
+                    this.handleError(error);
+                }
+            }
+
+            async initializeCamera() {
+                const constraints = {
+                    video: {
+                        facingMode: this.currentCamera,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                this.video.srcObject = this.stream;
+                this.updateDebug('stream', 'Connected');
+
+                this.video.setAttribute('playsinline', true);
+                this.video.setAttribute('webkit-playsinline', true);
+                this.video.muted = true;
+
+                await this.waitForVideoReady();
+                
+                this.isScanning = true;
+                await this.calibrateCamera();
+            }
+
+            async waitForVideoReady() {
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Video initialization timeout'));
+                    }, 10000);
+
+                    const checkReady = () => {
+                        if (this.video.readyState === 4 && this.video.videoWidth > 0) {
+                            clearTimeout(timeout);
+                            this.updateDebug('status', 'Video ready');
+                            resolve();
+                        } else {
+                            setTimeout(checkReady, 100);
+                        }
+                    };
+                    checkReady();
+                });
+            }
+
+            async calibrateCamera() {
+                if (this.isCalibrating || this.calibrationAttempts >= this.maxCalibrationAttempts) {
+                    return;
+                }
+
+                this.isCalibrating = true;
+                this.calibrationAttempts++;
+                
+                this.calibrationIndicator.classList.remove('hidden');
+                this.updateStatus(`カメラ調整中... (${this.calibrationAttempts}/${this.maxCalibrationAttempts})`);
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                this.calibrationIndicator.classList.add('hidden');
+                this.isCalibrating = false;
+
+                if (this.video.readyState === 4 && this.video.videoWidth > 0) {
+                    this.startQRDetection();
+                } else {
+                    setTimeout(() => this.calibrateCamera(), 1000);
+                }
+            }
+
+            async startQRDetection() {
+                this.updateStatus('在庫QRコードをスキャン中...');
+                this.scanningAnimation.classList.remove('hidden');
+                this.updateDebug('detection', 'Starting');
+                
+                if (typeof QrScanner !== 'undefined') {
+                    try {
+                        this.qrScanner = new QrScanner(
+                            this.video,
+                            result => this.handleQRResult(result.data),
+                            {
+                                returnDetailedScanResult: true,
+                                highlightScanRegion: false,
+                                highlightCodeOutline: false,
+                                maxScansPerSecond: 10,
+                                calculateScanRegion: this.calculateScanRegion.bind(this)
+                            }
+                        );
+                        
+                        await this.qrScanner.start();
+                        this.updateDebug('detection', 'QrScanner active');
+                        this.startFrameCounter();
+                        
+                    } catch (error) {
+                        console.warn('QR Scanner failed, using fallback:', error);
+                        this.fallbackToManualDetection();
+                    }
+                } else {
+                    this.fallbackToManualDetection();
+                }
+            }
+
+            calculateScanRegion(video) {
+                const { videoWidth, videoHeight } = video;
+                const size = Math.min(videoWidth, videoHeight) * 0.6;
+                const x = (videoWidth - size) / 2;
+                const y = (videoHeight - size) / 2;
+                
+                return {
+                    x: Math.round(x),
+                    y: Math.round(y),
+                    width: Math.round(size),
+                    height: Math.round(size)
+                };
+            }
+
+            startFrameCounter() {
+                const countFrames = () => {
+                    if (this.isScanning) {
+                        this.frameCount++;
+                        this.updateDebug('frames', this.frameCount);
+                        requestAnimationFrame(countFrames);
+                    }
+                };
+                countFrames();
+            }
+
+            fallbackToManualDetection() {
+                if ('BarcodeDetector' in window) {
+                    const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39'] });
+                    
+                    const detectQR = async () => {
+                        if (this.isScanning && this.video.readyState === 4) {
+                            try {
+                                const currentTime = Date.now();
+                                if (currentTime - this.lastDetectionAttempt > 200) {
+                                    const barcodes = await detector.detect(this.video);
+                                    this.lastDetectionAttempt = currentTime;
+                                    
+                                    if (barcodes.length > 0) {
+                                        this.handleQRResult(barcodes[0].rawValue);
+                                        return;
+                                    }
+                                }
+                            } catch (error) {
+                                console.warn('Manual detection error:', error);
+                            }
+                        }
+                        
+                        if (this.isScanning) {
+                            requestAnimationFrame(detectQR);
+                        }
+                    };
+                    
+                    detectQR();
+                    this.updateDebug('detection', 'Manual fallback active');
+                } else {
+                    this.handleError(new Error('QRコード検出機能がサポートされていません'));
+                }
+            }
+
+            handleQRResult(data) {
+                if (!this.isScanning) return;
+                
+                this.updateDebug('detection', 'QR detected!');
+                this.showSuccessOverlay();
+                
+                setTimeout(() => {
+                    this.stopScan();
+                    this.processInventoryData(data);
+                }, 1500);
+            }
+
+            processInventoryData(data) {
+                console.log('処理中のデータ:', data);
+                
+                this.resultData.textContent = data;
+                this.resultDisplay.classList.add('show');
+                
+                if (this.autoVerifyInventory.checked) {
+                    this.verifyWithInventory(data);
+                } else {
+                    this.verificationStatus.textContent = '手動確認待ち';
+                    this.verificationStatus.style.color = '#f59e0b';
+                }
+                
+                this.addToVerifiedList(data);
+            }
+
+            verifyWithInventory(scannedData) {
+                // 在庫データとの照合処理
+                const matchedItem = this.expectedItems.find(item => 
+                    scannedData.includes(item.lotNumber) || 
+                    scannedData.includes(item.itemCode)
+                );
+                
+                if (matchedItem) {
+                    this.verificationStatus.textContent = `✅ 照合成功: ${matchedItem.name}`;
+                    this.verificationStatus.style.color = '#16a34a';
+                    
+                    // SyteLine IDOとの連携をシミュレート
+                    this.updateSyteLineInventory(matchedItem, scannedData);
+                } else {
+                    this.verificationStatus.textContent = '❌ 照合失敗: 該当する在庫が見つかりません';
+                    this.verificationStatus.style.color = '#dc2626';
+                }
+            }
+
+            updateSyteLineInventory(item, scannedData) {
+                console.log('SyteLine IDO更新:', {
+                    item: item,
+                    scannedData: scannedData,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // 実際の実装では、ここでSyteLine IDOのAPIを呼び出す
+                setTimeout(() => {
+                    alert(`在庫照合完了!\n\n品目: ${item.name}\nロット: ${item.lotNumber}\n保管場所: ${item.location}\n\n✅ SyteLine在庫管理システムに記録されました。`);
+                }, 500);
+            }
+
+            addToVerifiedList(data) {
+                // 照合済み品目リストに追加
+                const verifiedItemsContainer = document.getElementById('verified-items');
+                if (verifiedItemsContainer) {
+                    const timestamp = new Date().toLocaleTimeString('ja-JP');
+                    const newItem = document.createElement('div');
+                    newItem.className = 'item-card fade-in';
+                    newItem.innerHTML = `
+                        <div class="item-header">
+                            <div class="item-info">
+                                <div class="item-title">📦 スキャン済み: ${data}</div>
+                                <div class="item-meta">照合時刻: ${timestamp}</div>
+                                <div class="item-meta">ステータス: ${this.verificationStatus.textContent}</div>
+                                <div class="status-badge status-completed">照合完了</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 最新のアイテムを先頭に挿入
+                    const firstChild = verifiedItemsContainer.querySelector('.item-card');
+                    if (firstChild) {
+                        verifiedItemsContainer.insertBefore(newItem, firstChild);
+                    } else {
+                        verifiedItemsContainer.appendChild(newItem);
+                    }
+                }
+            }
+
+            handleManualInput(lotNumber) {
+                console.log('手動入力:', lotNumber);
+                this.processInventoryData(lotNumber);
+            }
+
+            showManualInput() {
+                const lotNumber = prompt('ロット番号またはアイテムコードを入力してください:');
+                if (lotNumber && lotNumber.trim()) {
+                    this.handleManualInput(lotNumber.trim());
+                }
+            }
+
+            setupScanTimeout() {
+                const timeoutSeconds = parseInt(this.scanTimeoutSelect.value) * 1000;
+                this.scanTimeout = setTimeout(() => {
+                    if (this.isScanning) {
+                        this.handleError(new Error('スキャンタイムアウトしました。もう一度お試しください。'));
+                    }
+                }, timeoutSeconds);
+            }
+
+            clearScanTimeout() {
+                if (this.scanTimeout) {
+                    clearTimeout(this.scanTimeout);
+                    this.scanTimeout = null;
+                }
+            }
+
+            showSuccessOverlay() {
+                this.hideAllOverlays();
+                this.successOverlay.classList.remove('hidden');
+                setTimeout(() => {
+                    this.successOverlay.classList.add('hidden');
+                }, 2000);
+            }
+
+            showErrorOverlay(message) {
+                this.hideAllOverlays();
+                this.errorMessage.textContent = message;
+                this.errorOverlay.classList.remove('hidden');
+                setTimeout(() => {
+                    this.errorOverlay.classList.add('hidden');
+                }, 3000);
+            }
+
+            hideAllOverlays() {
+                this.calibrationIndicator.classList.add('hidden');
+                this.successOverlay.classList.add('hidden');
+                this.errorOverlay.classList.add('hidden');
+            }
+
+            pauseScanning() {
+                if (this.qrScanner) {
+                    this.qrScanner.stop();
+                }
+                this.scanningAnimation.classList.add('hidden');
+                this.updateStatus('一時停止中...');
+            }
+
+            async resumeScanning() {
+                if (this.qrScanner && this.isScanning) {
+                    try {
+                        await this.qrScanner.start();
+                        this.scanningAnimation.classList.remove('hidden');
+                        this.updateStatus('在庫QRコードをスキャン中...');
+                    } catch (error) {
+                        console.warn('Resume scanning failed:', error);
+                        this.calibrateCamera();
+                    }
+                }
+            }
+
+            stopScan() {
+                this.isScanning = false;
+                this.isCalibrating = false;
+                this.scanningAnimation.classList.add('hidden');
+                this.hideAllOverlays();
+                this.clearScanTimeout();
+                
+                this.cleanupResources();
+                this.showScreen('initial');
+            }
+
+            cleanupResources() {
+                if (this.qrScanner) {
+                    this.qrScanner.stop();
+                    this.qrScanner.destroy();
+                    this.qrScanner = null;
+                }
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                
+                this.updateDebug('stream', 'Disconnected');
+                this.updateDebug('detection', 'Stopped');
+            }
+
+            handleError(error) {
+                this.stopScan();
+                
+                let message = 'カメラにアクセスできませんでした。';
+                
+                switch (error.name) {
+                    case 'NotAllowedError':
+                        message = 'カメラの使用が拒否されました。ブラウザの設定からカメラの許可を有効にしてください。';
+                        break;
+                    case 'NotFoundError':
+                        message = 'カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。';
+                        break;
+                    case 'NotSupportedError':
+                        message = 'このブラウザではカメラ機能がサポートされていません。最新のSafari、Chrome、またはEdgeをお試しください。';
+                        break;
+                    case 'NotReadableError':
+                        message = 'カメラが他のアプリケーションで使用中です。他のアプリを閉じてから再試行してください。';
+                        break;
+                    case 'SecurityError':
+                        message = 'セキュリティ制限によりカメラにアクセスできません。HTTPS環境が必要です。';
+                        break;
+                    default:
+                        if (error.message) {
+                            message = error.message;
+                        }
+                        break;
+                }
+
+                this.showErrorOverlay(message);
+                console.error('QR Scanner Error:', error);
+            }
+
+            resetScanner() {
+                this.stopScan();
+                this.calibrationAttempts = 0;
+                this.frameCount = 0;
+                this.showScreen('initial');
+            }
+
+            clearResult() {
+                this.resultDisplay.classList.remove('show');
+                this.resultData.textContent = '';
+                this.verificationStatus.textContent = '待機中';
+                this.verificationStatus.style.color = '#6b7280';
+            }
+        }
+
+        // アプリケーション初期化時にQRスキャナーを作成
+        document.addEventListener('DOMContentLoaded', () => {
+            // 照合画面がアクティブになった時にQRスキャナーを初期化
+            const originalGoToVerification = window.goToVerification;
+            window.goToVerification = function() {
+                if (originalGoToVerification) {
+                    originalGoToVerification();
+                }
+                
+                // QRスキャナーを初期化（一度だけ）
+                if (!window.inventoryQRScanner) {
+                    window.inventoryQRScanner = new InventoryQRScanner();
+                }
+            };
+        });
+    </script>
+</body>
+</html>

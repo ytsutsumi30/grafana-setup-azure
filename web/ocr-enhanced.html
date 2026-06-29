@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-OCR強化版 - デモ</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <style>
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .quality-bar {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+        <div class="max-w-6xl mx-auto">
+            <h1 class="text-3xl font-bold">🚀 AI-OCR強化版</h1>
+            <p class="mt-2">画像前処理・ハイブリッドOCR・AI補正・学習機能</p>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-6">
+        <!-- 画像アップロード -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">📸 画像アップロード</h2>
+            <input type="file" id="imageInput" accept="image/*" 
+                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <div id="imagePreview" class="mt-4 hidden">
+                <img id="previewImg" class="max-w-full h-auto rounded-lg border-2 border-gray-200">
+            </div>
+        </div>
+
+        <!-- 画質評価 -->
+        <div id="qualitySection" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4">📊 画質評価</h2>
+            <div class="space-y-3">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span>総合スコア</span>
+                        <span id="qualityOverall" class="font-bold">-</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="qualityOverallBar" class="quality-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="qualityRecommendations" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 hidden">
+                    <p class="font-bold text-yellow-800">改善提案:</p>
+                    <ul id="recommendationsList" class="list-disc list-inside text-yellow-700 mt-2"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- OCR設定 -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">⚙️ OCR設定</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">OCRエンジン</label>
+                    <select id="engineSelect" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="tesseract-enhanced">Tesseract強化版 (推奨)</option>
+                        <option value="hybrid">ハイブリッドOCR (自動フォールバック)</option>
+                        <option value="textract">AWS Textract</option>
+                        <option value="documentai">GCP Document AI</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">文書タイプ</label>
+                    <select id="contextSelect" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="default">汎用</option>
+                        <option value="invoice">請求書</option>
+                        <option value="receipt">レシート</option>
+                        <option value="shipping">出荷伝票</option>
+                    </select>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="preprocessingCheck" checked class="mr-2">
+                    <label>画像前処理を有効化</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="aiCorrectionCheck" class="mr-2">
+                    <label>AI補正を有効化</label>
+                </div>
+            </div>
+            <button id="recognizeBtn" class="mt-4 w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:bg-gray-300" disabled>
+                🔍 OCR実行
+            </button>
+        </div>
+
+        <!-- OCR結果 -->
+        <div id="resultSection" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4">📝 OCR結果</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <span class="font-semibold">エンジン:</span>
+                        <span id="resultEngine" class="ml-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"></span>
+                    </div>
+                    <div>
+                        <span class="font-semibold">信頼度:</span>
+                        <span id="resultConfidence" class="ml-2 text-2xl font-bold text-green-600">-</span>
+                    </div>
+                    <div>
+                        <span class="font-semibold">処理時間:</span>
+                        <span id="resultTime" class="ml-2 text-gray-600">-</span>
+                    </div>
+                </div>
+                <div>
+                    <textarea id="resultText" rows="10" class="w-full p-4 border rounded-lg font-mono text-sm"></textarea>
+                </div>
+                <div class="flex gap-4">
+                    <button id="copyBtn" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        📋 コピー
+                    </button>
+                    <button id="feedbackBtn" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        ✅ フィードバック送信
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 統計情報 -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4">📈 統計情報</h2>
+            <button id="loadStatsBtn" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                統計を読み込み
+            </button>
+            <div id="statsContent" class="mt-4 hidden">
+                <div id="statsData" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 処理中オーバーレイ -->
+    <div id="processingOverlay" class="processing-overlay hidden">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+            <p id="processingStatus" class="text-white text-xl mt-4">処理中...</p>
+        </div>
+    </div>
+
+    <!-- OCRモジュール読み込み -->
+    <script src="/js/image-preprocessor.js"></script>
+    <script src="/js/ocr-engine-enhanced.js"></script>
+    <script src="/js/ocr-module.js"></script>
+
+    <script>
+        let ocrModule = null;
+        let currentOCRResult = null;
+        let currentImage = null;
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('[Demo] 初期化開始');
+            
+            ocrModule = new OCRModule({
+                enablePreprocessing: true,
+                enableAICorrection: false,
+                enableFeedback: true
+            });
+            
+            await ocrModule.initialize();
+            console.log('[Demo] 初期化完了');
+        });
+
+        // 画像アップロード
+        document.getElementById('imageInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // プレビュー表示
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = document.getElementById('previewImg');
+                img.src = e.target.result;
+                document.getElementById('imagePreview').classList.remove('hidden');
+                document.getElementById('recognizeBtn').disabled = false;
+            };
+            reader.readAsDataURL(file);
+            
+            currentImage = file;
+            
+            // 画質評価
+            try {
+                const quality = await ocrModule.assessImageQuality(file);
+                if (quality) {
+                    showQuality(quality);
+                }
+            } catch (error) {
+                console.error('[Demo] 画質評価エラー:', error);
+            }
+        });
+
+        // 画質表示
+        function showQuality(quality) {
+            const section = document.getElementById('qualitySection');
+            section.classList.remove('hidden');
+            
+            const overallPct = (quality.overall * 100).toFixed(0);
+            document.getElementById('qualityOverall').textContent = `${overallPct}%`;
+            document.getElementById('qualityOverallBar').style.width = `${overallPct}%`;
+            
+            if (quality.recommendations && quality.recommendations.length > 0) {
+                const recSection = document.getElementById('qualityRecommendations');
+                const recList = document.getElementById('recommendationsList');
+                recSection.classList.remove('hidden');
+                recList.innerHTML = quality.recommendations.map(r => `<li>${r}</li>`).join('');
+            }
+        }
+
+        // OCR実行
+        document.getElementById('recognizeBtn').addEventListener('click', async () => {
+            if (!currentImage) return;
+            
+            showProcessing('OCR処理中...');
+            
+            try {
+                const engine = document.getElementById('engineSelect').value;
+                const context = document.getElementById('contextSelect').value;
+                const enablePreprocessing = document.getElementById('preprocessingCheck').checked;
+                const enableAICorrection = document.getElementById('aiCorrectionCheck').checked;
+                
+                ocrModule.options.enablePreprocessing = enablePreprocessing;
+                ocrModule.options.enableAICorrection = enableAICorrection;
+                
+                const result = await ocrModule.recognize(currentImage, {
+                    engine,
+                    context
+                });
+                
+                currentOCRResult = result;
+                showResult(result);
+                
+            } catch (error) {
+                console.error('[Demo] OCRエラー:', error);
+                alert('OCR処理中にエラーが発生しました: ' + error.message);
+            } finally {
+                hideProcessing();
+            }
+        });
+
+        // 結果表示
+        function showResult(result) {
+            const section = document.getElementById('resultSection');
+            section.classList.remove('hidden');
+            
+            document.getElementById('resultEngine').textContent = result.engine;
+            document.getElementById('resultConfidence').textContent = result.confidence.toFixed(1) + '%';
+            document.getElementById('resultTime').textContent = result.totalProcessingTime + 'ms';
+            document.getElementById('resultText').value = result.text;
+        }
+
+        // コピー
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            const text = document.getElementById('resultText').value;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('コピーしました！');
+            });
+        });
+
+        // フィードバック送信
+        document.getElementById('feedbackBtn').addEventListener('click', async () => {
+            if (!currentOCRResult) return;
+            
+            const correctedText = document.getElementById('resultText').value;
+            
+            try {
+                showProcessing('フィードバック送信中...');
+                await ocrModule.submitFeedback(currentOCRResult, correctedText);
+                alert('フィードバックを送信しました！');
+            } catch (error) {
+                console.error('[Demo] フィードバックエラー:', error);
+                alert('フィードバック送信エラー: ' + error.message);
+            } finally {
+                hideProcessing();
+            }
+        });
+
+        // 統計読み込み
+        document.getElementById('loadStatsBtn').addEventListener('click', async () => {
+            try {
+                showProcessing('統計取得中...');
+                const stats = await ocrModule.getFeedbackStats();
+                
+                if (stats && stats.length > 0) {
+                    const statsHtml = stats.map(s => `
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <div class="font-bold">${s.engine}</div>
+                            <div class="text-sm text-gray-600">平均精度: ${s.avgAccuracy}%</div>
+                            <div class="text-sm text-gray-600">件数: ${s.totalFeedbacks}</div>
+                        </div>
+                    `).join('');
+                    
+                    document.getElementById('statsData').innerHTML = statsHtml;
+                    document.getElementById('statsContent').classList.remove('hidden');
+                } else {
+                    alert('統計データがありません');
+                }
+            } catch (error) {
+                console.error('[Demo] 統計取得エラー:', error);
+                alert('統計取得エラー: ' + error.message);
+            } finally {
+                hideProcessing();
+            }
+        });
+
+        // 処理中表示
+        function showProcessing(message) {
+            document.getElementById('processingStatus').textContent = message;
+            document.getElementById('processingOverlay').classList.remove('hidden');
+        }
+
+        function hideProcessing() {
+            document.getElementById('processingOverlay').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

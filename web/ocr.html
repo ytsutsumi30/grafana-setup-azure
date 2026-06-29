@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI伝票読み取りシステム - OCR</title>
+    
+    <!-- キャッシュ対策 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <style>
+        .camera-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            max-height: 500px;
+        }
+        
+        .camera-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 60%;
+            border: 3px dashed rgba(96, 165, 250, 0.8);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .capture-guide-corner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 4px solid #60a5fa;
+        }
+        
+        .corner-tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+        .corner-tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+        .corner-bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+        .corner-br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+        
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .match-card {
+            transition: all 0.3s ease;
+        }
+        
+        .match-card.matched {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border-left: 4px solid #10b981;
+        }
+        
+        .match-card.unmatched {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border-left: 4px solid #ef4444;
+        }
+        
+        .match-card.partial {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid #f59e0b;
+        }
+        
+        @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        
+        .scanning-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+            animation: scan 2s ease-in-out infinite;
+            z-index: 11;
+        }
+        
+        .ocr-text-preview {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
+            <div class="px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-xl font-bold flex items-center gap-2">
+                            <span class="text-2xl">📄</span>
+                            AI伝票読み取りシステム
+                        </h1>
+                        <p class="text-xs text-blue-100 mt-1">OCR自動認識 & マッチング</p>
+                    </div>
+                    <button onclick="window.location.href='index.html'" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors">
+                        🏠 ホーム
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 p-4 space-y-4">
+            <!-- メインコンテンツ -->
+            <div class="max-w-4xl mx-auto space-y-4">
+                
+                <!-- OCRエンジン設定 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-900">⚙️ OCR設定</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 mb-2 block">OCRエンジン選択</label>
+                            <select id="ocr-engine-select" onchange="updateOCREngine()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="tesseract-enhanced">Tesseract.js 高精度版（無料・オフライン）</option>
+                                <option value="textract">AWS Textract ⭐ 推奨（表・フォーム認識）</option>
+                                <option value="google-vision">Google Cloud Vision API（高精度・要APIキー）</option>
+                                <option value="azure-vision">Azure Computer Vision（高精度・要APIキー）</option>
+                            </select>
+                        </div>
+                        
+                        <!-- APIキー入力（クラウドOCR用） -->
+                        <div id="api-key-section" class="hidden">
+                            <label class="text-sm font-medium text-gray-700 mb-2 block">APIキー</label>
+                            <input type="password" id="ocr-api-key" placeholder="APIキーを入力してください" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">APIキーはブラウザに保存されます（サーバーには送信されません）</p>
+                        </div>
+                        
+                        <div id="ocr-engine-info" class="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                            <strong>Tesseract.js 高精度版:</strong> 画像前処理＋デュアル言語モデル（日本語・英語）で精度を向上。完全無料でオフライン動作。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- モード選択 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-900">📋 伝票種別選択</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="btn-order-mode" onclick="setDocumentMode('order')" class="document-mode-btn bg-blue-50 border-2 border-blue-200 text-blue-700 px-6 py-4 rounded-xl font-medium hover:bg-blue-100 transition-all">
+                            📝 注文/発注伝票
+                        </button>
+                        <button id="btn-delivery-mode" onclick="setDocumentMode('delivery')" class="document-mode-btn bg-gray-50 border-2 border-gray-200 text-gray-700 px-6 py-4 rounded-xl font-medium hover:bg-gray-100 transition-all">
+                            📦 納品/送り状
+                        </button>
+                    </div>
+                    <div id="mode-description" class="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800 hidden">
+                        <!-- モード説明がここに表示される -->
+                    </div>
+                </div>
+
+                <!-- カメラ撮影エリア -->
+                <div id="camera-section" class="bg-white rounded-xl shadow-sm p-6 hidden">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-900">📷 伝票を撮影</h2>
+                    
+                    <div class="camera-container mb-4">
+                        <video id="camera-video" class="w-full h-full object-cover" playsinline muted webkit-playsinline autoplay></video>
+                        <canvas id="capture-canvas" class="hidden"></canvas>
+                        <div class="camera-overlay">
+                            <div class="capture-guide-corner corner-tl"></div>
+                            <div class="capture-guide-corner corner-tr"></div>
+                            <div class="capture-guide-corner corner-bl"></div>
+                            <div class="capture-guide-corner corner-br"></div>
+                        </div>
+                        <div id="scanning-indicator" class="scanning-line hidden"></div>
+                        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-full text-sm">
+                            <span id="camera-status">伝票を枠内に合わせてください</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3 justify-center">
+                        <button id="btn-start-camera" onclick="startCamera()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
+                            📷 カメラ起動
+                        </button>
+                        <button id="btn-capture" onclick="captureImage()" class="bg-green-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-700 transition-colors hidden">
+                            ✅ 撮影してOCR実行
+                        </button>
+                        <button id="btn-stop-camera" onclick="stopCamera()" class="bg-gray-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-700 transition-colors hidden">
+                            ⏹️ カメラ停止
+                        </button>
+                    </div>
+                </div>
+
+                <!-- OCR結果表示 -->
+                <div id="ocr-result-section" class="bg-white rounded-xl shadow-sm p-6 hidden">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-900">🔍 OCR認識結果</h2>
+                    
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">認識精度</span>
+                            <span id="ocr-confidence" class="text-sm font-semibold text-blue-600">--%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="ocr-confidence-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="text-sm font-medium text-gray-700 mb-2 block">認識テキスト（生データ）</label>
+                        <div id="ocr-raw-text" class="ocr-text-preview text-gray-700">
+                            <!-- OCR生データがここに表示される -->
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 mb-1 block">抽出された伝票番号</label>
+                            <input type="text" id="extracted-doc-number" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="自動抽出">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 mb-1 block">抽出された金額</label>
+                            <input type="text" id="extracted-amount" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="自動抽出">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="text-sm font-medium text-gray-700 mb-1 block">📍 住所</label>
+                            <input type="text" id="extracted-address" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="自動抽出">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 mb-1 block">📮 送り先</label>
+                            <input type="text" id="extracted-destination" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="自動抽出">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 mb-1 block">📦 品目</label>
+                            <input type="text" id="extracted-items" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="自動抽出">
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="retakePhoto()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                            🔄 再撮影
+                        </button>
+                        <button onclick="saveOCRResult()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex-1">
+                            💾 この結果を保存
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 保存済み伝票リスト -->
+                <div id="saved-documents-section" class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-900">📚 保存済み伝票</h2>
+                        <button onclick="clearAllDocuments()" class="text-sm text-red-600 hover:text-red-700">
+                            🗑️ すべてクリア
+                        </button>
+                    </div>
+                    
+                    <div id="documents-list" class="space-y-3">
+                        <div class="text-center text-gray-400 py-8">
+                            伝票を撮影して保存してください
+                        </div>
+                    </div>
+                </div>
+
+                <!-- マッチング結果 -->
+                <div id="matching-section" class="bg-white rounded-xl shadow-sm p-6 hidden">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-900">🔗 マッチング結果</h2>
+                    <div id="matching-results" class="space-y-3">
+                        <!-- マッチング結果がここに表示される -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="bg-white border-t border-gray-200 p-4 text-center">
+            <p class="text-sm text-gray-500">🤖 Powered by Tesseract.js OCR Engine</p>
+            <p class="text-xs text-gray-400 mt-1">iPad Safari最適化版 v1.0</p>
+        </div>
+    </div>
+
+    <!-- 処理中オーバーレイ -->
+    <div id="processing-overlay" class="processing-overlay hidden">
+        <div class="bg-white rounded-xl p-8 text-center max-w-sm">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">OCR処理中...</h3>
+            <p id="processing-status" class="text-sm text-gray-600">画像を解析しています</p>
+            <div class="mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="processing-progress" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="processing-percentage" class="text-xs text-gray-500 mt-1">0%</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let currentMode = 'order'; // 'order' or 'delivery'
+        let videoStream = null;
+        let savedDocuments = {
+            orders: [],
+            deliveries: []
+        };
+        let ocrEngine = 'tesseract-enhanced'; // デフォルトエンジン
+        let ocrApiKey = '';
+
+        // ローカルストレージから保存済みデータを読み込み
+        function loadSavedDocuments() {
+            const saved = localStorage.getItem('ocrDocuments');
+            if (saved) {
+                savedDocuments = JSON.parse(saved);
+                updateDocumentsList();
+                updateMatching();
+            }
+            
+            // OCR設定を読み込み
+            const savedEngine = localStorage.getItem('ocrEngine');
+            const savedApiKey = localStorage.getItem('ocrApiKey');
+            if (savedEngine) {
+                ocrEngine = savedEngine;
+                document.getElementById('ocr-engine-select').value = savedEngine;
+                updateOCREngine();
+            }
+            if (savedApiKey) {
+                ocrApiKey = savedApiKey;
+                document.getElementById('ocr-api-key').value = savedApiKey;
+            }
+        }
+
+        // OCRエンジン更新
+        function updateOCREngine() {
+            ocrEngine = document.getElementById('ocr-engine-select').value;
+            localStorage.setItem('ocrEngine', ocrEngine);
+            
+            const apiKeySection = document.getElementById('api-key-section');
+            const infoDiv = document.getElementById('ocr-engine-info');
+            
+            if (ocrEngine === 'tesseract-enhanced') {
+                apiKeySection.classList.add('hidden');
+                infoDiv.innerHTML = '<strong>Tesseract.js 高精度版:</strong> 画像前処理＋デュアル言語モデル（日本語・英語）で精度を向上。完全無料でオフライン動作。';
+                infoDiv.className = 'p-3 bg-blue-50 rounded-lg text-sm text-blue-800';
+            } else if (ocrEngine === 'textract') {
+                apiKeySection.classList.add('hidden');
+                infoDiv.innerHTML = '<strong>⭐ AWS Textract:</strong> 表形式データ・フォーム認識に最適。日本語手書き文字対応。サーバー経由で処理（APIキー不要）。';
+                infoDiv.className = 'p-3 bg-orange-50 rounded-lg text-sm text-orange-800';
+            } else if (ocrEngine === 'google-vision') {
+                apiKeySection.classList.remove('hidden');
+                infoDiv.innerHTML = '<strong>Google Cloud Vision API:</strong> 最高精度のAI-OCR。手書き文字も高精度で認識。<a href="https://cloud.google.com/vision/docs/ocr" target="_blank" class="underline">APIキー取得方法</a>';
+                infoDiv.className = 'p-3 bg-green-50 rounded-lg text-sm text-green-800';
+            } else if (ocrEngine === 'azure-vision') {
+                apiKeySection.classList.remove('hidden');
+                infoDiv.innerHTML = '<strong>Azure Computer Vision:</strong> 日本語に特化した高精度OCR。レイアウト解析に優れる。<a href="https://azure.microsoft.com/ja-jp/products/ai-services/ai-vision" target="_blank" class="underline">APIキー取得方法</a>';
+                infoDiv.className = 'p-3 bg-purple-50 rounded-lg text-sm text-purple-800';
+            }
+            
+            // APIキーを保存
+            const apiKeyInput = document.getElementById('ocr-api-key');
+            apiKeyInput.addEventListener('change', () => {
+                ocrApiKey = apiKeyInput.value;
+                localStorage.setItem('ocrApiKey', ocrApiKey);
+            });
+        }
+
+        // ドキュメントモード設定
+        function setDocumentMode(mode) {
+            currentMode = mode;
+            
+            // ボタンのスタイル更新
+            document.querySelectorAll('.document-mode-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700');
+                btn.classList.add('bg-gray-50', 'border-gray-200', 'text-gray-700');
+            });
+            
+            const activeBtn = mode === 'order' ? document.getElementById('btn-order-mode') : document.getElementById('btn-delivery-mode');
+            activeBtn.classList.remove('bg-gray-50', 'border-gray-200', 'text-gray-700');
+            activeBtn.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+            
+            // モード説明を表示
+            const description = document.getElementById('mode-description');
+            description.classList.remove('hidden');
+            description.innerHTML = mode === 'order' 
+                ? '<strong>📝 注文/発注伝票モード:</strong> 注文書や発注書の伝票番号、金額、品目などを読み取ります。'
+                : '<strong>📦 納品/送り状モード:</strong> 納品書や送り状の伝票番号、金額を読み取り、注文伝票とマッチングします。';
+            
+            // カメラセクションを表示
+            document.getElementById('camera-section').classList.remove('hidden');
+        }
+
+        // カメラ起動（iPad Safari最適化版）
+        async function startCamera() {
+            try {
+                document.getElementById('camera-status').textContent = 'カメラを起動中...';
+                
+                // iPad Safari対応: より柔軟なカメラ制約
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920, min: 640 },
+                        height: { ideal: 1080, min: 480 },
+                        aspectRatio: { ideal: 16/9 }
+                    },
+                    audio: false
+                };
+                
+                console.log('[OCR Camera] Requesting camera access with constraints:', constraints);
+                
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('camera-video');
+                
+                video.srcObject = videoStream;
+                
+                // iPad Safari: videoがloadedmetadataイベントを発火するまで待つ
+                await new Promise((resolve, reject) => {
+                    video.onloadedmetadata = () => {
+                        console.log('[OCR Camera] Video metadata loaded, resolution:', video.videoWidth, 'x', video.videoHeight);
+                        resolve();
+                    };
+                    video.onerror = (err) => {
+                        console.error('[OCR Camera] Video error:', err);
+                        reject(new Error('ビデオ読み込みエラー'));
+                    };
+                    setTimeout(() => reject(new Error('カメラ起動タイムアウト')), 10000);
+                });
+                
+                // 明示的にplay()を呼び出し（iOS Safari対策）
+                await video.play();
+                console.log('[OCR Camera] Video playing successfully');
+                
+                document.getElementById('btn-start-camera').classList.add('hidden');
+                document.getElementById('btn-capture').classList.remove('hidden');
+                document.getElementById('btn-stop-camera').classList.remove('hidden');
+                document.getElementById('camera-status').textContent = '伝票を枠内に合わせてください';
+            } catch (error) {
+                console.error('[OCR Camera] Camera error:', error);
+                
+                let errorMessage = 'カメラの起動に失敗しました: ' + error.message;
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'カメラの使用が拒否されました。Safari設定でカメラの許可を有効にしてください。\n\n設定 > Safari > カメラ';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = 'カメラが見つかりませんでした。デバイスにカメラが接続されているか確認してください。';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage = 'カメラが他のアプリで使用中です。他のアプリを閉じてから再試行してください。';
+                }
+                
+                alert(errorMessage);
+                document.getElementById('camera-status').textContent = 'カメラ起動失敗';
+            }
+        }
+
+        // カメラ停止
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+                document.getElementById('camera-video').srcObject = null;
+            }
+            
+            document.getElementById('btn-start-camera').classList.remove('hidden');
+            document.getElementById('btn-capture').classList.add('hidden');
+            document.getElementById('btn-stop-camera').classList.add('hidden');
+            document.getElementById('camera-status').textContent = '伝票を枠内に合わせてください';
+        }
+
+        // 画像キャプチャとOCR実行
+        async function captureImage() {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('capture-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // キャンバスサイズを動画に合わせる
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // 動画フレームをキャンバスに描画
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // カメラを停止
+            stopCamera();
+            
+            // OCR処理を実行（選択されたエンジンで）
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+            
+            // OCRエンジンに応じて処理を振り分け
+            if (ocrEngine === 'textract') {
+                await performTextractOCR(imageData);
+            } else if (ocrEngine === 'google-vision') {
+                await performGoogleVisionOCR(imageData);
+            } else if (ocrEngine === 'azure-vision') {
+                await performAzureVisionOCR(imageData);
+            } else {
+                await performOCR(imageData);
+            }
+        }
+
+        // 画像前処理（OCR精度向上）
+        async function preprocessImage(imageData) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    // キャンバスを作成（高解像度）
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 画像を2倍のサイズで処理（高解像度化）
+                    const scale = 2;
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    
+                    // アンチエイリアスを無効化（シャープな画像）
+                    ctx.imageSmoothingEnabled = false;
+                    
+                    // 画像を描画
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // 画像データを取得
+                    const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageDataObj.data;
+                    
+                    // グレースケール変換 + コントラスト強調
+                    for (let i = 0; i < data.length; i += 4) {
+                        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                        
+                        // コントラスト強調（閾値処理）
+                        const threshold = 128;
+                        const contrast = 1.5;
+                        let value = ((gray - threshold) * contrast) + threshold;
+                        value = Math.max(0, Math.min(255, value));
+                        
+                        data[i] = data[i + 1] = data[i + 2] = value;
+                    }
+                    
+                    ctx.putImageData(imageDataObj, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = imageData;
+            });
+        }
+
+        // OCR処理実行（高精度版）
+        async function performOCR(imageData) {
+            // 処理中オーバーレイを表示
+            const overlay = document.getElementById('processing-overlay');
+            overlay.classList.remove('hidden');
+            
+            try {
+                document.getElementById('processing-status').textContent = '画像を最適化中...';
+                
+                // 画像前処理
+                const processedImage = await preprocessImage(imageData);
+                
+                document.getElementById('processing-status').textContent = 'OCRエンジン初期化中...';
+                
+                // 日本語+英語のマルチ言語モデルで高精度化
+                const worker = await Tesseract.createWorker(['jpn', 'eng'], 1, {
+                    logger: (m) => {
+                        console.log(m);
+                        if (m.status === 'recognizing text') {
+                            const progress = Math.round(m.progress * 100);
+                            document.getElementById('processing-progress').style.width = progress + '%';
+                            document.getElementById('processing-percentage').textContent = progress + '%';
+                            document.getElementById('processing-status').textContent = `テキスト認識中... ${progress}%`;
+                        }
+                    }
+                });
+                
+                // Tesseractパラメータ設定（精度最優先）
+                await worker.setParameters({
+                    tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+                    tessedit_char_whitelist: '', // すべての文字を許可
+                    preserve_interword_spaces: '1',
+                    // 精度向上のための設定
+                    tessedit_do_invert: '0',
+                    classify_enable_learning: '1',
+                    classify_enable_adaptive_matcher: '1'
+                });
+                
+                document.getElementById('processing-status').textContent = '高精度OCR処理中...';
+                
+                // OCR実行
+                const { data: { text, confidence } } = await worker.recognize(processedImage);
+                
+                console.log('OCR Result:', { text, confidence });
+                
+                await worker.terminate();
+                
+                // 結果を表示
+                displayOCRResult(text, confidence, imageData);
+                
+            } catch (error) {
+                console.error('OCR error:', error);
+                alert('OCR処理でエラーが発生しました: ' + error.message);
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // Google Cloud Vision API OCR
+        async function performGoogleVisionOCR(imageData) {
+            const overlay = document.getElementById('processing-overlay');
+            overlay.classList.remove('hidden');
+            
+            try {
+                if (!ocrApiKey) {
+                    alert('Google Cloud Vision APIキーを設定してください');
+                    return;
+                }
+                
+                document.getElementById('processing-status').textContent = 'Google Vision APIに接続中...';
+                document.getElementById('processing-progress').style.width = '30%';
+                document.getElementById('processing-percentage').textContent = '30%';
+                
+                // Base64画像データを準備
+                const base64Image = imageData.split(',')[1];
+                
+                const requestBody = {
+                    requests: [{
+                        image: { content: base64Image },
+                        features: [{
+                            type: 'DOCUMENT_TEXT_DETECTION',
+                            maxResults: 1
+                        }],
+                        imageContext: {
+                            languageHints: ['ja', 'en']
+                        }
+                    }]
+                };
+                
+                document.getElementById('processing-status').textContent = 'AI-OCR処理中...';
+                document.getElementById('processing-progress').style.width = '60%';
+                document.getElementById('processing-percentage').textContent = '60%';
+                
+                const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${ocrApiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                document.getElementById('processing-progress').style.width = '100%';
+                document.getElementById('processing-percentage').textContent = '100%';
+                
+                if (result.responses && result.responses[0].fullTextAnnotation) {
+                    const text = result.responses[0].fullTextAnnotation.text;
+                    const confidence = result.responses[0].fullTextAnnotation.pages[0]?.confidence * 100 || 95;
+                    
+                    console.log('Google Vision OCR Result:', { text, confidence });
+                    displayOCRResult(text, confidence, imageData);
+                } else {
+                    throw new Error('テキストが検出されませんでした');
+                }
+                
+            } catch (error) {
+                console.error('Google Vision OCR error:', error);
+                alert('Google Vision OCRでエラーが発生しました: ' + error.message);
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // Azure Computer Vision API OCR
+        async function performAzureVisionOCR(imageData) {
+            const overlay = document.getElementById('processing-overlay');
+            overlay.classList.remove('hidden');
+            
+            try {
+                if (!ocrApiKey) {
+                    alert('Azure Computer Vision APIキーを設定してください');
+                    return;
+                }
+                
+                // APIキーにエンドポイントが含まれているか確認
+                let endpoint = 'https://YOUR-RESOURCE-NAME.cognitiveservices.azure.com';
+                let apiKey = ocrApiKey;
+                
+                if (ocrApiKey.includes('|')) {
+                    [endpoint, apiKey] = ocrApiKey.split('|');
+                }
+                
+                document.getElementById('processing-status').textContent = 'Azure Vision APIに接続中...';
+                document.getElementById('processing-progress').style.width = '30%';
+                document.getElementById('processing-percentage').textContent = '30%';
+                
+                // Base64をBlobに変換
+                const base64Data = imageData.split(',')[1];
+                const binaryData = atob(base64Data);
+                const bytes = new Uint8Array(binaryData.length);
+                for (let i = 0; i < binaryData.length; i++) {
+                    bytes[i] = binaryData.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'image/jpeg' });
+                
+                document.getElementById('processing-status').textContent = 'AI-OCR処理中...';
+                document.getElementById('processing-progress').style.width = '60%';
+                document.getElementById('processing-percentage').textContent = '60%';
+                
+                // Azure Read API を使用
+                const readResponse = await fetch(`${endpoint}/vision/v3.2/read/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Ocp-Apim-Subscription-Key': apiKey,
+                        'Content-Type': 'application/octet-stream'
+                    },
+                    body: blob
+                });
+                
+                if (!readResponse.ok) {
+                    throw new Error(`API Error: ${readResponse.status} ${readResponse.statusText}`);
+                }
+                
+                // 結果取得用のURL
+                const operationLocation = readResponse.headers.get('Operation-Location');
+                
+                // 結果を取得（ポーリング）
+                let resultData = null;
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    const resultResponse = await fetch(operationLocation, {
+                        headers: { 'Ocp-Apim-Subscription-Key': apiKey }
+                    });
+                    
+                    resultData = await resultResponse.json();
+                    
+                    if (resultData.status === 'succeeded') break;
+                    if (resultData.status === 'failed') throw new Error('OCR処理に失敗しました');
+                    
+                    document.getElementById('processing-percentage').textContent = `${60 + i * 4}%`;
+                }
+                
+                document.getElementById('processing-progress').style.width = '100%';
+                document.getElementById('processing-percentage').textContent = '100%';
+                
+                if (resultData && resultData.analyzeResult) {
+                    const lines = resultData.analyzeResult.readResults[0].lines;
+                    const text = lines.map(line => line.text).join('\n');
+                    const confidence = lines.reduce((sum, line) => sum + (line.confidence || 0.95), 0) / lines.length * 100;
+                    
+                    console.log('Azure Vision OCR Result:', { text, confidence });
+                    displayOCRResult(text, confidence, imageData);
+                } else {
+                    throw new Error('テキストが検出されませんでした');
+                }
+                
+            } catch (error) {
+                console.error('Azure Vision OCR error:', error);
+                alert('Azure Vision OCRでエラーが発生しました: ' + error.message + '\n\n設定形式: エンドポイント|APIキー');
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // AWS Textract OCR（サーバー経由）
+        async function performTextractOCR(imageData) {
+            const overlay = document.getElementById('processing-overlay');
+            overlay.classList.remove('hidden');
+            
+            try {
+                document.getElementById('processing-status').textContent = 'AWS Textractに接続中...';
+                document.getElementById('processing-progress').style.width = '30%';
+                document.getElementById('processing-percentage').textContent = '30%';
+                
+                // Base64画像データを準備
+                const base64Image = imageData.split(',')[1] || imageData;
+                
+                document.getElementById('processing-status').textContent = 'AI-OCR処理中（表・フォーム認識）...';
+                document.getElementById('processing-progress').style.width = '60%';
+                document.getElementById('processing-percentage').textContent = '60%';
+                
+                // サーバーのOCR APIエンドポイントを呼び出し
+                const response = await fetch('/api/ocr/textract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: imageData,
+                        documentType: currentMode === 'order' ? 'invoice' : 'receipt'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `API Error: ${response.status}`);
+                }
+                
+                document.getElementById('processing-progress').style.width = '90%';
+                document.getElementById('processing-percentage').textContent = '90%';
+                
+                const result = await response.json();
+                
+                document.getElementById('processing-progress').style.width = '100%';
+                document.getElementById('processing-percentage').textContent = '100%';
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Textract処理に失敗しました');
+                }
+                
+                console.log('AWS Textract OCR Result:', result);
+                
+                // 警告がある場合は表示
+                if (result.warning) {
+                    console.warn('Textract Warning:', result.warning);
+                }
+                
+                // 結果を表示
+                displayOCRResult(result.text, result.confidence, imageData);
+                
+                // 処理時間をログ出力
+                console.log(`Textract処理時間: ${result.processingTime}ms, 信頼度: ${result.confidence.toFixed(2)}%`);
+                
+            } catch (error) {
+                console.error('AWS Textract OCR error:', error);
+                alert('AWS Textract OCRでエラーが発生しました: ' + error.message + '\n\nサーバー側のAWS認証情報を確認してください。');
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // OCR結果表示
+        function displayOCRResult(text, confidence, imageData) {
+            // OCR結果セクションを表示
+            document.getElementById('ocr-result-section').classList.remove('hidden');
+            
+            // 精度表示
+            const confidencePercent = Math.round(confidence);
+            document.getElementById('ocr-confidence').textContent = confidencePercent + '%';
+            document.getElementById('ocr-confidence-bar').style.width = confidencePercent + '%';
+            
+            // 生テキスト表示
+            document.getElementById('ocr-raw-text').textContent = text;
+            
+            // 伝票データを抽出
+            const extracted = extractDocumentData(text);
+            document.getElementById('extracted-doc-number').value = extracted.documentNumber || '';
+            document.getElementById('extracted-amount').value = extracted.amount || '';
+            document.getElementById('extracted-address').value = extracted.address || '';
+            document.getElementById('extracted-destination').value = extracted.destination || '';
+            document.getElementById('extracted-items').value = extracted.items || '';
+            
+            // 一時データとして保存
+            window.currentOCRData = {
+                text: text,
+                confidence: confidence,
+                imageData: imageData,
+                documentNumber: extracted.documentNumber,
+                amount: extracted.amount,
+                address: extracted.address,
+                destination: extracted.destination,
+                items: extracted.items,
+                mode: currentMode,
+                timestamp: new Date().toISOString()
+            };
+        }
+
+        // 伝票データ抽出（住所、送り先、品目対応版）
+        function extractDocumentData(text) {
+            const result = {
+                documentNumber: null,
+                amount: null,
+                address: null,
+                destination: null,
+                items: null
+            };
+            
+            // 伝票番号抽出（例: NO.123456, 注文番号:123456, など）
+            const docNumberPatterns = [
+                /(?:NO\.?|番号[:：]?|注文番号[:：]?|発注番号[:：]?|伝票[:：]?)\s*([A-Z0-9\-]+)/i,
+                /([A-Z]{2,}\d{4,})/  // 例: SHIP001, ORDER123
+            ];
+            
+            for (const pattern of docNumberPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.documentNumber = match[1].trim();
+                    break;
+                }
+            }
+            
+            // 金額抽出（例: ¥10,000, 10,000円, など）
+            const amountPatterns = [
+                /[¥￥]?\s*([\d,]+)\s*円/,
+                /金額[:：]?\s*[¥￥]?\s*([\d,]+)/,
+                /合計[:：]?\s*[¥￥]?\s*([\d,]+)/
+            ];
+            
+            for (const pattern of amountPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.amount = match[1].replace(/,/g, '');
+                    break;
+                }
+            }
+            
+            // 住所抽出（例: 東京都, 〒123-4567, 市区町村を含む）
+            const addressPatterns = [
+                /(?:住所[:：]?|所在地[:：]?)\s*([^\n]+)/,
+                /(〒\d{3}-?\d{4}[^\n]+)/,
+                /((?:東京都|北海道|(?:京都|大阪)府|.{2,3}県).+?[市区町村][^\n]{5,30})/
+            ];
+            
+            for (const pattern of addressPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.address = match[1].trim();
+                    break;
+                }
+            }
+            
+            // 送り先抽出（例: 御中, 様, 宛）
+            const destinationPatterns = [
+                /(?:送り先[:：]?|届け先[:：]?|納品先[:：]?)\s*([^\n]+)/,
+                /([^\n]{2,20}(?:御中|様|宛|殿))/,
+                /(?:株式会社|有限会社)([^\n]{2,30})/
+            ];
+            
+            for (const pattern of destinationPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.destination = match[1].trim();
+                    break;
+                }
+            }
+            
+            // 品目抽出（例: 品名:, 商品:, 品目:）
+            const itemsPatterns = [
+                /(?:品名[:：]?|商品名[:：]?|品目[:：]?|内容[:：]?)\s*([^\n]+)/,
+                /(?:商品|製品|品)\s*[:：]\s*([^\n]+)/
+            ];
+            
+            for (const pattern of itemsPatterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    result.items = match[1].trim();
+                    break;
+                }
+            }
+            
+            return result;
+        }
+
+        // OCR結果を保存
+        function saveOCRResult() {
+            if (!window.currentOCRData) {
+                alert('保存するデータがありません');
+                return;
+            }
+            
+            // 手動修正された値を取得
+            const documentNumber = document.getElementById('extracted-doc-number').value;
+            const amount = document.getElementById('extracted-amount').value;
+            const address = document.getElementById('extracted-address').value;
+            const destination = document.getElementById('extracted-destination').value;
+            const items = document.getElementById('extracted-items').value;
+            
+            if (!documentNumber) {
+                alert('伝票番号を入力してください');
+                return;
+            }
+            
+            const docData = {
+                id: Date.now(),
+                type: currentMode,
+                documentNumber: documentNumber,
+                amount: amount,
+                address: address,
+                destination: destination,
+                items: items,
+                rawText: window.currentOCRData.text,
+                confidence: window.currentOCRData.confidence,
+                timestamp: new Date().toISOString()
+            };            // モードに応じて保存
+            if (currentMode === 'order') {
+                savedDocuments.orders.push(document);
+            } else {
+                savedDocuments.deliveries.push(document);
+            }
+            
+            // ローカルストレージに保存
+            localStorage.setItem('ocrDocuments', JSON.stringify(savedDocuments));
+            
+            // リストを更新
+            updateDocumentsList();
+            updateMatching();
+            
+            // フォームをリセット
+            document.getElementById('ocr-result-section').classList.add('hidden');
+            window.currentOCRData = null;
+            
+            alert('伝票を保存しました！');
+        }
+
+        // 保存済み伝票リスト更新
+        function updateDocumentsList() {
+            const listContainer = document.getElementById('documents-list');
+            
+            const allDocs = [
+                ...savedDocuments.orders.map(d => ({ ...d, type: 'order' })),
+                ...savedDocuments.deliveries.map(d => ({ ...d, type: 'delivery' }))
+            ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            if (allDocs.length === 0) {
+                listContainer.innerHTML = '<div class="text-center text-gray-400 py-8">伝票を撮影して保存してください</div>';
+                return;
+            }
+            
+            listContainer.innerHTML = allDocs.map(doc => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg">${doc.type === 'order' ? '📝' : '📦'}</span>
+                                <span class="font-semibold text-gray-900">${doc.documentNumber}</span>
+                                <span class="px-2 py-1 text-xs rounded-full ${doc.type === 'order' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
+                                    ${doc.type === 'order' ? '注文' : '納品'}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-600 space-y-1">
+                                <div>💰 金額: ${doc.amount ? '¥' + parseInt(doc.amount).toLocaleString() : '未設定'}</div>
+                                ${doc.address ? `<div>📍 住所: ${doc.address}</div>` : ''}
+                                ${doc.destination ? `<div>📮 送り先: ${doc.destination}</div>` : ''}
+                                ${doc.items ? `<div>📦 品目: ${doc.items}</div>` : ''}
+                                <div>🕐 ${new Date(doc.timestamp).toLocaleString('ja-JP')}</div>
+                                <div>📊 認識精度: ${Math.round(doc.confidence)}%</div>
+                            </div>
+                        </div>
+                        <button onclick="deleteDocument(${doc.id}, '${doc.type}')" class="text-red-600 hover:text-red-700 ml-2">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // マッチング処理と結果表示
+        function updateMatching() {
+            if (savedDocuments.orders.length === 0 || savedDocuments.deliveries.length === 0) {
+                document.getElementById('matching-section').classList.add('hidden');
+                return;
+            }
+            
+            document.getElementById('matching-section').classList.remove('hidden');
+            const matchingContainer = document.getElementById('matching-results');
+            
+            const matches = [];
+            
+            // 各注文に対して納品書をマッチング
+            savedDocuments.orders.forEach(order => {
+                const matchedDeliveries = savedDocuments.deliveries.filter(delivery => {
+                    let matchScore = 0;
+                    
+                    // 伝票番号完全一致（高優先度）
+                    if (delivery.documentNumber === order.documentNumber) matchScore += 10;
+                    
+                    // 伝票番号部分一致（最初の4文字など）
+                    if (delivery.documentNumber && order.documentNumber) {
+                        const cleanOrder = order.documentNumber.replace(/[^A-Z0-9]/gi, '');
+                        const cleanDelivery = delivery.documentNumber.replace(/[^A-Z0-9]/gi, '');
+                        if (cleanOrder.substring(0, 4) === cleanDelivery.substring(0, 4)) matchScore += 5;
+                    }
+                    
+                    // 住所マッチング（新規）
+                    if (delivery.address && order.address) {
+                        const cleanDeliveryAddr = delivery.address.replace(/\s/g, '');
+                        const cleanOrderAddr = order.address.replace(/\s/g, '');
+                        if (cleanDeliveryAddr.includes(cleanOrderAddr) || cleanOrderAddr.includes(cleanDeliveryAddr)) {
+                            matchScore += 8;
+                        }
+                    }
+                    
+                    // 送り先マッチング（新規）
+                    if (delivery.destination && order.destination) {
+                        const cleanDeliveryDest = delivery.destination.replace(/\s/g, '');
+                        const cleanOrderDest = order.destination.replace(/\s/g, '');
+                        if (cleanDeliveryDest.includes(cleanOrderDest) || cleanOrderDest.includes(cleanDeliveryDest)) {
+                            matchScore += 8;
+                        }
+                    }
+                    
+                    // 品目マッチング（新規）
+                    if (delivery.items && order.items) {
+                        const cleanDeliveryItems = delivery.items.replace(/\s/g, '');
+                        const cleanOrderItems = order.items.replace(/\s/g, '');
+                        if (cleanDeliveryItems.includes(cleanOrderItems) || cleanOrderItems.includes(cleanDeliveryItems)) {
+                            matchScore += 7;
+                        }
+                    }
+                    
+                    // 金額一致
+                    if (delivery.amount && order.amount && delivery.amount === order.amount) matchScore += 5;
+                    
+                    // スコアが5以上ならマッチと判定
+                    return matchScore >= 5;
+                });
+                
+                const matchStatus = matchedDeliveries.length > 0 ? 
+                    (matchedDeliveries.length === 1 ? 'matched' : 'partial') : 
+                    'unmatched';
+                
+                matches.push({
+                    order: order,
+                    deliveries: matchedDeliveries,
+                    status: matchStatus
+                });
+            });
+            
+            matchingContainer.innerHTML = matches.map(match => {
+                const statusInfo = {
+                    matched: { icon: '✅', text: 'マッチング成功', class: 'matched' },
+                    partial: { icon: '⚠️', text: '複数マッチ', class: 'partial' },
+                    unmatched: { icon: '❌', text: 'マッチなし', class: 'unmatched' }
+                };
+                
+                const status = statusInfo[match.status];
+                
+                return `
+                    <div class="match-card ${status.class} rounded-lg p-4 border">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">${status.icon}</span>
+                                <span class="font-semibold text-gray-900">${match.order.documentNumber}</span>
+                            </div>
+                            <span class="text-sm font-medium">${status.text}</span>
+                        </div>
+                        
+                        <div class="space-y-2 text-sm">
+                            <div class="bg-blue-50 p-2 rounded">
+                                <div class="font-semibold text-blue-900 mb-1">📝 注文伝票</div>
+                                ${match.order.address ? `<div class="text-gray-700">📍 ${match.order.address}</div>` : ''}
+                                ${match.order.destination ? `<div class="text-gray-700">� ${match.order.destination}</div>` : ''}
+                                ${match.order.items ? `<div class="text-gray-700">📦 ${match.order.items}</div>` : ''}
+                                <div class="text-gray-700">💰 ¥${match.order.amount ? parseInt(match.order.amount).toLocaleString() : '-'}</div>
+                            </div>
+                            
+                            ${match.deliveries.length > 0 ? match.deliveries.map(d => `
+                                <div class="bg-green-50 p-2 rounded">
+                                    <div class="font-semibold text-green-900 mb-1">📦 納品書 (${d.documentNumber})</div>
+                                    ${d.address ? `<div class="text-gray-700">📍 ${d.address}</div>` : ''}
+                                    ${d.destination ? `<div class="text-gray-700">📮 ${d.destination}</div>` : ''}
+                                    ${d.items ? `<div class="text-gray-700">📦 ${d.items}</div>` : ''}
+                                    <div class="text-gray-700">💰 ¥${d.amount ? parseInt(d.amount).toLocaleString() : '-'}</div>
+                                </div>
+                            `).join('') : '<div class="text-red-600 p-2 bg-red-50 rounded">⚠️ 対応する納品書が見つかりません</div>'}
+                            
+                            ${match.status === 'matched' && match.deliveries.length > 0 ? `
+                                <div class="pt-2 border-t">
+                                    <div class="font-semibold text-gray-700 mb-1">マッチング詳細:</div>
+                                    ${match.deliveries[0].address && match.order.address && 
+                                      (match.deliveries[0].address.includes(match.order.address) || match.order.address.includes(match.deliveries[0].address)) ? 
+                                        '<div class="text-green-600">✓ 住所一致</div>' : ''}
+                                    ${match.deliveries[0].destination && match.order.destination && 
+                                      (match.deliveries[0].destination.includes(match.order.destination) || match.order.destination.includes(match.deliveries[0].destination)) ? 
+                                        '<div class="text-green-600">✓ 送り先一致</div>' : ''}
+                                    ${match.deliveries[0].items && match.order.items && 
+                                      (match.deliveries[0].items.includes(match.order.items) || match.order.items.includes(match.deliveries[0].items)) ? 
+                                        '<div class="text-green-600">✓ 品目一致</div>' : ''}
+                                    ${match.deliveries[0].amount && match.order.amount && match.deliveries[0].amount === match.order.amount ? 
+                                        '<div class="text-green-600">✓ 金額一致</div>' : 
+                                        (match.deliveries[0].amount && match.order.amount ? '<div class="text-orange-600">⚠️ 金額不一致</div>' : '')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 伝票削除
+        function deleteDocument(id, type) {
+            if (!confirm('この伝票を削除しますか？')) return;
+            
+            if (type === 'order') {
+                savedDocuments.orders = savedDocuments.orders.filter(d => d.id !== id);
+            } else {
+                savedDocuments.deliveries = savedDocuments.deliveries.filter(d => d.id !== id);
+            }
+            
+            localStorage.setItem('ocrDocuments', JSON.stringify(savedDocuments));
+            updateDocumentsList();
+            updateMatching();
+        }
+
+        // すべての伝票をクリア
+        function clearAllDocuments() {
+            if (!confirm('すべての伝票を削除しますか？')) return;
+            
+            savedDocuments = { orders: [], deliveries: [] };
+            localStorage.removeItem('ocrDocuments');
+            updateDocumentsList();
+            updateMatching();
+        }
+
+        // 再撮影
+        function retakePhoto() {
+            document.getElementById('ocr-result-section').classList.add('hidden');
+            window.currentOCRData = null;
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSavedDocuments();
+            console.log('AI伝票読み取りシステム initialized');
+        });
+    </script>
+</body>
+</html>

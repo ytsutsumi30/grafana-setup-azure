@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="description" content="Safari最適化QRスキャナーを使った在庫照合システム">
+    <title>出荷指示管理システム</title>
+    
+    <!-- PWA対応 -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <!-- 外部ライブラリ -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- カスタムCSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/delivery.css">
+    <link rel="stylesheet" href="css/map.css">
+    <link rel="stylesheet" href="css/qr-scanner.css">
+    <link rel="stylesheet" href="css/mobile.css">
+    <link rel="stylesheet" href="css/device-mode.css">
+    
+    <!-- QR Scanner Library -->
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+</head>
+<body>
+    <!-- デバイスモード選択画面 -->
+    <div id="device-mode-selection" class="mode-selection-overlay">
+        <div class="mode-selection-container">
+            <div class="mode-selection-header">
+                <h1>🚚 出荷指示管理システム</h1>
+                <p class="mode-selection-subtitle">デバイスモードを選択してください</p>
+            </div>
+            
+            <div class="mode-selection-content">
+                <button class="mode-selection-card" data-mode="ipad-mini" onclick="selectDeviceMode('ipad-mini')">
+                    <div class="mode-icon">📱</div>
+                    <h2>iPad Mini モード</h2>
+                    <div class="mode-specs">
+                        <div class="spec-item">
+                            <span class="spec-label">画面サイズ</span>
+                            <span class="spec-value">7.9インチ (768×1024)</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">推奨用途</span>
+                            <span class="spec-value">タブレット・大画面</span>
+                        </div>
+                    </div>
+                    <div class="mode-features">
+                        <span class="feature-tag">✓ 2カラムレイアウト</span>
+                        <span class="feature-tag">✓ 大きな文字</span>
+                        <span class="feature-tag">✓ 広い作業エリア</span>
+                    </div>
+                </button>
+                
+                <button class="mode-selection-card" data-mode="iphone-6" onclick="selectDeviceMode('iphone-6')">
+                    <div class="mode-icon">📱</div>
+                    <h2>iPhone 6 モード</h2>
+                    <div class="mode-specs">
+                        <div class="spec-item">
+                            <span class="spec-label">画面サイズ</span>
+                            <span class="spec-value">4.7インチ (375×667)</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">推奨用途</span>
+                            <span class="spec-value">スマートフォン・小画面</span>
+                        </div>
+                    </div>
+                    <div class="mode-features">
+                        <span class="feature-tag">✓ 1カラムレイアウト</span>
+                        <span class="feature-tag">✓ コンパクト表示</span>
+                        <span class="feature-tag">✓ 片手操作対応</span>
+                    </div>
+                </button>
+            </div>
+            
+            <div class="mode-selection-footer">
+                <p class="mode-note">💡 選択したモードは設定から変更できます</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>🚚 出荷指示管理システム</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="shipping-instruction-maintenance.html" class="mode-switch-btn" style="text-decoration: none; display: inline-flex; align-items: center;" title="出荷指示マスタメンテナンス">
+                <span class="mode-switch-icon">⚙️</span>
+                <span class="mode-switch-text">マスタ</span>
+            </a>
+            <button class="mode-switch-btn" onclick="showModeSelection()" title="デバイスモード変更">
+                <span class="mode-switch-icon">📱</span>
+                <span class="mode-switch-text" id="current-mode-text">モード変更</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- ローディングオーバーレイ -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- 出荷指示一覧画面（納入場所別表示） -->
+        <div id="shipping-screen" class="screen active">
+            <div class="breadcrumb">
+                ホーム > 出荷管理 > <strong>出荷指示</strong>
+            </div>
+            
+            <h2>📦 出荷指示検索</h2>
+            
+            <div class="search-section">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="shipping-location">出荷場所</label>
+                        <select id="shipping-location">
+                            <option value="">すべて</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="delivery-location">納入場所</label>
+                        <select id="delivery-location">
+                            <option value="">すべて</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="shipping-date-from">出荷予定日（開始）</label>
+                        <input type="date" id="shipping-date-from">
+                    </div>
+                    <div class="form-group">
+                        <label for="shipping-date-to">出荷予定日（終了）</label>
+                        <input type="date" id="shipping-date-to">
+                    </div>
+                    <div class="form-group">
+                        <label for="instruction-id">出荷指示ID</label>
+                        <input type="text" id="instruction-id" placeholder="出荷指示IDを入力">
+                    </div>
+                </div>
+                <button class="btn" onclick="searchShipments()">
+                    🔍 検索
+                </button>
+            </div>
+
+            <!-- ３ -->
+            <div class="delivery-locations" id="delivery-locations">
+                <!-- 検索結果がここに動的に表示される -->
+            </div>
+        </div>
+
+        <!-- 納入場所詳細画面 -->
+        <div id="delivery-detail-screen" class="screen">
+            <div class="breadcrumb">
+                <a onclick="goToShipping()">出荷指示</a> > <strong>納入場所詳細</strong>
+            </div>
+            
+            <h2>🏢 納入場所詳細 - <span id="delivery-name">読み込み中...</span></h2>
+
+            <!-- タブナビゲーション -->
+            <div class="delivery-tabs">
+                <button type="button" class="tab-button active" data-tab="info">配送先情報</button>
+                <button type="button" class="tab-button" data-tab="map">地図表示</button>
+            </div>
+
+            <!-- 配送先情報タブ -->
+            <div class="delivery-tab-content active" id="info-content">
+                <div class="delivery-card">
+                    <div class="delivery-info">
+                        <h3>配送先詳細</h3>
+                        <div class="delivery-meta" id="detail-info">
+                            データを読み込み中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 地図表示タブ -->
+            <div class="delivery-tab-content" id="map-content">
+                <!-- 選択された場所の情報 -->
+                <div id="selectedLocationInfo" class="selected-location-info">
+                    <button type="button" class="clear-selection-btn" onclick="window.deliveryMap?.clearLocationSelection()">クリア</button>
+                    <h4 id="selectedLocationTitle">選択された場所</h4>
+                    <p id="selectedLocationDetails">詳細情報</p>
+                </div>
+                
+                <div class="map-section">
+                    <!-- ローディングオーバーレイ -->
+                    <div class="loading-overlay" id="mapLoadingOverlay" style="display: none;">
+                        <div class="loading-spinner"></div>
+                    </div>
+                    
+                    <div class="map-header">
+                        <span>配送先地図</span>
+                        <span class="map-info" id="mapInfo">地図を初期化中...</span>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            
+            <div class="item-list" id="delivery-item-list">
+                <h3>📦 出荷品目一覧</h3>
+                <div id="items-container">
+                    データを読み込み中...
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn btn-secondary" onclick="goToShipping()">
+                    ⬅ 出荷指示一覧に戻る
+                </button>
+                <div class="item-summary">
+                    <div class="summary-item">
+                        <div class="summary-value" id="total-quantity">-</div>
+                        <div class="summary-label">総数量</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="completed-quantity">-</div>
+                        <div class="summary-label">完了数量</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- 照合画面 -->
+        <div id="verification-screen" class="screen">
+            <div class="breadcrumb">
+                <a onclick="goToShipping()">出荷指示</a> > 
+                <a onclick="goToDeliveryDetail()">納入場所詳細</a> >
+                <a onclick="goToPicking()">ピッキング</a> > 
+                <strong>照合</strong>
+            </div>
+            
+            <h2>🔍 在庫照合</h2>
+            
+            <!-- QRスキャナー設定パネル -->
+            <div class="search-section mobile-optimized">
+                <h3>🔧 スキャン設定 <span class="safari-badge">Safari最適化</span></h3>
+                <div class="form-grid">
+                    <label class="flex items-center gap-3">
+                        <input type="checkbox" id="auto-verify-inventory" checked>
+                        <span>自動在庫照合</span>
+                    </label>
+                    <label class="flex items-center gap-3">
+                        <input type="checkbox" id="enable-debug-mode">
+                        <span>デバッグモード</span>
+                    </label>
+                    <div class="form-group">
+                        <label for="scan-timeout">タイムアウト</label>
+                        <select id="scan-timeout">
+                            <option value="30">30秒</option>
+                            <option value="60" selected>60秒</option>
+                            <option value="120">120秒</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 折りたたみ可能な詳細情報 -->
+                <details class="mobile-details">
+                    <summary class="mobile-summary">🍎 Safari最適化機能について</summary>
+                    <div class="mobile-details-content">
+                        <ul>
+                            <li>カメラ初期化の遅延問題を解決</li>
+                            <li>自動キャリブレーション機能（最大3回試行）</li>
+                            <li>スキャン精度向上（中央60%領域に最適化）</li>
+                            <li>失敗時の自動リトライ機能</li>
+                            <li>ページ遷移時の自動再開</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+
+            <!-- QRスキャナーメイン画面 -->
+            <div id="qr-scanner-main" class="camera-section">
+                <!-- 初期画面 -->
+                <div id="qr-initial-screen">
+                    <h3>📱 QRコードスキャン（在庫照合）</h3>
+                    <p style="color: #6b7280; margin: 0.5rem 0 1rem 0;">Safari最適化版：高精度スキャンで在庫照合を実施</p>
+                    <div class="qr-controls">
+                        <button class="btn" id="start-qr-scan">📷 カメラ開始</button>
+                        <button class="btn btn-secondary" id="manual-lot-input">⌨️ 手動入力</button>
+                    </div>
+                    
+                    <!-- カメラ情報表示 -->
+                    <div id="camera-info" style="margin-top: 1rem; padding: 0.75rem; background: #f3f4f6; border-radius: 8px; font-size: 0.875rem; color: #4b5563;">
+                        <div id="camera-count">📷 カメラ検出中...</div>
+                    </div>
+                </div>
+
+                <!-- カメラスキャン画面 -->
+                <div id="qr-camera-screen" class="hidden">
+                    <div class="qr-video-container">
+                        <video id="qr-camera-video" class="qr-video" autoplay muted playsinline webkit-playsinline></video>
+                        
+                        <!-- スキャンガイド -->
+                        <div class="qr-scan-guide"></div>
+                        <div class="qr-scan-corners">
+                            <div class="qr-corner qr-corner-tl"></div>
+                            <div class="qr-corner qr-corner-tr"></div>
+                            <div class="qr-corner qr-corner-bl"></div>
+                            <div class="qr-corner qr-corner-br"></div>
+                        </div>
+                        <div id="qr-scanning-animation" class="qr-scanning-line hidden"></div>
+                        
+                        <!-- Safari最適化オーバーレイ -->
+                        <div id="qr-calibration-indicator" class="qr-calibration-indicator hidden">
+                            <div class="qr-calibration-content">
+                                <div class="text-4xl mb-2">⚙️</div>
+                                <div class="text-lg font-semibold mb-1">キャリブレーション中</div>
+                                <div class="text-sm text-gray-600">カメラを調整しています...</div>
+                            </div>
+                        </div>
+                        
+                        <div id="qr-success-overlay" class="qr-success-overlay hidden">
+                            <div class="qr-success-icon">✅</div>
+                            <div>スキャン成功!</div>
+                        </div>
+                        
+                        <div id="qr-error-overlay" class="qr-error-overlay hidden">
+                            <div>❌ エラーが発生しました</div>
+                            <div id="qr-error-message">カメラにアクセスできません</div>
+                        </div>
+                        
+                        <!-- ステータス表示 -->
+                        <div id="qr-scan-status" class="qr-status">スキャン準備中...</div>
+                        
+                        <!-- デバッグ情報 -->
+                        <div id="qr-debug-info" class="qr-debug-info hidden">
+                            <div><strong>デバッグ情報</strong></div>
+                            <div>ReadyState: <span id="debug-ready">-</span></div>
+                            <div>Stream: <span id="debug-stream">-</span></div>
+                            <div>Detection: <span id="debug-detection">-</span></div>
+                            <div>Frames: <span id="debug-frames">0</span></div>
+                            <div>Calibration: <span id="debug-calibration">-</span></div>
+                            <div>Cameras: <span id="debug-cameras">-</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="qr-controls">
+                        <button class="btn btn-secondary" id="stop-qr-scan">⏹️ 停止</button>
+                        <button class="btn btn-warning" id="calibrate-qr-camera">🎯 再調整</button>
+                        <button class="btn btn-info" id="toggle-qr-debug">🔧 デバッグ</button>
+                    </div>
+                    
+                    <!-- スキャン統計情報 -->
+                    <div id="qr-stats" class="qr-stats" style="margin-top: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 8px; font-size: 0.875rem;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+                            <div>
+                                <div style="font-weight: bold; color: #1f2937;" id="stats-frames">0</div>
+                                <div style="color: #6b7280; font-size: 0.75rem;">処理フレーム</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: bold; color: #1f2937;" id="stats-calibration">0/3</div>
+                                <div style="color: #6b7280; font-size: 0.75rem;">キャリブレーション</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: bold; color: #1f2937;" id="stats-status">待機中</div>
+                                <div style="color: #6b7280; font-size: 0.75rem;">ステータス</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 結果表示 -->
+                <div id="qr-result-display" class="qr-result-display">
+                    <div class="qr-result-header">
+                        <h4 class="qr-result-title">スキャン結果</h4>
+                        <button class="btn btn-secondary" id="clear-qr-result">クリア</button>
+                    </div>
+                    <div id="qr-result-data" class="qr-result-data">
+                        スキャンデータがここに表示されます
+                    </div>
+                    <div style="margin-top: 12px;">
+                        <strong>照合結果:</strong> <span id="verification-status">待機中</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 照合済み品目リスト -->
+            <div class="item-list" id="verified-items">
+                <h3>✅ 照合済み品目</h3>
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">LOT-2024-001 - 特殊部品</div>
+                            <div class="item-meta">スキャン日時: 2024-08-27 14:30:25</div>
+                        </div>
+                        <div class="status-badge status-completed">照合済み</div>
+                    </div>
+                </div>
+                <div class="item-card">
+                    <div class="item-header">
+                        <div class="item-info">
+                            <div class="item-title">LOT-2024-002 - 特殊部品マニュアル</div>
+                            <div class="item-meta">スキャン日時: 2024-08-27 14:32:10</div>
+                        </div>
+                        <div class="status-badge status-completed">照合済み</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ナビゲーション -->
+            <div class="navigation">
+                <button class="btn btn-secondary" onclick="goToPicking()">
+                    ⬅ ピッキングに戻る
+                </button>
+                <button class="btn btn-success">
+                    💾 照合結果保存
+                </button>
+            </div>
+        </div>
+
+        <!-- ピッキング画面 -->
+        <div id="picking-screen" class="screen">
+            <div class="breadcrumb">
+                <a onclick="goBackToDeliveryDetail()">納入場所詳細</a> > <strong>ピッキング作業</strong>
+            </div>
+            
+            <h2>📦 ピッキング作業 - <span id="picking-item-title">品目A-001</span></h2>
+
+            <!-- 品目情報 -->
+            <div class="delivery-card">
+                <div class="delivery-info">
+                    <h3>品目詳細</h3>
+                    <div class="delivery-meta" id="picking-item-info">
+                        品目A-001 - 特殊部品<br>
+                        客先注番: ORD-2024-001 | 出荷指示数: 100個<br>
+                        納入場所: 東京営業所 | 出荷予定日: 2024-08-27
+                    </div>
+                </div>
+            </div>
+
+            <!-- ピッキング操作 -->
+            <div class="picking-section">
+                <h3>📋 ピッキング作業</h3>
+                
+                <div class="form-group">
+                    <label for="picked-quantity">ピッキング済み数量</label>
+                    <div class="input-group">
+                        <input type="number" id="picked-quantity" class="qty-input" value="0" min="0">
+                        <span class="input-suffix">個</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="picking-notes">備考</label>
+                    <textarea id="picking-notes" class="form-input" rows="3" placeholder="ピッキング時の特記事項があれば記入"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="goBackToDeliveryDetail()">
+                        ⬅ 納入場所詳細に戻る
+                    </button>
+                    <button class="btn btn-warning" onclick="goToVerification()">
+                        � 照合開始
+                    </button>
+                    <button class="btn btn-success" onclick="savePicking()">
+                        💾 ピッキング保存
+                    </button>
+                </div>
+            </div>
+
+            <!-- ピッキング済み品目表示 -->
+            <div class="picked-items" id="picked-items">
+                <h3>📦 ピッキング状況</h3>
+                <div class="status-summary">
+                    <div class="status-item">
+                        <span class="status-label">出荷対象数:</span>
+                        <span class="status-value" id="target-quantity">100個</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">ピッキング済み:</span>
+                        <span class="status-value" id="picked-summary">0個</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">残り:</span>
+                        <span class="status-value" id="remaining-quantity">100個</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 外部JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <!-- デバイスモード管理（最初に読み込む） -->
+    <script src="js/device-mode.js"></script>
+    
+    <!-- アプリケーションメイン -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

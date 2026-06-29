@@ -1,0 +1,197 @@
+/**
+ * 地図機能スタイルシート
+ */
+
+/* 地図セクション */
+.map-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    overflow: hidden;
+    position: relative;
+    margin: 1rem 0;
+}
+
+.map-header {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    color: white;
+    padding: 16px 20px;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.map-info {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+#map {
+    height: 400px;
+    width: 100%;
+    z-index: 1;
+}
+
+/* 選択された場所の情報 */
+.selected-location-info {
+    background: #eff6ff;
+    border: 2px solid #3b82f6;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: none;
+}
+
+.selected-location-info.show {
+    display: block;
+}
+
+.selected-location-info h4 {
+    margin: 0 0 8px 0;
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.selected-location-info p {
+    margin: 0;
+    color: #1e40af;
+    font-size: 14px;
+}
+
+.clear-selection-btn {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    float: right;
+}
+
+.clear-selection-btn:hover {
+    background: #4b5563;
+}
+
+/* ローディングオーバーレイ */
+.loading-overlay {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* カスタムLeafletポップアップスタイル */
+.leaflet-popup-content-wrapper {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.leaflet-popup-content {
+    margin: 16px 20px;
+    line-height: 1.4;
+    min-width: 250px;
+}
+
+.popup-title {
+    margin: 0 0 12px 0;
+    color: #1e40af;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.popup-info {
+    margin: 6px 0;
+    font-size: 14px;
+    color: #374151;
+}
+
+.popup-buttons {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+}
+
+.popup-button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-weight: 600;
+}
+
+.popup-button:hover {
+    background: #2563eb;
+}
+
+.popup-button.select {
+    background: #059669;
+}
+
+.popup-button.select:hover {
+    background: #047857;
+}
+
+/* カスタムマーカーアイコンスタイル */
+.custom-marker-icon {
+    background: #3b82f6;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+}
+
+.custom-marker-icon.main-office {
+    background: #dc2626;
+}
+
+.custom-marker-icon.selected {
+    background: #059669;
+    transform: scale(1.2);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1.2); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1.2); }
+}
+
+.map-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #fee2e2;
+    color: #dc2626;
+    font-weight: 600;
+    text-align: center;
+    padding: 20px;
+    border-radius: 8px;
+}

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データベース管理</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #6f42c1, #9171d4);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+        }
+        .card-header {
+            border-radius: 1rem 1rem 0 0 !important;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .operation-card {
+            transition: transform 0.2s;
+        }
+        .operation-card:hover {
+            transform: translateY(-5px);
+        }
+        .icon-large {
+            font-size: 4rem;
+            margin: 1rem 0;
+        }
+        .file-drop-zone {
+            border: 3px dashed #6c757d;
+            border-radius: 1rem;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .file-drop-zone:hover {
+            border-color: #6f42c1;
+            background-color: rgba(111, 66, 193, 0.05);
+        }
+        .file-drop-zone.dragover {
+            border-color: #6f42c1;
+            background-color: rgba(111, 66, 193, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- ローディングオーバーレイ -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- ページヘッダー -->
+    <div class="page-header">
+        <div class="container">
+            <h1><i class="fas fa-database me-2"></i>データベース管理</h1>
+            <p class="mb-0">データベースのバックアップと復元</p>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container mb-5">
+        <!-- アクションボタン -->
+        <div class="row mb-4">
+            <div class="col">
+                <a href="maintenance.html" class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>メンテナンス画面に戻る
+                </a>
+            </div>
+        </div>
+
+        <!-- 警告メッセージ -->
+        <div class="alert alert-warning" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>注意:</strong> データベース復元操作は現在のデータをすべて削除します。必ず事前にバックアップを取得してください。
+        </div>
+
+        <!-- 操作カード -->
+        <div class="row g-4 mb-5">
+            <!-- バックアップ -->
+            <div class="col-md-6">
+                <div class="card operation-card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-download me-2"></i>データベースバックアップ</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="icon-large text-success">
+                            <i class="fas fa-file-download"></i>
+                        </div>
+                        <h4>バックアップ作成</h4>
+                        <p class="text-muted mb-4">
+                            現在のデータベースの全データをSQLファイルとしてダウンロードします。<br>
+                            全テーブルのデータが含まれます。
+                        </p>
+                        <button class="btn btn-success btn-lg" id="btn-backup">
+                            <i class="fas fa-download me-2"></i>バックアップ実行
+                        </button>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                ファイル名: production_db_backup_YYYY-MM-DD-HHmmss.sql
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 復元 -->
+            <div class="col-md-6">
+                <div class="card operation-card h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>データベース復元</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="icon-large text-danger">
+                            <i class="fas fa-file-upload"></i>
+                        </div>
+                        <h4>バックアップから復元</h4>
+                        <p class="text-muted mb-4">
+                            バックアップSQLファイルからデータベースを復元します。<br>
+                            <strong class="text-danger">現在のデータはすべて削除されます。</strong>
+                        </p>
+
+                        <!-- ファイルドロップゾーン -->
+                        <div class="file-drop-zone mb-3" id="dropZone">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <p class="mb-2">SQLファイルをドラッグ＆ドロップ</p>
+                            <p class="text-muted">または</p>
+                            <label for="file-input" class="btn btn-outline-secondary">
+                                <i class="fas fa-folder-open me-2"></i>ファイルを選択
+                            </label>
+                            <input type="file" id="file-input" accept=".sql" style="display: none;">
+                        </div>
+
+                        <div id="selected-file" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="fas fa-file me-2"></i>
+                                <span id="file-name"></span>
+                                <span class="ms-2 text-muted">(<span id="file-size"></span>)</span>
+                            </div>
+                            <button class="btn btn-danger btn-lg" id="btn-restore">
+                                <i class="fas fa-exclamation-triangle me-2"></i>復元実行（データ削除）
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- バックアップ履歴・情報 -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>バックアップについて</h5>
+            </div>
+            <div class="card-body">
+                <h6><i class="fas fa-check-circle me-2 text-success"></i>バックアップに含まれるデータ</h6>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <ul>
+                            <li>製品マスタ</li>
+                            <li>出荷元拠点</li>
+                            <li>配送先拠点</li>
+                            <li>生産計画</li>
+                            <li>生産実績</li>
+                            <li>在庫データ</li>
+                            <li>検品記録</li>
+                            <li>出荷指示</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul>
+                            <li>出荷検品記録</li>
+                            <li>製品構成部品</li>
+                            <li>QR検品記録</li>
+                            <li>QR検品詳細</li>
+                            <li>検品者マスタ</li>
+                            <li>在庫スナップショット</li>
+                            <li>パフォーマンス指標</li>
+                            <li>システムアラート</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6><i class="fas fa-shield-alt me-2 text-primary"></i>バックアップの特徴</h6>
+                <ul>
+                    <li>トランザクション制御により、バックアップ・復元の原子性を保証</li>
+                    <li>外部キー制約を考慮した正しいテーブル順序でバックアップ</li>
+                    <li>GENERATED列（計算列）は自動的に除外</li>
+                    <li>シーケンス（自動採番）も正しく復元</li>
+                    <li>最大10MBまでのSQLファイルをサポート</li>
+                </ul>
+
+                <h6><i class="fas fa-lightbulb me-2 text-warning"></i>推奨事項</h6>
+                <ul>
+                    <li>定期的にバックアップを取得してください（週1回以上推奨）</li>
+                    <li>重要な操作の前には必ずバックアップを取得してください</li>
+                    <li>バックアップファイルは安全な場所に保管してください</li>
+                    <li>復元操作はテスト環境で確認してから本番環境で実行してください</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const API_BASE_URL = '/api';
+        let selectedFile = null;
+
+        // ローディング表示制御
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        // バックアップ実行
+        document.getElementById('btn-backup').addEventListener('click', async () => {
+            if (!confirm('データベースのバックアップを開始します。よろしいですか？')) {
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(\`\${API_BASE_URL}/database/backup\`);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'バックアップの生成に失敗しました');
+                }
+
+                // SQLファイルをダウンロード
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                // ファイル名をレスポンスヘッダーから取得
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'production_db_backup.sql';
+                if (contentDisposition) {
+                    const matches = /filename="(.+)"/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showSuccess(\`バックアップファイルをダウンロードしました: \${filename}\`);
+
+            } catch (error) {
+                console.error('Backup error:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // ファイル選択
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
+        });
+
+        // ドラッグ＆ドロップ
+        const dropZone = document.getElementById('dropZone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        dropZone.addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+
+        // ファイル選択処理
+        function handleFileSelect(file) {
+            if (!file.name.endsWith('.sql')) {
+                showError('SQLファイル(.sql)を選択してください');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError('ファイルサイズが10MBを超えています');
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('file-name').textContent = file.name;
+            document.getElementById('file-size').textContent = formatFileSize(file.size);
+            document.getElementById('selected-file').style.display = 'block';
+        }
+
+        // 復元実行
+        document.getElementById('btn-restore').addEventListener('click', async () => {
+            if (!selectedFile) {
+                showError('復元するSQLファイルを選択してください');
+                return;
+            }
+
+            const confirmMsg = \`警告: データベースを復元します。\\n\\n\` +
+                \`現在のすべてのデータが削除され、選択したバックアップファイルの内容に置き換えられます。\\n\\n\` +
+                \`ファイル: \${selectedFile.name}\\n\` +
+                \`サイズ: \${formatFileSize(selectedFile.size)}\\n\\n\` +
+                \`この操作は取り消せません。本当に実行しますか？\`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            // 2段階確認
+            if (!confirm('最終確認: データベースを復元してよろしいですか？')) {
+                return;
+            }
+
+            showLoading();
+            try {
+                // ファイルを読み込む
+                const sqlContent = await selectedFile.text();
+
+                const response = await fetch(\`\${API_BASE_URL}/database/restore\`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ sql: sqlContent })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.details || error.error || 'データベースの復元に失敗しました');
+                }
+
+                const result = await response.json();
+
+                showSuccess('データベースの復元が完了しました');
+
+                // フォームをリセット
+                selectedFile = null;
+                document.getElementById('file-input').value = '';
+                document.getElementById('selected-file').style.display = 'none';
+
+                // 3秒後にリロード
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+
+            } catch (error) {
+                console.error('Restore error:', error);
+                showError(\`復元エラー: \${error.message}\`);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // ファイルサイズフォーマット
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // 成功メッセージ表示
+        function showSuccess(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '10000';
+            alert.style.minWidth = '400px';
+            alert.innerHTML = \`
+                <i class="fas fa-check-circle me-2"></i>\${escapeHtml(message)}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            \`;
+            document.body.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // エラーメッセージ表示
+        function showError(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '10000';
+            alert.style.minWidth = '400px';
+            alert.innerHTML = \`
+                <i class="fas fa-exclamation-circle me-2"></i>\${escapeHtml(message)}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            \`;
+            document.body.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 7000);
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>

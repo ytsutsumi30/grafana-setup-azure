@@ -1,0 +1,703 @@
+/**
+ * モバイル最適化CSS
+ * スマートフォン向けレスポンシブデザイン
+ */
+
+/* ============================================
+   基本設定
+   ============================================ */
+
+/* タッチ操作の最適化 */
+* {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    -webkit-touch-callout: none;
+}
+
+/* スクロールの最適化 */
+html {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+}
+
+body {
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+}
+
+/* ============================================
+   モバイル表示時の基本レイアウト
+   ============================================ */
+
+@media screen and (max-width: 768px) {
+    
+    /* ヘッダー最適化 */
+    .header {
+        padding: 0.75rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header h1 {
+        font-size: 1.125rem;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* コンテナの最適化 */
+    .container {
+        padding: 0.5rem;
+        max-width: 100%;
+    }
+    
+    /* パンくずリスト */
+    .breadcrumb {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .breadcrumb::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* 見出し */
+    h2 {
+        font-size: 1.25rem;
+        margin: 0.75rem 0;
+        padding: 0 0.5rem;
+    }
+    
+    h3 {
+        font-size: 1rem;
+        margin: 0.5rem 0;
+    }
+    
+    /* ============================================
+       在庫照合画面の最適化
+       ============================================ */
+    
+    /* 検索セクション */
+    .search-section {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .search-section h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    /* フォームグリッド - モバイルでは1カラム */
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    /* フォーム要素 */
+    .form-group {
+        margin-bottom: 0;
+    }
+    
+    .form-group label {
+        font-size: 0.875rem;
+        margin-bottom: 0.375rem;
+        display: block;
+    }
+    
+    .form-group input,
+    .form-group select {
+        font-size: 1rem;
+        padding: 0.75rem;
+        min-height: 44px; /* タッチターゲットの最小サイズ */
+    }
+    
+    /* チェックボックス・ラジオボタン */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 20px;
+        height: 20px;
+        min-height: auto;
+    }
+    
+    /* ラベルとチェックボックス */
+    .flex.items-center {
+        padding: 0.5rem;
+        background: #f9fafb;
+        border-radius: 6px;
+    }
+    
+    .flex.items-center span {
+        font-size: 0.875rem;
+    }
+    
+    /* ============================================
+       QRスキャナー最適化
+       ============================================ */
+    
+    /* カメラセクション */
+    .camera-section {
+        padding: 0.75rem;
+        background: #f8fafc;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+    }
+    
+    #qr-initial-screen h3 {
+        font-size: 1.125rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    #qr-initial-screen p {
+        font-size: 0.875rem;
+        margin: 0.5rem 0 0.75rem 0;
+    }
+    
+    /* ビデオコンテナ - フルスクリーン風 */
+    .qr-video-container {
+        aspect-ratio: 4/3;
+        max-height: 60vh;
+        border-radius: 12px;
+        margin: 0.75rem 0;
+    }
+    
+    /* スキャンガイド - モバイルサイズに調整 */
+    .qr-scan-guide {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .qr-scan-corners {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .qr-corner {
+        width: 24px;
+        height: 24px;
+        border-width: 3px;
+    }
+    
+    /* スキャンライン */
+    .qr-scanning-line {
+        width: 200px;
+        height: 200px;
+    }
+    
+    /* ステータス表示 */
+    .qr-status {
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+        bottom: 0.5rem;
+    }
+    
+    /* キャリブレーション表示 */
+    .qr-calibration-indicator .text-4xl {
+        font-size: 2.5rem;
+    }
+    
+    .qr-calibration-indicator .text-lg {
+        font-size: 1rem;
+    }
+    
+    .qr-calibration-indicator .text-sm {
+        font-size: 0.875rem;
+    }
+    
+    /* 成功オーバーレイ */
+    .qr-success-overlay {
+        font-size: 1.25rem;
+    }
+    
+    .qr-success-icon {
+        font-size: 4rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* エラーオーバーレイ */
+    .qr-error-overlay {
+        font-size: 0.875rem;
+        padding: 1rem;
+    }
+    
+    /* デバッグ情報 */
+    .qr-debug-info {
+        font-size: 0.75rem;
+        padding: 0.5rem;
+        max-width: 150px;
+        top: 0.5rem;
+        right: 0.5rem;
+    }
+    
+    /* ============================================
+       ボタン最適化
+       ============================================ */
+    
+    /* 基本ボタン */
+    .btn {
+        min-height: 44px;
+        padding: 0.75rem 1.25rem;
+        font-size: 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform 0.1s ease;
+    }
+    
+    .btn:active {
+        transform: scale(0.97);
+    }
+    
+    /* ボタングループ */
+    .qr-controls {
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+    
+    .qr-controls .btn {
+        width: 100%;
+        margin: 0;
+    }
+    
+    /* ナビゲーションボタン */
+    .navigation {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+    
+    .navigation .btn {
+        width: 100%;
+    }
+    
+    /* ============================================
+       結果表示最適化
+       ============================================ */
+    
+    /* 結果表示エリア */
+    .qr-result-display {
+        margin: 0.75rem 0;
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .qr-result-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .qr-result-title {
+        font-size: 1rem;
+    }
+    
+    .qr-result-data {
+        font-size: 0.875rem;
+        padding: 0.75rem;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    /* ============================================
+       統計情報最適化
+       ============================================ */
+    
+    #qr-stats {
+        padding: 0.75rem;
+        margin-top: 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    #qr-stats > div {
+        gap: 0.5rem;
+    }
+    
+    #qr-stats .stat-value {
+        font-size: 1.125rem;
+    }
+    
+    #qr-stats .stat-label {
+        font-size: 0.75rem;
+    }
+    
+    /* カメラ情報 */
+    #camera-info {
+        padding: 0.625rem;
+        font-size: 0.875rem;
+        margin-top: 0.75rem;
+    }
+    
+    /* ============================================
+       照合済み品目リスト最適化
+       ============================================ */
+    
+    .item-list {
+        padding: 0.75rem;
+        margin: 0.75rem 0;
+    }
+    
+    .item-list h3 {
+        font-size: 1.125rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .item-card {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .item-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .item-title {
+        font-size: 0.9375rem;
+        line-height: 1.4;
+    }
+    
+    .item-meta {
+        font-size: 0.8125rem;
+    }
+    
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+        align-self: flex-start;
+    }
+    
+    /* ============================================
+       アラート・通知最適化
+       ============================================ */
+    
+    .alert {
+        padding: 0.75rem;
+        margin: 0.75rem 0;
+        font-size: 0.875rem;
+        border-radius: 8px;
+    }
+    
+    .alert strong {
+        font-size: 0.9375rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .alert ul {
+        margin: 0.5rem 0 0 1.25rem;
+        font-size: 0.8125rem;
+    }
+    
+    .alert li {
+        margin: 0.375rem 0;
+        line-height: 1.4;
+    }
+    
+    /* ============================================
+       ローディングオーバーレイ
+       ============================================ */
+    
+    .loading-overlay {
+        backdrop-filter: blur(4px);
+    }
+    
+    .loading-spinner {
+        width: 48px;
+        height: 48px;
+        border-width: 4px;
+    }
+}
+
+/* ============================================
+   小型スマートフォン (最大375px)
+   ============================================ */
+
+@media screen and (max-width: 375px) {
+    
+    .header h1 {
+        font-size: 1rem;
+    }
+    
+    h2 {
+        font-size: 1.125rem;
+    }
+    
+    .qr-scan-guide,
+    .qr-scan-corners,
+    .qr-scanning-line {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .qr-corner {
+        width: 20px;
+        height: 20px;
+        border-width: 2px;
+    }
+    
+    .btn {
+        font-size: 0.9375rem;
+        padding: 0.625rem 1rem;
+    }
+    
+    #qr-stats > div {
+        gap: 0.375rem;
+    }
+}
+
+/* ============================================
+   大型スマートフォン/タブレット (最小769px)
+   ============================================ */
+
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+    
+    .container {
+        padding: 1rem;
+    }
+    
+    .form-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .qr-video-container {
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .qr-controls {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .qr-controls .btn {
+        width: auto;
+        min-width: 200px;
+    }
+}
+
+/* ============================================
+   横向き表示の最適化
+   ============================================ */
+
+@media screen and (max-height: 600px) and (orientation: landscape) {
+    
+    .header {
+        padding: 0.5rem 1rem;
+    }
+    
+    .header h1 {
+        font-size: 1rem;
+    }
+    
+    h2 {
+        font-size: 1.125rem;
+        margin: 0.5rem 0;
+    }
+    
+    .qr-video-container {
+        max-height: 50vh;
+    }
+    
+    .qr-controls {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .qr-controls .btn {
+        width: auto;
+        min-width: 140px;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .alert {
+        font-size: 0.8125rem;
+    }
+    
+    .item-card {
+        padding: 0.5rem;
+    }
+}
+
+/* ============================================
+   PWA フルスクリーンモード
+   ============================================ */
+
+@media all and (display-mode: standalone) {
+    
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+    
+    .header {
+        padding-top: calc(0.75rem + env(safe-area-inset-top));
+    }
+}
+
+/* ============================================
+   ダークモード対応（オプション）
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+    
+    /* 必要に応じてダークモード対応を追加 */
+    /* 現在は未実装 */
+}
+
+/* ============================================
+   アクセシビリティ向上
+   ============================================ */
+
+/* フォーカス表示の強化 */
+@media screen and (max-width: 768px) {
+    
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+        outline: 3px solid #3b82f6;
+        outline-offset: 2px;
+    }
+    
+    /* タッチターゲットの最小サイズ確保 */
+    a, button, input, select, textarea {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* テキストの可読性向上 */
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* ============================================
+   アニメーション最適化
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ============================================
+   折りたたみ可能な詳細情報
+   ============================================ */
+
+.mobile-details {
+    margin-top: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.mobile-summary {
+    padding: 0.75rem;
+    background: #f9fafb;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1e40af;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.2s ease;
+}
+
+.mobile-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mobile-summary::after {
+    content: '▼';
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+details[open] .mobile-summary::after {
+    transform: rotate(180deg);
+}
+
+.mobile-summary:active {
+    background: #f3f4f6;
+}
+
+.mobile-details-content {
+    padding: 0.75rem;
+    background: white;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.mobile-details-content ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    list-style: none;
+}
+
+.mobile-details-content li {
+    margin: 0.5rem 0;
+    padding-left: 0.25rem;
+    position: relative;
+}
+
+.mobile-details-content li::before {
+    content: '✓';
+    position: absolute;
+    left: -1.25rem;
+    color: #10b981;
+    font-weight: bold;
+}
+
+/* Safari バッジ（コンパクト版） */
+.safari-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    margin-left: 0.375rem;
+    vertical-align: middle;
+}
+
+@media screen and (max-width: 768px) {
+    .safari-badge {
+        font-size: 0.5625rem;
+        padding: 0.125rem 0.375rem;
+    }
+    
+    .mobile-details-content {
+        font-size: 0.75rem;
+    }
+    
+    .mobile-summary {
+        font-size: 0.8125rem;
+        padding: 0.625rem;
+    }
+}

@@ -1,0 +1,219 @@
+/**
+ * 配送・物流関連コンポーネントスタイル
+ */
+
+/* 納入場所カード */
+.delivery-locations {
+    margin-top: 2rem;
+}
+
+.delivery-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s;
+}
+
+.delivery-card:hover {
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.delivery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.delivery-info h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.delivery-meta {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.item-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.summary-item {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+/* アイテムリスト */
+.item-list {
+    margin-top: 2rem;
+}
+
+.item-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s;
+}
+
+.item-card:hover {
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.item-info {
+    flex: 1;
+}
+
+.item-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.item-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.item-meta {
+    color: #6b7280;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+/* ステータスバッジ */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+/* タブナビゲーション */
+.delivery-tabs {
+    display: flex;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 12px 20px;
+    background-color: #f8f9fa;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.tab-button.active {
+    background-color: #007bff;
+    color: white;
+    border-bottom-color: #0056b3;
+}
+
+.tab-button:hover {
+    background-color: #e9ecef;
+}
+
+.tab-button.active:hover {
+    background-color: #0056b3;
+}
+
+.delivery-tab-content {
+    display: none;
+}
+
+.delivery-tab-content.active {
+    display: block;
+}
+
+/* ピッキング関連 */
+.picked-items {
+    margin-top: 2rem;
+}
+
+.picked-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f0fdf4;
+    border: 1px solid #dcfce7;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.qty-input {
+    width: 100px;
+    margin-left: 1rem;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .item-header, 
+    .delivery-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .item-actions {
+        margin-top: 1rem;
+    }
+
+    .item-summary {
+        grid-template-columns: 1fr;
+    }
+}

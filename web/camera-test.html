@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カメラAPI診断ツール</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .result-box {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-ok {
+            color: #28a745;
+        }
+        .status-error {
+            color: #dc3545;
+        }
+        .status-warning {
+            color: #ffc107;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .test-video {
+            width: 100%;
+            max-width: 640px;
+            background: #000;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">📱 カメラAPI診断ツール</h1>
+        
+        <div class="result-box">
+            <h3>🔍 環境情報</h3>
+            <table class="table table-sm">
+                <tr>
+                    <th width="200">プロトコル</th>
+                    <td id="protocol"></td>
+                </tr>
+                <tr>
+                    <th>ホスト名</th>
+                    <td id="hostname"></td>
+                </tr>
+                <tr>
+                    <th>完全URL</th>
+                    <td id="fullurl"></td>
+                </tr>
+                <tr>
+                    <th>ユーザーエージェント</th>
+                    <td id="useragent" style="font-size: 0.85em; word-break: break-all;"></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="result-box">
+            <h3>🎥 カメラAPI対応状況</h3>
+            <table class="table table-sm">
+                <tr>
+                    <th width="200">navigator</th>
+                    <td id="has-navigator"></td>
+                </tr>
+                <tr>
+                    <th>navigator.mediaDevices</th>
+                    <td id="has-mediadevices"></td>
+                </tr>
+                <tr>
+                    <th>getUserMedia</th>
+                    <td id="has-getusermedia"></td>
+                </tr>
+                <tr>
+                    <th>enumerateDevices</th>
+                    <td id="has-enumerate"></td>
+                </tr>
+                <tr>
+                    <th>セキュアコンテキスト</th>
+                    <td id="is-secure"></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="result-box">
+            <h3>📹 カメラデバイス一覧</h3>
+            <div id="devices-list">
+                <button class="btn btn-primary" id="btn-enumerate">デバイスを列挙</button>
+            </div>
+        </div>
+
+        <div class="result-box">
+            <h3>🚀 カメラテスト</h3>
+            <button class="btn btn-success mb-3" id="btn-test-camera">カメラを起動してテスト</button>
+            <button class="btn btn-danger mb-3 ms-2" id="btn-stop-camera" style="display:none;">カメラを停止</button>
+            <div id="camera-status" class="alert" style="display:none;"></div>
+            <video id="test-video" class="test-video" playsinline webkit-playsinline muted autoplay style="display:none;"></video>
+        </div>
+
+        <div class="result-box">
+            <h3>💡 推奨事項</h3>
+            <div id="recommendations"></div>
+        </div>
+
+        <div class="result-box">
+            <h3>📋 診断結果（JSON）</h3>
+            <button class="btn btn-secondary btn-sm mb-2" id="btn-copy-json">クリップボードにコピー</button>
+            <pre id="json-output"></pre>
+        </div>
+    </div>
+
+    <script>
+        const diagnostics = {};
+
+        // 環境情報の収集
+        function collectEnvironmentInfo() {
+            diagnostics.environment = {
+                protocol: window.location.protocol,
+                hostname: window.location.hostname,
+                port: window.location.port,
+                fullUrl: window.location.href,
+                userAgent: navigator.userAgent,
+                isSecureContext: window.isSecureContext
+            };
+
+            document.getElementById('protocol').innerHTML = 
+                `<strong class="${diagnostics.environment.protocol === 'https:' ? 'status-ok' : 'status-error'}">${diagnostics.environment.protocol}</strong>`;
+            document.getElementById('hostname').textContent = diagnostics.environment.hostname;
+            document.getElementById('fullurl').textContent = diagnostics.environment.fullUrl;
+            document.getElementById('useragent').textContent = diagnostics.environment.userAgent;
+        }
+
+        // API対応状況の確認
+        function checkAPISupport() {
+            diagnostics.apiSupport = {
+                hasNavigator: !!navigator,
+                hasMediaDevices: !!navigator.mediaDevices,
+                hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+                hasEnumerateDevices: !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices),
+                isSecureContext: window.isSecureContext
+            };
+
+            const statusHtml = (supported) => supported 
+                ? '<span class="status-ok">✅ サポートあり</span>' 
+                : '<span class="status-error">❌ サポートなし</span>';
+
+            document.getElementById('has-navigator').innerHTML = statusHtml(diagnostics.apiSupport.hasNavigator);
+            document.getElementById('has-mediadevices').innerHTML = statusHtml(diagnostics.apiSupport.hasMediaDevices);
+            document.getElementById('has-getusermedia').innerHTML = statusHtml(diagnostics.apiSupport.hasGetUserMedia);
+            document.getElementById('has-enumerate').innerHTML = statusHtml(diagnostics.apiSupport.hasEnumerateDevices);
+            document.getElementById('is-secure').innerHTML = diagnostics.apiSupport.isSecureContext
+                ? '<span class="status-ok">✅ はい（HTTPS or localhost）</span>'
+                : '<span class="status-error">❌ いいえ（HTTP）</span>';
+        }
+
+        // デバイス列挙
+        async function enumerateDevices() {
+            const container = document.getElementById('devices-list');
+            
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                container.innerHTML = '<div class="alert alert-danger">enumerateDevices APIがサポートされていません</div>';
+                return;
+            }
+
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                diagnostics.devices = devices.map(d => ({
+                    kind: d.kind,
+                    label: d.label,
+                    deviceId: d.deviceId
+                }));
+
+                const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                
+                if (videoInputs.length === 0) {
+                    container.innerHTML = '<div class="alert alert-warning">カメラデバイスが見つかりませんでした</div>';
+                } else {
+                    let html = `<div class="alert alert-success">カメラデバイス: ${videoInputs.length}台</div>`;
+                    html += '<ul class="list-group">';
+                    videoInputs.forEach((device, index) => {
+                        html += `<li class="list-group-item">
+                            <strong>カメラ ${index + 1}:</strong> ${device.label || '（ラベルなし）'}<br>
+                            <small class="text-muted">Device ID: ${device.deviceId}</small>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                    container.innerHTML = html;
+                }
+            } catch (error) {
+                diagnostics.deviceError = error.message;
+                container.innerHTML = `<div class="alert alert-danger">デバイス列挙エラー: ${error.message}</div>`;
+            }
+        }
+
+        // カメラテスト
+        let currentStream = null;
+        async function testCamera() {
+            const video = document.getElementById('test-video');
+            const statusDiv = document.getElementById('camera-status');
+            const startBtn = document.getElementById('btn-test-camera');
+            const stopBtn = document.getElementById('btn-stop-camera');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.textContent = 'getUserMedia APIがサポートされていません';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                startBtn.disabled = true;
+                statusDiv.className = 'alert alert-info';
+                statusDiv.textContent = 'カメラを起動しています...';
+                statusDiv.style.display = 'block';
+
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                diagnostics.cameraTest = {
+                    success: true,
+                    tracks: currentStream.getVideoTracks().map(track => ({
+                        label: track.label,
+                        enabled: track.enabled,
+                        muted: track.muted,
+                        readyState: track.readyState,
+                        settings: track.getSettings()
+                    }))
+                };
+
+                video.srcObject = currentStream;
+                video.style.display = 'block';
+                
+                statusDiv.className = 'alert alert-success';
+                statusDiv.textContent = '✅ カメラが正常に起動しました！';
+                
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+
+                updateJSON();
+            } catch (error) {
+                diagnostics.cameraTest = {
+                    success: false,
+                    error: error.message,
+                    errorName: error.name
+                };
+
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.innerHTML = `<strong>カメラ起動エラー:</strong><br>${error.name}: ${error.message}`;
+                
+                startBtn.disabled = false;
+                updateJSON();
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            
+            const video = document.getElementById('test-video');
+            video.srcObject = null;
+            video.style.display = 'none';
+            
+            const statusDiv = document.getElementById('camera-status');
+            statusDiv.style.display = 'none';
+            
+            document.getElementById('btn-test-camera').style.display = 'inline-block';
+            document.getElementById('btn-test-camera').disabled = false;
+            document.getElementById('btn-stop-camera').style.display = 'none';
+        }
+
+        // 推奨事項の表示
+        function showRecommendations() {
+            const container = document.getElementById('recommendations');
+            const recommendations = [];
+
+            if (diagnostics.environment.protocol !== 'https:' && 
+                diagnostics.environment.hostname !== 'localhost' && 
+                diagnostics.environment.hostname !== '127.0.0.1') {
+                recommendations.push({
+                    level: 'error',
+                    icon: '🚫',
+                    text: '<strong>HTTPSが必要です:</strong> カメラAPIはセキュアコンテキスト（HTTPS or localhost）でのみ動作します。',
+                    action: `<code>https://${diagnostics.environment.hostname}</code> でアクセスするか、<code>./setup-ssl.sh</code> を実行してSSLを有効化してください。`
+                });
+            }
+
+            if (!diagnostics.apiSupport.hasGetUserMedia) {
+                recommendations.push({
+                    level: 'error',
+                    icon: '❌',
+                    text: '<strong>getUserMedia APIがありません:</strong> ブラウザが古いか、機能が無効化されている可能性があります。',
+                    action: 'ブラウザを最新版に更新するか、Safari設定でカメラ権限を確認してください。'
+                });
+            }
+
+            if (navigator.userAgent.match(/iPhone|iPad|iPod/i)) {
+                recommendations.push({
+                    level: 'info',
+                    icon: '📱',
+                    text: '<strong>iOSデバイスを検出:</strong>',
+                    action: '設定 → Safari → カメラ で「許可」を選択してください。また、プライバシーとセキュリティ → カメラでSafariを許可してください。'
+                });
+            }
+
+            if (diagnostics.apiSupport.hasGetUserMedia && diagnostics.environment.protocol === 'https:') {
+                recommendations.push({
+                    level: 'success',
+                    icon: '✅',
+                    text: '<strong>すべての条件を満たしています!</strong>',
+                    action: 'QRスキャン機能が使用できます。カメラテストを実行して動作を確認してください。'
+                });
+            }
+
+            if (recommendations.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">特に問題は検出されませんでした。</div>';
+            } else {
+                let html = '';
+                recommendations.forEach(rec => {
+                    const alertClass = rec.level === 'error' ? 'alert-danger' : 
+                                      rec.level === 'warning' ? 'alert-warning' : 
+                                      rec.level === 'success' ? 'alert-success' : 'alert-info';
+                    html += `
+                        <div class="alert ${alertClass}">
+                            <div class="mb-2">${rec.icon} ${rec.text}</div>
+                            <div style="font-size: 0.9em;">${rec.action}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+        }
+
+        // JSONの更新
+        function updateJSON() {
+            document.getElementById('json-output').textContent = JSON.stringify(diagnostics, null, 2);
+        }
+
+        // クリップボードにコピー
+        function copyToClipboard() {
+            const json = JSON.stringify(diagnostics, null, 2);
+            navigator.clipboard.writeText(json).then(() => {
+                alert('診断結果をクリップボードにコピーしました');
+            }).catch(err => {
+                console.error('コピー失敗:', err);
+                alert('コピーに失敗しました');
+            });
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            collectEnvironmentInfo();
+            checkAPISupport();
+            showRecommendations();
+            updateJSON();
+
+            document.getElementById('btn-enumerate').addEventListener('click', () => {
+                enumerateDevices();
+                updateJSON();
+            });
+
+            document.getElementById('btn-test-camera').addEventListener('click', testCamera);
+            document.getElementById('btn-stop-camera').addEventListener('click', stopCamera);
+            document.getElementById('btn-copy-json').addEventListener('click', copyToClipboard);
+        });
+    </script>
+</body>
+</html>

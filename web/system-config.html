@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>システム設定 - 出荷検品システム</title>
+    
+    <!-- キャッシュ制御 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .config-card {
+            border-left: 4px solid #667eea;
+            margin-bottom: 1.5rem;
+        }
+        .config-card.poc-mode {
+            border-left-color: #ff6b6b;
+        }
+        .config-card.normal-mode {
+            border-left-color: #51cf66;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+        }
+        .mode-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .mode-indicator.poc {
+            background-color: #ff6b6b;
+            animation: pulse 2s infinite;
+        }
+        .mode-indicator.normal {
+            background-color: #51cf66;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .info-box {
+            background-color: #e7f5ff;
+            border-left: 4px solid #339af0;
+            padding: 1rem;
+            border-radius: 0.25rem;
+            margin-bottom: 1rem;
+        }
+        .warning-box {
+            background-color: #fff4e6;
+            border-left: 4px solid #fd7e14;
+            padding: 1rem;
+            border-radius: 0.25rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー -->
+    <div class="header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-cog me-2"></i>システム設定
+                    </h1>
+                    <p class="mb-0 mt-2 opacity-75">POCモード・データベース書き込み制御</p>
+                </div>
+                <div class="col-auto">
+                    <a href="maintenance.html" class="btn btn-light">
+                        <i class="fas fa-arrow-left me-2"></i>メンテナンスに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 現在の設定状態 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card config-card" id="current-mode-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-2">
+                                    <span class="mode-indicator" id="mode-indicator"></span>
+                                    現在の動作モード
+                                </h5>
+                                <h3 class="mb-0" id="current-mode-text">読み込み中...</h3>
+                            </div>
+                            <div>
+                                <span class="badge status-badge" id="status-badge">読み込み中</span>
+                            </div>
+                        </div>
+                        <hr>
+                        <p class="mb-1 text-muted">
+                            <small>最終更新: <span id="last-updated">-</span></small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- POCモード設定 -->
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-flask me-2"></i>POCモード設定
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-box">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>POCモードとは？</strong>
+                            <p class="mb-0 mt-2">展示会・デモンストレーション用のモードです。データベースへの書き込みを抑止し、動作確認のみ行います。</p>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="poc-mode-switch" style="width: 3em; height: 1.5em;">
+                            <label class="form-check-label ms-2" for="poc-mode-switch">
+                                <strong>POCモードを有効にする</strong>
+                            </label>
+                        </div>
+
+                        <div class="alert alert-warning" id="poc-mode-warning" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            POCモードが有効です。データベースへの書き込みが制限されます。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>QR検品DB書き込み設定
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="warning-box">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <strong>注意事項</strong>
+                            <p class="mb-0 mt-2">この設定を無効にすると、QRコードスキャン時にデータベースへの記録が行われません。POCモード時のみ推奨されます。</p>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="qr-db-switch" style="width: 3em; height: 1.5em;">
+                            <label class="form-check-label ms-2" for="qr-db-switch">
+                                <strong>QR検品のDB書き込みを有効にする</strong>
+                            </label>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-lightbulb me-2"></i>推奨設定
+                            </h6>
+                            <ul class="mb-0">
+                                <li><strong>POCモード時:</strong> 無効（チェックOFF）</li>
+                                <li><strong>本番運用時:</strong> 有効（チェックON）</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 設定の説明 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-book me-2"></i>設定詳細
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>設定項目</th>
+                                        <th>POCモード</th>
+                                        <th>本番モード</th>
+                                        <th>説明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>POCモード</strong></td>
+                                        <td><span class="badge bg-danger">ON</span></td>
+                                        <td><span class="badge bg-success">OFF</span></td>
+                                        <td>展示会・デモ用のモード設定</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>QR検品DB書き込み</strong></td>
+                                        <td><span class="badge bg-secondary">OFF</span></td>
+                                        <td><span class="badge bg-primary">ON</span></td>
+                                        <td>qr_inspection_detailsテーブルへの記録</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>スキャン動作</strong></td>
+                                        <td>UI更新のみ</td>
+                                        <td>DB記録 + UI更新</td>
+                                        <td>QRコードスキャン時の動作</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>データ永続化</strong></td>
+                                        <td>なし（セッションのみ）</td>
+                                        <td>あり（DB保存）</td>
+                                        <td>検品記録の保存方法</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 保存ボタン -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <button type="button" class="btn btn-primary btn-lg px-5" id="btn-save">
+                            <i class="fas fa-save me-2"></i>設定を保存
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-lg px-5 ms-3" id="btn-reset">
+                            <i class="fas fa-undo me-2"></i>リセット
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3001'
+            : `${window.location.protocol}//${window.location.host}/api`;
+
+        let currentConfig = null;
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            
+            document.getElementById('btn-save').addEventListener('click', saveConfig);
+            document.getElementById('btn-reset').addEventListener('click', loadConfig);
+        });
+
+        // 設定読み込み
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/system-config`);
+                
+                if (!response.ok) {
+                    throw new Error('設定の読み込みに失敗しました');
+                }
+
+                currentConfig = await response.json();
+                
+                // UIに反映
+                document.getElementById('poc-mode-switch').checked = currentConfig.pocMode;
+                document.getElementById('qr-db-switch').checked = currentConfig.enableQRInspectionDB;
+                
+                updateModeDisplay();
+                updateLastUpdated(currentConfig.lastUpdated);
+                
+                console.log('Config loaded:', currentConfig);
+            } catch (error) {
+                console.error('Failed to load config:', error);
+                alert('設定の読み込みに失敗しました: ' + error.message);
+            }
+        }
+
+        // 設定保存
+        async function saveConfig() {
+            try {
+                const pocMode = document.getElementById('poc-mode-switch').checked;
+                const enableQRInspectionDB = document.getElementById('qr-db-switch').checked;
+
+                // 確認ダイアログ
+                const modeText = pocMode ? 'POCモード' : '本番モード';
+                const dbText = enableQRInspectionDB ? '有効' : '無効';
+                
+                if (!confirm(`以下の設定で保存しますか？\n\n動作モード: ${modeText}\nQR検品DB書き込み: ${dbText}`)) {
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/system-config`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pocMode: pocMode,
+                        enableQRInspectionDB: enableQRInspectionDB
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('設定の保存に失敗しました');
+                }
+
+                const result = await response.json();
+                currentConfig = result.config;
+                
+                updateModeDisplay();
+                updateLastUpdated(currentConfig.lastUpdated);
+                
+                alert('✓ 設定を保存しました');
+                
+                console.log('Config saved:', result);
+            } catch (error) {
+                console.error('Failed to save config:', error);
+                alert('設定の保存に失敗しました: ' + error.message);
+            }
+        }
+
+        // モード表示更新
+        function updateModeDisplay() {
+            const pocMode = currentConfig.pocMode;
+            const card = document.getElementById('current-mode-card');
+            const indicator = document.getElementById('mode-indicator');
+            const modeText = document.getElementById('current-mode-text');
+            const statusBadge = document.getElementById('status-badge');
+            const pocWarning = document.getElementById('poc-mode-warning');
+
+            if (pocMode) {
+                card.classList.remove('normal-mode');
+                card.classList.add('poc-mode');
+                indicator.classList.remove('normal');
+                indicator.classList.add('poc');
+                modeText.textContent = 'POCモード（展示会・デモ用）';
+                statusBadge.className = 'badge status-badge bg-danger';
+                statusBadge.textContent = 'POCモード';
+                pocWarning.style.display = 'block';
+            } else {
+                card.classList.remove('poc-mode');
+                card.classList.add('normal-mode');
+                indicator.classList.remove('poc');
+                indicator.classList.add('normal');
+                modeText.textContent = '本番モード（通常運用）';
+                statusBadge.className = 'badge status-badge bg-success';
+                statusBadge.textContent = '本番モード';
+                pocWarning.style.display = 'none';
+            }
+        }
+
+        // 最終更新時刻表示
+        function updateLastUpdated(timestamp) {
+            const date = new Date(timestamp);
+            const formatted = date.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('last-updated').textContent = formatted;
+        }
+    </script>
+</body>
+</html>

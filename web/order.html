@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>受注オーダー出荷 - 受注番号 *1424571$M1*</title>
+    <link href="https://cdn.jsdelivr.net/npm/ids-enterprise@latest/dist/css/theme-new-light.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/ids-enterprise@latest/dist/css/ids-enterprise.min.css" rel="stylesheet">
+    <!-- JsBarcode for barcode generation -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- html5-qrcode for barcode scanning -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 5px;
+            margin: 0;
+            height: 100vh;
+            overflow: auto;
+        }
+        
+        .container {
+            max-width: 768px;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            padding: 10px;
+            min-height: calc(100vh - 10px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .title {
+            width: 100%;
+        }
+        
+        .title h1 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .order-number-section {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        
+        .order-number-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        
+        .info-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 6px 8px;
+            background: #fafafa;
+        }
+        
+        .info-label {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 2px;
+            font-weight: 600;
+        }
+        
+        .info-value {
+            font-size: 12px;
+            color: #333;
+            font-weight: 500;
+            word-break: break-all;
+        }
+        
+        .info-value.large {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .product-section {
+            border: 2px solid #333;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #f0f7ff;
+        }
+        
+        .product-header {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #cce5ff;
+        }
+        
+        .product-code-section {
+            width: 100%;
+            margin-bottom: 8px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+        
+        .product-code-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .product-code-label {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 2px;
+            font-weight: 600;
+        }
+        
+        .product-code-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 2px;
+        }
+        
+        .product-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 2px;
+            letter-spacing: 0.5px;
+        }
+        
+        .product-item-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 2px;
+        }
+        
+        .delivery-date {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 4px;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 3px;
+            border: 1px solid #333;
+            cursor: pointer;
+        }
+        
+        .delivery-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        
+        .delivery-label {
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+            min-width: 40px;
+        }
+        
+        .delivery-input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+        
+        .delivery-input {
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 3px;
+            border: 2px solid #333;
+            cursor: pointer;
+            font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        .delivery-input:focus {
+            outline: none;
+            border-color: #555;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+        }
+        
+        .delivery-display {
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 3px;
+            border: 2px solid #333;
+            cursor: pointer;
+            font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .delivery-display:hover {
+            background: #f9f9f9;
+        }
+        
+        .quantity-section {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+        
+        .quantity-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .quantity-label {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 3px;
+            font-weight: 600;
+        }
+        
+        .quantity-box {
+            background: white;
+            border: 2px solid #333;
+            border-radius: 4px;
+            padding: 6px 10px;
+            width: 100%;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .quantity-box2 {
+            background:  #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 6px 10px;
+            width: 100%;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .quantity-display {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .quantity-input {
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            border: none;
+            background: transparent;
+            outline: none;
+            height: 100%;
+        }
+        
+        .stock-quantity {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        
+        .product-barcode {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #cce5ff;
+        }
+        
+        .barcode-detail {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 48%;
+        }
+        
+        .barcode-detail svg {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .barcode-detail-text {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 3px;
+            font-weight: bold;
+        }
+        
+        .shipping-company {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            background:  #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            width: 48%;
+        }
+        
+        .details-grid {
+            display: grid;
+            grid-template-columns: 0.75fr 0.75fr 0.75fr 1.75fr;
+            gap: 6px;
+            margin-bottom: 0;
+        }
+        
+        .detail-item {
+            padding: 6px 8px;
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+        }
+        
+        .supplier-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 3px 8px;
+            background: #fafafa;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: flex-start;
+            width: 100%;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            border: none;
+            min-width: auto;
+            flex-shrink: 0;
+        }
+        
+        .address-content {
+            text-align: left;
+            font-size: 12px;
+            color: #333;
+            flex: 1;
+        }
+        
+        .address-line {
+            margin: 2px 0;
+            font-size: 12px;
+            color: #333;
+            text-align: left;
+        }
+        
+        .address-icon {
+            margin-right: 2px;
+            margin-left: 2px;
+            color: #666;
+        }
+        
+        .tracking-number-section {
+            margin-top: 8px;
+            padding: 8px;
+            background: #f0f7ff;
+            border: 1px solid #cce5ff;
+            border-radius: 4px;
+        }
+        
+        .tracking-label {
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        
+        .tracking-input-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .tracking-input {
+            flex: 1;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            border: 2px solid #333;
+            outline: none;
+            font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        .tracking-input:focus {
+            border-color: #0066cc;
+            box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+        }
+        
+        .btn-camera {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            background: #0066cc;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .btn-camera:hover {
+            background: #0052a3;
+        }
+        
+        .btn-camera:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-camera svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .btn-barcode {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            background: #008a00;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn-barcode:hover {
+            background: #006e00;
+        }
+        
+        /* バーコードスキャナー用モーダル */
+        .scanner-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .scanner-modal.active {
+            display: flex;
+        }
+        
+        .scanner-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 90%;
+            width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .scanner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .scanner-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .scanner-close {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .scanner-close:hover {
+            background: #c82333;
+        }
+        
+        #deliveryCodeReader {
+            width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        .scanner-result {
+            padding: 15px;
+            background: #e9f7ef;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .scanner-result.show {
+            display: block;
+        }
+        
+        .scanner-result-label {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        
+        .scanner-result-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            word-break: break-all;
+        }
+        
+        .barcode-clickable {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .barcode-clickable:hover {
+            transform: scale(1.05);
+        }
+        
+        .button-area {
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .checkbox-area {
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 3px;
+            border: 1px solid #e0e0e0;
+            flex: 1;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #333;
+            flex-shrink: 0;
+        }
+        
+        .checkbox-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 50%;
+        }
+        
+        .btn-back {
+            background-color: #f5f5f5;
+            color: #333;
+            border: 2px solid #333;
+        }
+        
+        .btn-back:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .btn-process {
+            background-color: #333;
+            color: white;
+            border: 2px solid #333;
+        }
+        
+        .btn-process:hover {
+            background-color: #555;
+            border-color: #555;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+            
+            .button-area {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー部 -->
+        <div class="header">
+            <div class="title">
+                <h1>受注オーダー出荷</h1>
+                <div class="order-number-section">
+                    <span class="order-number-label">受注番号：*1424571$M1*</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 印刷区分・製造元情報 -->
+        <div class="info-grid">
+            <div class="info-section">
+                <div class="info-label">印刷区分名</div>
+                <div class="info-value">(C1、WE、WTのみ)※郡山</div>
+            </div>
+            <div class="info-section">
+                <div class="info-label">得意先略称</div>
+                <div class="info-value">(株)村田製作所</div>
+            </div>
+            <div class="info-section">
+                <div class="info-label">製造元　客先注番</div>
+                <div class="info-value"><strong>WT</strong>　　KM9HT0003</div>
+            </div>
+            <div class="info-section">
+                <div class="info-label">ロケーション</div>
+                <div class="info-value"></div>
+            </div>
+        </div>
+
+        <!-- 商品情報セクション -->
+        <div class="product-section">
+            <div class="product-header">
+                <div class="product-code-section">
+                    <div class="product-code-item">
+                        <div class="product-code-label">得意先コード</div>
+                        <div class="product-code-value">0999</div>
+                    </div>
+                    <div class="product-code-item">
+                        <div class="product-code-label">品目名</div>
+                        <div class="product-code-value">PKLX0570</div>
+                    </div>
+                    <div class="product-code-item">
+                        <div class="product-code-label">商品コード</div>
+                        <div class="product-code-value">PKLX0570</div>
+                    </div>
+                </div>
+                <div class="delivery-section">
+                    <div class="delivery-label">納期</div>
+                    <div class="delivery-input-wrapper">
+                        <input type="date" 
+                               class="delivery-input" 
+                               id="deliveryDate" 
+                               value="2025-10-31"
+                               onchange="updateDeliveryDisplay()"
+                               style="position: absolute; opacity: 0; pointer-events: none;">
+                        <div class="delivery-display" id="deliveryDisplay" onclick="document.getElementById('deliveryDate').showPicker()">
+                            10/31(木)
+                        </div>
+                    </div>
+                </div>
+                <div class="quantity-section">
+                    <div class="quantity-item">
+                        <div class="quantity-label">出庫数量</div>
+                        <div class="quantity-box">
+                            <input type="text" 
+                                   class="quantity-input" 
+                                   id="shipQuantity" 
+                                   value="44,910"
+                                   placeholder="数量を入力">
+                        </div>
+                    </div>
+                    <div class="quantity-item">
+                        <div class="quantity-label">在庫数量</div>
+                        <div class="quantity-box2">
+                            <div class="quantity-display">179,676</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 運送会社情報 -->
+            <div class="product-barcode">
+                <div class="barcode-detail barcode-clickable" onclick="openDeliveryCodeScanner()" title="クリックして読み取り">
+                    <div class="info-label" style="font-size: 11px; margin-bottom: 4px;">納品先コード</div>
+                    <svg id="deliveryBarcode"></svg>
+                    <div class="barcode-detail-text" id="deliveryCodeText">00C099905</div>
+                </div>
+                <div class="shipping-company">
+                    <div class="info-label">運送会社</div>
+                    <div class="info-value" style="font-size: 13px; font-weight: bold; margin-top: 2px;">西濃　長岡支店</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 詳細情報グリッド -->
+        <div class="details-grid">
+            <div class="detail-item">
+                <div class="info-label">得意先コード</div>
+                <div class="info-value">0999</div>
+            </div>
+            <div class="detail-item">
+                <div class="info-label">納入先コード</div>
+                <div class="info-value">0</div>
+            </div>
+            <div class="detail-item">
+                <div class="info-label">〒</div>
+                <div class="info-value">923-8626</div>
+            </div>
+            <div class="detail-item">
+                <div class="info-label">納入先名称</div>
+                <div class="info-value">㈱小松村田製作所　納品受付係</div>
+            </div>
+        </div>
+
+        <!-- 住所セクション -->
+        <div class="supplier-section">
+            <div class="info-label">住所</div>
+            <div class="info-value">石川県小松市光町93</div>
+        </div>
+
+        <!-- 送り状番号入力セクション -->
+        <div class="tracking-number-section">
+            <div class="tracking-label">送り状番号</div>
+            <div class="tracking-input-wrapper">
+                <input type="text" 
+                       class="tracking-input" 
+                       id="trackingNumber" 
+                       placeholder="送り状番号を入力">
+                <button class="btn-camera" onclick="startOCRCamera()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    AI-OCR
+                </button>
+                <!-- バーコード読み取りボタン（AI-OCRの右） -->
+                <button class="btn-barcode" onclick="startBarcodeScanner()" title="バーコード読み取り">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                        <path d="M4 8v8" stroke-linecap="round"></path>
+                        <path d="M7 8v8" stroke-linecap="round"></path>
+                        <path d="M11 8v8" stroke-linecap="round"></path>
+                        <path d="M14 8v8" stroke-linecap="round"></path>
+                        <path d="M18 8v8" stroke-linecap="round"></path>
+                    </svg>
+                    バーコード
+                </button>
+                <!-- 画像からバーコード読み取りするための隠し input（フォールバック用） -->
+                <input type="file" id="barcodeImageInput" accept="image/*" capture="environment" style="display:none" onchange="handleBarcodeImageFile(event)">
+            </div>
+        </div>
+
+        <!-- チェックボックスエリア -->
+        <div class="checkbox-area">
+            <div class="checkbox-item">
+                <input type="checkbox" id="deliverySlip" onchange="handleCheckboxChange('deliverySlip')">
+                <label for="deliverySlip" class="checkbox-label">納品書設定</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="shippingLabel" onchange="handleCheckboxChange('shippingLabel')">
+                <label for="shippingLabel" class="checkbox-label">送り状出力</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="shipmentRegistration" onchange="handleCheckboxChange('shipmentRegistration')">
+                <label for="shipmentRegistration" class="checkbox-label">出荷登録</label>
+            </div>
+        </div>
+
+        <!-- ボタンエリア -->
+        <div class="button-area">
+            <button class="btn btn-back" onclick="goBack()">戻る</button>
+            <button class="btn btn-process" onclick="processOrder()">処理</button>
+        </div>
+    </div>
+
+    <!-- 納品先コードスキャナーモーダル -->
+    <div id="deliveryCodeScannerModal" class="scanner-modal">
+        <div class="scanner-container">
+            <div class="scanner-header">
+                <div class="scanner-title">納品先コード読み取り</div>
+                <button class="scanner-close" onclick="closeDeliveryCodeScanner()">閉じる</button>
+            </div>
+            <div id="deliveryCodeReader"></div>
+            <div id="deliveryCodeScannerResult" class="scanner-result">
+                <div class="scanner-result-label">読み取り結果:</div>
+                <div class="scanner-result-value" id="deliveryCodeScannerValue"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 納期の表示更新
+        function updateDeliveryDisplay() {
+            const dateInput = document.getElementById('deliveryDate');
+            const selectedDate = new Date(dateInput.value);
+            
+            // 日本語の曜日を取得
+            const daysOfWeek = ['日', '月', '火', '水', '木', '金', '土'];
+            const dayOfWeek = daysOfWeek[selectedDate.getDay()];
+            
+            // MM/DD(曜日)形式に変換
+            const month = selectedDate.getMonth() + 1;
+            const day = selectedDate.getDate();
+            const formattedDate = `${month}/${day}(${dayOfWeek})`;
+            
+            console.log('納期変更:', formattedDate);
+            
+            // 実際のシステムでは、この値をIDOに保存する処理を追加
+        }
+
+        // チェックボックスの変更処理
+        function handleCheckboxChange(checkboxId) {
+            const checkbox = document.getElementById(checkboxId);
+            const isChecked = checkbox.checked;
+            
+            let checkboxName = '';
+            switch(checkboxId) {
+                case 'deliverySlip':
+                    checkboxName = '納品書設定';
+                    break;
+                case 'shippingLabel':
+                    checkboxName = '送り状出力';
+                    break;
+                case 'shipmentRegistration':
+                    checkboxName = '出荷登録';
+                    break;
+            }
+            
+            console.log(`${checkboxName}: ${isChecked ? 'チェック' : 'チェック解除'}`);
+            
+            // 実際のシステムでは、チェック状態をIDOに保存する処理を追加
+            // 例: フラグをデータベースに保存、処理キューに追加など
+        }
+        
+        // チェックボックスの状態を取得
+        function getCheckboxStates() {
+            return {
+                deliverySlip: document.getElementById('deliverySlip').checked,
+                shippingLabel: document.getElementById('shippingLabel').checked,
+                shipmentRegistration: document.getElementById('shipmentRegistration').checked
+            };
+        }
+
+        // 戻るボタンの処理
+        function goBack() {
+            // 実際のシステムでは前の画面に戻る処理を実装
+            if (confirm('前の画面に戻りますか？')) {
+                window.history.back();
+                // または特定のURLに遷移
+                // window.location.href = '/order-list';
+            }
+        }
+
+        // AI-OCRカメラ起動（iPad Safari最適化版）
+        async function startOCRCamera() {
+            console.log('[AI-OCR] カメラを起動します');
+            
+            // オーバーレイ UI を作成
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.left = '0';
+            overlay.style.top = '0';
+            overlay.style.right = '0';
+            overlay.style.bottom = '0';
+            overlay.style.background = 'rgba(0,0,0,0.9)';
+            overlay.style.display = 'flex';
+            overlay.style.flexDirection = 'column';
+            overlay.style.alignItems = 'center';
+            overlay.style.justifyContent = 'center';
+            overlay.style.zIndex = '9999';
+
+            const container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '90%';
+            container.style.maxWidth = '600px';
+            container.style.borderRadius = '8px';
+            container.style.overflow = 'hidden';
+            container.style.background = '#000';
+
+            const video = document.createElement('video');
+            video.style.width = '100%';
+            video.style.height = 'auto';
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+
+            const canvas = document.createElement('canvas');
+            canvas.style.display = 'none';
+
+            const captureBtn = document.createElement('button');
+            captureBtn.textContent = '📷 撮影してOCR実行';
+            captureBtn.style.position = 'absolute';
+            captureBtn.style.bottom = '16px';
+            captureBtn.style.left = '50%';
+            captureBtn.style.transform = 'translateX(-50%)';
+            captureBtn.style.padding = '12px 24px';
+            captureBtn.style.fontSize = '16px';
+            captureBtn.style.fontWeight = 'bold';
+            captureBtn.style.border = 'none';
+            captureBtn.style.borderRadius = '8px';
+            captureBtn.style.background = '#0066cc';
+            captureBtn.style.color = 'white';
+            captureBtn.style.cursor = 'pointer';
+            captureBtn.style.zIndex = '10001';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.right = '8px';
+            closeBtn.style.top = '8px';
+            closeBtn.style.zIndex = '10001';
+            closeBtn.style.padding = '8px 12px';
+            closeBtn.style.border = 'none';
+            closeBtn.style.borderRadius = '4px';
+            closeBtn.style.background = '#fff';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.fontSize = '20px';
+
+            const statusText = document.createElement('div');
+            statusText.textContent = '送り状を画面中央に合わせてください';
+            statusText.style.position = 'absolute';
+            statusText.style.top = '16px';
+            statusText.style.left = '50%';
+            statusText.style.transform = 'translateX(-50%)';
+            statusText.style.background = 'rgba(0,0,0,0.7)';
+            statusText.style.color = 'white';
+            statusText.style.padding = '8px 16px';
+            statusText.style.borderRadius = '4px';
+            statusText.style.fontSize = '14px';
+            statusText.style.zIndex = '10001';
+
+            container.appendChild(video);
+            container.appendChild(canvas);
+            container.appendChild(captureBtn);
+            container.appendChild(closeBtn);
+            container.appendChild(statusText);
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+
+            try {
+                // iPad Safari最適化: 柔軟なカメラ制約
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920, min: 640 },
+                        height: { ideal: 1080, min: 480 }
+                    },
+                    audio: false
+                };
+
+                console.log('[AI-OCR] カメラアクセスリクエスト:', constraints);
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                video.srcObject = stream;
+                
+                // iPad Safari: loadedmetadata イベント待機
+                await new Promise((resolve, reject) => {
+                    video.onloadedmetadata = () => {
+                        console.log('[AI-OCR] Video metadata loaded, resolution:', video.videoWidth, 'x', video.videoHeight);
+                        resolve();
+                    };
+                    video.onerror = (err) => {
+                        console.error('[AI-OCR] Video error:', err);
+                        reject(new Error('ビデオ読み込みエラー'));
+                    };
+                    setTimeout(() => reject(new Error('カメラ起動タイムアウト')), 10000);
+                });
+
+                await video.play();
+                console.log('[AI-OCR] カメラ起動成功');
+
+                // 撮影ボタン
+                captureBtn.onclick = async () => {
+                    captureBtn.disabled = true;
+                    captureBtn.textContent = 'OCR処理中...';
+                    statusText.textContent = 'OCR処理中...';
+
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    // 画像をBase64に変換
+                    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+
+                    // カメラ停止
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(overlay);
+
+                    // OCR処理（簡易デモ版 - 実際は Tesseract.js やサーバーAPIを使用）
+                    await performSimpleOCR(imageData);
+                };
+
+                // 閉じるボタン
+                closeBtn.onclick = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(overlay);
+                };
+
+            } catch (error) {
+                console.error('[AI-OCR] カメラエラー:', error);
+                document.body.removeChild(overlay);
+                
+                let errorMessage = 'カメラの起動に失敗しました: ' + error.message;
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'カメラの使用が拒否されました。\n\niPad Safari: 設定 > Safari > カメラ から許可してください。';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = 'カメラが見つかりませんでした。';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage = 'カメラが他のアプリで使用中です。';
+                }
+                
+                alert(errorMessage);
+            }
+        }
+
+        // 簡易OCR処理（デモ版）
+        async function performSimpleOCR(imageData) {
+            // 実際の実装では Tesseract.js またはサーバー側OCR APIを使用
+            // ここではデモとして疑似的な番号を生成
+            const demoTrackingNumber = '1234-5678-' + Math.floor(Math.random() * 10000);
+            
+            // 処理中の演出
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            document.getElementById('trackingNumber').value = demoTrackingNumber;
+            alert('送り状番号を取得しました（デモ）: ' + demoTrackingNumber + '\n\n※実装時はTesseract.jsまたはサーバーOCR APIを使用します。');
+        }
+
+        // バーコード読み取り（入口 - iPad Safari最適化版）
+        function startBarcodeScanner() {
+            console.log('[Barcode] スキャン開始');
+            // まず BarcodeDetector が使えるか確認
+            if ('BarcodeDetector' in window) {
+                startCameraBarcodeScan();
+            } else {
+                // フォールバック: 画像選択から試行
+                if (confirm('このブラウザはネイティブのバーコード検出に対応していません。\n画像を選択してバーコードを読み取りますか？（うまくいかない場合は手動入力してください）')) {
+                    document.getElementById('barcodeImageInput').click();
+                } else {
+                    const manual = prompt('バーコードの値を手入力してください:');
+                    if (manual !== null) {
+                        document.getElementById('trackingNumber').value = manual.trim();
+                    }
+                }
+            }
+        }
+
+        // カメラを使ってバーコードを連続検出する（iPad Safari最適化版）
+        async function startCameraBarcodeScan() {
+            // iPad Safari最適化: 柔軟なカメラ制約
+            const constraints = {
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1920, min: 640 },
+                    height: { ideal: 1080, min: 480 }
+                },
+                audio: false
+            };
+            
+            let stream = null;
+            try {
+                console.log('[Barcode] カメラアクセスリクエスト:', constraints);
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                console.error('[Barcode] カメラアクセスエラー:', err);
+                let errorMessage = 'カメラにアクセスできませんでした: ' + err.message;
+                
+                if (err.name === 'NotAllowedError') {
+                    errorMessage = 'カメラの使用が拒否されました。\n\niPad Safari: 設定 > Safari > カメラ から許可してください。';
+                }
+                
+                alert(errorMessage);
+                return;
+            }
+
+            // オーバーレイ UI を作る
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.left = '0';
+            overlay.style.top = '0';
+            overlay.style.right = '0';
+            overlay.style.bottom = '0';
+            overlay.style.background = 'rgba(0,0,0,0.8)';
+            overlay.style.display = 'flex';
+            overlay.style.alignItems = 'center';
+            overlay.style.justifyContent = 'center';
+            overlay.style.zIndex = '9999';
+
+            const container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '90%';
+            container.style.maxWidth = '480px';
+            container.style.borderRadius = '8px';
+            container.style.overflow = 'hidden';
+            container.style.background = '#000';
+
+            const video = document.createElement('video');
+            video.style.width = '100%';
+            video.style.height = 'auto';
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.srcObject = stream;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'キャンセル';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.right = '8px';
+            closeBtn.style.top = '8px';
+            closeBtn.style.zIndex = '10000';
+            closeBtn.style.padding = '8px 12px';
+            closeBtn.style.border = 'none';
+            closeBtn.style.borderRadius = '4px';
+            closeBtn.style.background = '#fff';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.fontWeight = 'bold';
+
+            const statusText = document.createElement('div');
+            statusText.textContent = 'バーコードを画面中央に合わせてください';
+            statusText.style.position = 'absolute';
+            statusText.style.top = '16px';
+            statusText.style.left = '50%';
+            statusText.style.transform = 'translateX(-50%)';
+            statusText.style.background = 'rgba(0,0,0,0.7)';
+            statusText.style.color = 'white';
+            statusText.style.padding = '8px 16px';
+            statusText.style.borderRadius = '4px';
+            statusText.style.fontSize = '14px';
+            statusText.style.zIndex = '10001';
+            statusText.style.whiteSpace = 'nowrap';
+
+            container.appendChild(video);
+            container.appendChild(closeBtn);
+            container.appendChild(statusText);
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+
+            // BarcodeDetector の初期化
+            let detector;
+            try {
+                detector = new BarcodeDetector({
+                    formats: ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','qr_code']
+                });
+                console.log('[Barcode] BarcodeDetector初期化成功');
+            } catch (err) {
+                console.warn('[Barcode] BarcodeDetector 初期化エラー:', err);
+                alert('このブラウザではバーコード検出が利用できません。画像選択を試してください。');
+                document.getElementById('barcodeImageInput').click();
+                stopBarcodeScan(stream, overlay);
+                return;
+            }
+
+            // Canvas を使ってフレームを渡す
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            let scanning = true;
+
+            closeBtn.addEventListener('click', () => {
+                scanning = false;
+                stopBarcodeScan(stream, overlay);
+            });
+
+            // iPad Safari: loadedmetadata イベント待機
+            video.addEventListener('loadedmetadata', () => {
+                console.log('[Barcode] Video metadata loaded, resolution:', video.videoWidth, 'x', video.videoHeight);
+            });
+
+            video.addEventListener('play', function () {
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                console.log('[Barcode] スキャンループ開始');
+
+                const loop = async () => {
+                    if (!scanning) return;
+                    try {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        // detect に canvas を渡す
+                        const results = await detector.detect(canvas);
+                        if (results && results.length) {
+                            const code = results[0].rawValue || results[0].raw_text || '';
+                            if (code) {
+                                console.log('[Barcode] 検出成功:', code);
+                                document.getElementById('trackingNumber').value = code;
+                                
+                                // ビープ音
+                                playBeepSound();
+                                
+                                statusText.textContent = '読み取り成功！';
+                                statusText.style.background = 'rgba(0, 200, 0, 0.8)';
+                                
+                                setTimeout(() => {
+                                    scanning = false;
+                                    stopBarcodeScan(stream, overlay);
+                                }, 800);
+                                return;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('[Barcode] 検出中にエラー:', err);
+                    }
+                    requestAnimationFrame(loop);
+                };
+                requestAnimationFrame(loop);
+            });
+        }
+
+        // カメラとオーバーレイをクリーンアップ
+        function stopBarcodeScan(stream, overlay) {
+            try {
+                if (stream) {
+                    const tracks = stream.getTracks();
+                    tracks.forEach(t => t.stop());
+                }
+            } catch (e) {
+                console.warn('ストリーム停止中にエラー', e);
+            }
+            try {
+                if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        // 画像選択によるフォールバック処理
+        async function handleBarcodeImageFile(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            if (!('BarcodeDetector' in window)) {
+                alert('お使いのブラウザは画像からの自動検出に対応していません。選択した画像を見て、値を手入力してください。');
+                const manual = prompt('画像のバーコード値を手入力してください:');
+                if (manual !== null) document.getElementById('trackingNumber').value = manual.trim();
+                return;
+            }
+
+            try {
+                const imgBitmap = await createImageBitmap(file);
+                const canvas = document.createElement('canvas');
+                canvas.width = imgBitmap.width;
+                canvas.height = imgBitmap.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(imgBitmap, 0, 0);
+
+                const detector = new BarcodeDetector({formats: ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','qr_code']});
+                const results = await detector.detect(canvas);
+                if (results && results.length) {
+                    const code = results[0].rawValue || results[0].raw_text || '';
+                    if (code) {
+                        document.getElementById('trackingNumber').value = code;
+                        alert('画像からバーコードを取得しました: ' + code);
+                        return;
+                    }
+                }
+
+                alert('画像からバーコードを検出できませんでした。手動で入力してください。');
+                const manual = prompt('バーコードの値を手入力してください:');
+                if (manual !== null) document.getElementById('trackingNumber').value = manual.trim();
+            } catch (err) {
+                console.error('画像からのバーコード検出エラー:', err);
+                alert('バーコード検出中にエラーが発生しました。手動で入力してください。');
+                const manual = prompt('バーコードの値を手入力してください:');
+                if (manual !== null) document.getElementById('trackingNumber').value = manual.trim();
+            } finally {
+                // input をリセット
+                event.target.value = '';
+            }
+        }
+
+        // 処理ボタンの処理
+        function processOrder() {
+            // チェックボックスの状態を取得
+            const checkboxStates = getCheckboxStates();
+            const trackingNumber = document.getElementById('trackingNumber').value;
+            
+            if (!trackingNumber) {
+                alert('送り状番号を入力してください。');
+                return;
+            }
+            
+            // 確認メッセージを構築
+            let confirmMessage = '出荷処理を実行しますか？\n受注番号: *1424571$M1*\n送り状番号: ' + trackingNumber + '\n\n選択された処理:\n';
+            
+            if (checkboxStates.deliverySlip) {
+                confirmMessage += '✓ 納品書設定\n';
+            }
+            if (checkboxStates.shippingLabel) {
+                confirmMessage += '✓ 送り状出力\n';
+            }
+            if (checkboxStates.shipmentRegistration) {
+                confirmMessage += '✓ 出荷登録\n';
+            }
+            
+            if (!checkboxStates.deliverySlip && !checkboxStates.shippingLabel && !checkboxStates.shipmentRegistration) {
+                confirmMessage += '（処理が選択されていません）\n';
+            }
+            
+            // 実際のシステムでは出荷処理を実行
+            if (confirm(confirmMessage)) {
+                // ここでバックエンドAPIまたはIDOメソッドを呼び出し
+                console.log('Processing order: 1424571$M1, Tracking: ' + trackingNumber);
+                console.log('Checkbox states:', checkboxStates);
+                
+                // 処理中の表示
+                const processBtn = event.target;
+                processBtn.disabled = true;
+                processBtn.textContent = '処理中...';
+                
+                // 実際の処理（例：IDOのSaveメソッド呼び出し）
+                setTimeout(() => {
+                    let resultMessage = '出荷処理が完了しました。\n送り状番号: ' + trackingNumber + '\n\n実行された処理:\n';
+                    
+                    if (checkboxStates.deliverySlip) {
+                        resultMessage += '✓ 納品書を設定しました\n';
+                    }
+                    if (checkboxStates.shippingLabel) {
+                        resultMessage += '✓ 送り状を出力しました\n';
+                    }
+                    if (checkboxStates.shipmentRegistration) {
+                        resultMessage += '✓ 出荷登録を完了しました\n';
+                    }
+                    
+                    alert(resultMessage);
+                    // 処理完了後の遷移
+                    // window.location.href = '/order-complete';
+                    processBtn.disabled = false;
+                    processBtn.textContent = '処理';
+                }, 1000);
+            }
+        }
+
+        // 印刷機能
+        function printDocument() {
+            window.print();
+        }
+
+        // キーボードショートカット（Ctrl+P で印刷）
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                printDocument();
+            }
+        });
+
+        // データバインディング用の関数（実際のシステムではIDOから取得）
+        function loadOrderData(orderNumber) {
+            // ここでバックエンドAPIまたはIDOからデータを取得
+            console.log('Loading order:', orderNumber);
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Order Shipping initialized');
+            // loadOrderData('1424571$M1');
+            
+            // 納期の初期表示を設定
+            updateDeliveryDisplay();
+            
+            // 納品先コードのバーコードを生成 (CODE39)
+            updateDeliveryCodeBarcode('00C099905');
+        });
+
+        // 納品先コードのバーコードを更新
+        function updateDeliveryCodeBarcode(code) {
+            try {
+                JsBarcode("#deliveryBarcode", code, {
+                    format: "CODE39",
+                    width: 2,
+                    height: 40,
+                    displayValue: false,
+                    margin: 5
+                });
+                document.getElementById('deliveryCodeText').textContent = code;
+            } catch (err) {
+                console.error('バーコード生成エラー:', err);
+            }
+        }
+
+        // 納品先コードスキャナー用の変数
+        let deliveryCodeScanner = null;
+        let deliveryCodeScannerActive = false;
+
+        // 納品先コードスキャナーを開く（iPad Safari最適化版）
+        function openDeliveryCodeScanner() {
+            const modal = document.getElementById('deliveryCodeScannerModal');
+            const resultDiv = document.getElementById('deliveryCodeScannerResult');
+            
+            modal.classList.add('active');
+            resultDiv.classList.remove('show');
+            
+            if (!deliveryCodeScanner) {
+                deliveryCodeScanner = new Html5Qrcode("deliveryCodeReader");
+            }
+            
+            if (deliveryCodeScannerActive) return;
+            
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                const codeType = decodedResult.result.format.formatName;
+                console.log(`納品先コード読み取り成功: ${codeType} - ${decodedText}`);
+                
+                // 結果を表示
+                document.getElementById('deliveryCodeScannerValue').textContent = 
+                    `${codeType}: ${decodedText}`;
+                document.getElementById('deliveryCodeScannerResult').classList.add('show');
+                
+                // ビープ音を鳴らす
+                playBeepSound();
+                
+                // バーコードを更新
+                updateDeliveryCodeBarcode(decodedText);
+                
+                // 1秒後にスキャナーを閉じる
+                setTimeout(() => {
+                    closeDeliveryCodeScanner();
+                }, 1000);
+            };
+            
+            // iPad Safari最適化スキャン設定
+            const config = { 
+                fps: 10,  // iPad: 10fps
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,
+                disableFlip: false,
+                videoConstraints: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1920, min: 640 },
+                    height: { ideal: 1080, min: 480 }
+                },
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.QR_CODE
+                ]
+            };
+            
+            console.log('[納品先コード] スキャン開始:', config);
+            
+            deliveryCodeScanner.start(
+                { facingMode: { ideal: "environment" } },  // iPad Safari: ideal指定
+                config,
+                qrCodeSuccessCallback
+            ).then(() => {
+                deliveryCodeScannerActive = true;
+                console.log("[納品先コード] スキャン開始成功（iPad Safari対応）");
+            }).catch(err => {
+                console.error("[納品先コード] スキャン開始エラー:", err);
+                
+                let errorMessage = "カメラのアクセスに失敗しました: " + err;
+                
+                if (err.name === 'NotAllowedError' || err.toString().includes('NotAllowedError')) {
+                    errorMessage = 'カメラの使用が拒否されました。\n\niPad Safari: 設定 > Safari > カメラ から許可してください。';
+                }
+                
+                alert(errorMessage);
+                closeDeliveryCodeScanner();
+            });
+        }
+
+        // 納品先コードスキャナーを閉じる
+        function closeDeliveryCodeScanner() {
+            const modal = document.getElementById('deliveryCodeScannerModal');
+            
+            if (deliveryCodeScannerActive && deliveryCodeScanner) {
+                deliveryCodeScanner.stop().then(() => {
+                    deliveryCodeScannerActive = false;
+                    modal.classList.remove('active');
+                    console.log("納品先コードスキャン停止");
+                }).catch(err => {
+                    console.error("スキャン停止エラー:", err);
+                    modal.classList.remove('active');
+                });
+            } else {
+                modal.classList.remove('active');
+            }
+        }
+
+        // ビープ音を鳴らす関数
+        function playBeepSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                const gainNode = context.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(context.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 1000;
+                gainNode.gain.value = 0.1;
+                
+                oscillator.start();
+                oscillator.stop(context.currentTime + 0.1);
+            } catch (err) {
+                console.warn('ビープ音再生エラー:', err);
+            }
+        }
+    </script>
+</body>
+</html>

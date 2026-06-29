@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生産モニタリングダッシュボード - 生産管理システム</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .stat-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-icon {
+            font-size: 3rem;
+            opacity: 0.2;
+            position: absolute;
+            right: 1.5rem;
+            top: 1.5rem;
+        }
+        .alert-critical { border-left: 4px solid #dc3545; }
+        .alert-warning { border-left: 4px solid #ffc107; }
+        .alert-info { border-left: 4px solid #17a2b8; }
+        .alert-success { border-left: 4px solid #28a745; }
+
+        .health-status-critical {
+            background: #dc3545;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+        }
+        .health-status-warning {
+            background: #ffc107;
+            color: #000;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+        }
+        .health-status-healthy {
+            background: #28a745;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+        }
+        .health-status-overstocked {
+            background: #17a2b8;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .performance-excellent { color: #28a745; font-weight: bold; }
+        .performance-good { color: #17a2b8; font-weight: bold; }
+        .performance-fair { color: #ffc107; font-weight: bold; }
+        .performance-needs_improvement { color: #dc3545; font-weight: bold; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 2rem;
+        }
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 2rem 0 1rem 0;
+            color: #333;
+        }
+        .refresh-indicator {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .table-sm th {
+            background-color: #f8f9fa;
+            border-top: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- ダッシュボードヘッダー -->
+    <div class="dashboard-header">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1><i class="fas fa-chart-line me-3"></i>生産モニタリングダッシュボード</h1>
+                    <p class="mb-0">リアルタイム出荷・在庫・パフォーマンス分析</p>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-warning btn-lg me-2" onclick="generateSampleData()">
+                        <i class="fas fa-database me-2"></i>サンプルデータ生成
+                    </button>
+                    <button class="btn btn-light btn-lg me-2" onclick="refreshAllData()">
+                        <i class="fas fa-sync-alt me-2" id="refresh-icon"></i>更新
+                    </button>
+                    <a href="index.html" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-home me-2"></i>ホーム
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container-fluid">
+        <!-- 統合サマリーKPI -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card alert-success">
+                    <i class="fas fa-box-open stat-icon"></i>
+                    <div class="stat-label">本日の出荷完了</div>
+                    <div class="stat-value" id="stat-today-completed">--</div>
+                    <small class="text-muted">進行中: <span id="stat-in-progress">--</span></small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card alert-info">
+                    <i class="fas fa-warehouse stat-icon"></i>
+                    <div class="stat-label">在庫アラート</div>
+                    <div class="stat-value" id="stat-inventory-critical">--</div>
+                    <small class="text-muted">警告: <span id="stat-inventory-warning">--</span></small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card alert-warning">
+                    <i class="fas fa-exclamation-triangle stat-icon"></i>
+                    <div class="stat-label">未対応アラート</div>
+                    <div class="stat-value" id="stat-alerts-total">--</div>
+                    <small class="text-muted">重大: <span id="stat-alerts-critical">--</span></small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card alert-critical">
+                    <i class="fas fa-users stat-icon"></i>
+                    <div class="stat-label">検品員稼働</div>
+                    <div class="stat-value" id="stat-active-inspectors">--</div>
+                    <small class="text-muted">平均成功率: <span id="stat-avg-success">--</span>%</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- タブナビゲーション -->
+        <ul class="nav nav-pills mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="shipment-tab" data-bs-toggle="pill" data-bs-target="#shipment" type="button">
+                    <i class="fas fa-shipping-fast me-2"></i>出荷モニタリング
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inventory-tab" data-bs-toggle="pill" data-bs-target="#inventory" type="button">
+                    <i class="fas fa-boxes me-2"></i>在庫健全性
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="performance-tab" data-bs-toggle="pill" data-bs-target="#performance" type="button">
+                    <i class="fas fa-user-check me-2"></i>検品員パフォーマンス
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="alerts-tab" data-bs-toggle="pill" data-bs-target="#alerts" type="button">
+                    <i class="fas fa-bell me-2"></i>アラート
+                </button>
+            </li>
+        </ul>
+
+        <!-- タブコンテンツ -->
+        <div class="tab-content">
+            <!-- 出荷モニタリング -->
+            <div class="tab-pane fade show active" id="shipment" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">時間帯別出荷推移（本日）</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="hourlyTrendChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">製品別出荷ランキング（過去30日）</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="productRankingChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">リアルタイム出荷状況</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 text-center">
+                                <h6>本日総件数</h6>
+                                <h2 class="text-primary" id="today-total">--</h2>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <h6>完了</h6>
+                                <h2 class="text-success" id="today-completed">--</h2>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <h6>進行中</h6>
+                                <h2 class="text-warning" id="today-in-progress">--</h2>
+                            </div>
+                            <div class="col-md-3 text-center">
+                                <h6>待機中</h6>
+                                <h2 class="text-info" id="today-waiting">--</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 在庫健全性 -->
+            <div class="tab-pane fade" id="inventory" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">欠品リスク製品</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive" style="max-height: 400px;">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="sticky-top">
+                                            <tr>
+                                                <th>製品コード</th>
+                                                <th>製品名</th>
+                                                <th>利用可能在庫</th>
+                                                <th>在庫日数</th>
+                                                <th>リスク</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="stockout-risk-tbody">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted">データを読み込んでいます...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">在庫健全性サマリー</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive" style="max-height: 400px;">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="sticky-top">
+                                            <tr>
+                                                <th>製品コード</th>
+                                                <th>製品名</th>
+                                                <th>利用可能在庫</th>
+                                                <th>平均日次需要</th>
+                                                <th>ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="inventory-health-tbody">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted">データを読み込んでいます...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">在庫回転率ランキング</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container" style="height: 350px;">
+                            <canvas id="turnoverRateChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 検品員パフォーマンス -->
+            <div class="tab-pane fade" id="performance" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">検品員別パフォーマンスサマリー（過去7日間）</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>検品員</th>
+                                        <th>総検品数</th>
+                                        <th>完了</th>
+                                        <th>失敗</th>
+                                        <th>成功率</th>
+                                        <th>平均時間（分）</th>
+                                        <th>総コンポーネント</th>
+                                        <th>評価</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inspector-performance-tbody">
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">データを読み込んでいます...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">検品員別成功率比較</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="inspectorComparisonChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- アラート -->
+            <div class="tab-pane fade" id="alerts" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">アクティブアラート</h5>
+                        <div>
+                            <select class="form-select form-select-sm" id="alert-filter-severity">
+                                <option value="">全ての重要度</option>
+                                <option value="critical">重大</option>
+                                <option value="high">高</option>
+                                <option value="medium">中</option>
+                                <option value="low">低</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="alerts-container">
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-bell fa-3x mb-3"></i>
+                                <p>データを読み込んでいます...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/monitoring-dashboard.js"></script>
+</body>
+</html>
