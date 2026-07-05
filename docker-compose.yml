@@ -38,6 +38,10 @@ services:
       M365_AUTH_CLIENT_ID: ""
       M365_AUTH_SCOPES: "User.Read"
       M365_AUTH_ALLOWED_DOMAINS: ""
+      # セキュリティ運用フラグ(既定は POC 維持)
+      WRITE_AUTH_MODE: "${WRITE_AUTH_MODE:-off}"       # off | warn | enforce
+      ADMIN_API_TOKEN: "${ADMIN_API_TOKEN:-}"          # 危険EP/enforce時の管理者トークン
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-}" # 空=クロスオリジン拒否
       TZ: Asia/Tokyo
     depends_on:
       postgres:

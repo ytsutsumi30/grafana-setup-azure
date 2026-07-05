@@ -220,6 +220,56 @@ app.use((req, res, next) => {
     next();
 });
 
+// 更新系(POST/PUT/PATCH/DELETE)への認証 段階導入ミドルウェア
+// WRITE_AUTH_MODE で挙動を切り替える(既定 off = POC の書き込みを維持):
+//   off     : 認証チェックなし(従来通り)
+//   warn    : トークンがあれば検証して req.user に載せる。なくても通すが warn ログを出す(移行観察用)
+//   enforce : 有効な認証(M365トークン or ADMIN_API_TOKEN)がなければ 401(本番想定)
+// 認証手段: M365 有効時は Bearer トークン、無効時は x-admin-token(ADMIN_API_TOKEN)。
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// 認証不要の更新系エンドポイント(存在すればここに追加。現状なし)
+const WRITE_AUTH_EXEMPT = [];
+
+async function resolveAuthenticatedUser(req) {
+    if (m365AuthConfig.enabled) {
+        const user = await validateM365Token(getBearerToken(req));
+        return user || null;
+    }
+    const adminToken = process.env.ADMIN_API_TOKEN || '';
+    if (adminToken) {
+        const provided = req.get('x-admin-token') || '';
+        const a = Buffer.from(provided);
+        const b = Buffer.from(adminToken);
+        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+            return { id: 'admin-token', displayName: 'Admin (token)' };
+        }
+    }
+    return null;
+}
+
+app.use(async (req, res, next) => {
+    if (!WRITE_METHODS.has(req.method)) return next();
+    const mode = (process.env.WRITE_AUTH_MODE || 'off').toLowerCase();
+    if (mode === 'off') return next();
+    if (WRITE_AUTH_EXEMPT.some(p => req.path.startsWith(p))) return next();
+    try {
+        const user = await resolveAuthenticatedUser(req);
+        if (user) {
+            req.user = user;
+            return next();
+        }
+        if (mode === 'warn') {
+            logger.warn('Unauthenticated write (warn mode)', { method: req.method, path: req.path, ip: req.ip });
+            return next();
+        }
+        // enforce
+        return res.status(401).json({ error: 'Unauthorized' });
+    } catch (err) {
+        logger.error('write-auth middleware error', { err: err.message });
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ヘルスチェック
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
