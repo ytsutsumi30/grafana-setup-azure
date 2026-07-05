@@ -45,6 +45,12 @@ done
 echo "[4b] 分離ルーターの疎通(200)"
 chk 200 GET /api/reports/dashboard-stats
 chk 200 GET /api/reports/recent-inspections
+chk 200 GET /api/production-plans
+chk 200 GET /api/inventory
+chk 200 GET /api/inspectors
+chk 200 GET /api/new-qc/projects
+chk 200 GET /api/qc-tools/pareto
+chk 200 GET /api/monitoring/inventory-health
 
 echo "[5] 危険EPは保護継続(403)"
 chk 403 GET  /api/database/backups

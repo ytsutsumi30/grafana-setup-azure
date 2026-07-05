@@ -170,3 +170,22 @@ D5(server.js 分割)は段階実施中。振る舞い不変・各段階スモー
 - system-config は共有可変状態 systemConfig に結合のため、状態の lib 化と併せて対応
 
 目標(server.js ≤ 200 行)は未達。継続時は 1 ドメイン=1 コミット+スモークの方式を踏襲する。
+
+## Phase 3b 進捗 (2026-07-06 追記)
+
+さらに 13 ドメインを分離。共有可変状態も lib 化。
+
+完了(追加):
+- api/lib/config.js に systemConfig(POC可変状態)を集約
+- routes 追加: production-plans, shipping-locations, delivery-locations, product-components,
+  inventory, inspectors, new-qc(31EP), lot-inventory, picking-instructions, packing-records,
+  logs(注入型), qr-inspections, system-config
+- server.js: 4,536 → 1,967 行(初期 5,783 から約66%削減、計16ルーター)
+
+残(結合・非連続のため要個別対応):
+- shipping-instructions(15EP・execPromise/fs/path/systemConfig/requireAdmin、非連続)
+- products(6EP・非連続)/ database(5EP・execPromise/fs/path)/ shipping-inspections(2EP・非連続)
+- auth(M365 2EP、m365 設定と密結合)/ health / db-test は server.js に残置が妥当
+
+教訓: 最後尾ドメインの抽出では終端がEOFまで伸び、404ハンドラ/app.listen を巻き込む。
+末尾の起動処理(app.use('*')・app.listen・SIGTERM/SIGINT)は server.js に残すこと。
