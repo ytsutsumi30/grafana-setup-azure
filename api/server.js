@@ -138,6 +138,43 @@ async function validateM365Token(token) {
     return user;
 }
 
+// 管理者専用エンドポイント保護ミドルウェア
+// 危険なエンドポイント(/database/*, /logs/*, sample-data)を保護する。
+// M365認証が有効な場合はM365ユーザー(allowedDomains適用済み)を要求し、
+// 無効な場合はADMIN_API_TOKEN(x-admin-token ヘッダ)で保護する。
+// どちらも未設定の場合は安全側に倒して 403 で拒否する(既定オフ)。
+async function requireAdmin(req, res, next) {
+    try {
+        if (m365AuthConfig.enabled) {
+            const user = await validateM365Token(getBearerToken(req));
+            if (!user) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+            req.user = user;
+            return next();
+        }
+        const adminToken = process.env.ADMIN_API_TOKEN || '';
+        if (adminToken) {
+            const provided = req.get('x-admin-token') || '';
+            // 長さ非依存の定数時間比較
+            const a = Buffer.from(provided);
+            const b = Buffer.from(adminToken);
+            if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+                return next();
+            }
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        // 認証手段が未設定 → 危険エンドポイントは既定で無効
+        logger.warn('Admin endpoint blocked: no M365 auth and no ADMIN_API_TOKEN configured', {
+            path: req.originalUrl
+        });
+        return res.status(403).json({ error: 'This endpoint is disabled (no admin auth configured)' });
+    } catch (err) {
+        logger.error('requireAdmin error', { err: err.message });
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
 // システム設定（POC用）
 let systemConfig = {
     pocMode: true,  // POCモード: true = DB書き込み抑止, false = 通常動作
@@ -150,7 +187,12 @@ app.set('trust proxy', 1);
 
 // ミドルウェア設定
 app.use(helmet());
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors({
+    origin: allowedOrigins.length ? allowedOrigins : false,
+    credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -176,6 +218,56 @@ app.use((req, res, next) => {
         userAgent: req.get('User-Agent')
     });
     next();
+});
+
+// 更新系(POST/PUT/PATCH/DELETE)への認証 段階導入ミドルウェア
+// WRITE_AUTH_MODE で挙動を切り替える(既定 off = POC の書き込みを維持):
+//   off     : 認証チェックなし(従来通り)
+//   warn    : トークンがあれば検証して req.user に載せる。なくても通すが warn ログを出す(移行観察用)
+//   enforce : 有効な認証(M365トークン or ADMIN_API_TOKEN)がなければ 401(本番想定)
+// 認証手段: M365 有効時は Bearer トークン、無効時は x-admin-token(ADMIN_API_TOKEN)。
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// 認証不要の更新系エンドポイント(存在すればここに追加。現状なし)
+const WRITE_AUTH_EXEMPT = [];
+
+async function resolveAuthenticatedUser(req) {
+    if (m365AuthConfig.enabled) {
+        const user = await validateM365Token(getBearerToken(req));
+        return user || null;
+    }
+    const adminToken = process.env.ADMIN_API_TOKEN || '';
+    if (adminToken) {
+        const provided = req.get('x-admin-token') || '';
+        const a = Buffer.from(provided);
+        const b = Buffer.from(adminToken);
+        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+            return { id: 'admin-token', displayName: 'Admin (token)' };
+        }
+    }
+    return null;
+}
+
+app.use(async (req, res, next) => {
+    if (!WRITE_METHODS.has(req.method)) return next();
+    const mode = (process.env.WRITE_AUTH_MODE || 'off').toLowerCase();
+    if (mode === 'off') return next();
+    if (WRITE_AUTH_EXEMPT.some(p => req.path.startsWith(p))) return next();
+    try {
+        const user = await resolveAuthenticatedUser(req);
+        if (user) {
+            req.user = user;
+            return next();
+        }
+        if (mode === 'warn') {
+            logger.warn('Unauthenticated write (warn mode)', { method: req.method, path: req.path, ip: req.ip });
+            return next();
+        }
+        // enforce
+        return res.status(401).json({ error: 'Unauthorized' });
+    } catch (err) {
+        logger.error('write-auth middleware error', { err: err.message });
+        return res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // ヘルスチェック
@@ -2925,7 +3017,7 @@ function calculateCorrelation(x, y) {
 }
 
 // QCツール用サンプルデータ生成
-app.post('/qc-tools/generate-sample-data', async (req, res) => {
+app.post('/qc-tools/generate-sample-data', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
     try {
@@ -3230,7 +3322,7 @@ app.get('/inventory/by-product/:productId', async (req, res) => {
 // === データベース管理API ===
 
 // データベース統計情報取得
-app.get('/database/stats', async (req, res) => {
+app.get('/database/stats', requireAdmin, async (req, res) => {
     try {
         // テーブル一覧と行数
         const tablesResult = await pool.query(`
@@ -3271,7 +3363,7 @@ app.get('/database/stats', async (req, res) => {
 });
 
 // バックアップ作成
-app.post('/database/backup', async (req, res) => {
+app.post('/database/backup', requireAdmin, async (req, res) => {
     try {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' +
             new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
@@ -3319,7 +3411,7 @@ app.post('/database/backup', async (req, res) => {
 });
 
 // バックアップ一覧取得
-app.get('/database/backups', async (req, res) => {
+app.get('/database/backups', requireAdmin, async (req, res) => {
     try {
         const backupDir = '/app/backups';
 
@@ -3352,7 +3444,7 @@ app.get('/database/backups', async (req, res) => {
 // === システムログAPI ===
 
 // ログファイル一覧取得
-app.get('/logs/files', async (req, res) => {
+app.get('/logs/files', requireAdmin, async (req, res) => {
     try {
         const logDir = '/app';
         const logFiles = ['error.log', 'combined.log'];
@@ -3378,7 +3470,7 @@ app.get('/logs/files', async (req, res) => {
 });
 
 // ログ内容取得
-app.get('/logs/content/:filename', async (req, res) => {
+app.get('/logs/content/:filename', requireAdmin, async (req, res) => {
     try {
         const { filename } = req.params;
         const { lines = 100, level } = req.query;
@@ -4752,7 +4844,7 @@ app.get('/monitoring/dashboard-summary', async (req, res) => {
 });
 
 // サンプルデータ生成エンドポイント
-app.post('/monitoring/generate-sample-data', async (req, res) => {
+app.post('/monitoring/generate-sample-data', requireAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -4916,7 +5008,7 @@ app.post('/monitoring/generate-sample-data', async (req, res) => {
 // === データベース バックアップ・復元 API ===
 
 // データベース全体のバックアップSQLを生成
-app.get('/database/backup', async (req, res) => {
+app.get('/database/backup', requireAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
         logger.info('Database backup requested');
@@ -5069,7 +5161,7 @@ app.get('/database/backup', async (req, res) => {
 });
 
 // データベース復元
-app.post('/database/restore', async (req, res) => {
+app.post('/database/restore', requireAdmin, async (req, res) => {
     const client = await pool.connect();
 
     try {
