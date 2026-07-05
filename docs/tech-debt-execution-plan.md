@@ -216,3 +216,12 @@ server.js に残置(妥当):
 - CRUD 6ページ(delivery-locations/shipping-locations/production-plans/shipping-instructions/inspectors/product-components)のインラインstyle(~46行/枚)を components.css へ集約。ページ側は --page-accent 指定のみ。
 - 残11ページの <style> 内ステータス/ブランド色hex(37箇所)を tokens 変数へ置換。色定義の単一化(ダークテーマ対応)完了。
 - 残: index/monitoring/qr-inspection3 等の「ページ固有レイアウト」インラインstyleはページ機能に密結合のため残置(色はトークン化済み)。完全ゼロ化は各ページの個別対応が必要だが、D2の主目的(ステータス色の統一・単一ソース化)は達成。
+
+## D9 進捗 (2026-07-06)
+
+- tests/api/contract.test.js(node:test 内蔵、外部依存なし)を追加。28件全PASS。
+  分割ルーターの形状/疎通、system-config 共有状態、危険EP 403(/api・ルート両経路)、404 を検証。
+- tests/e2e/inspection.spec.js(Playwright)を追加。WSL はブラウザ依存欠落で未実行だが、
+  ブラウザ有り環境/CI で実行可能(README に手順)。
+- 既存: tests/smoke/smoke.sh(HTTP回帰ガード)。
+- 注意: レート制限(100/15分)によりスイート連続実行で429。api 再起動でリセット。
