@@ -195,8 +195,68 @@ module.exports = function createAuth(logger) {
     }
   }
 
+  // ============================================================
+  // Azure Container Apps Easy Auth 連携
+  // 認証は ACA プラットフォーム(ウォール)が処理し、認証済みリクエストに
+  // ヘッダ X-MS-CLIENT-PRINCIPAL(-NAME/-IDP) を注入する。ここではそれを読むだけ。
+  // ローカル docker にはヘッダが無い → { authenticated:false } を返す(無認証で動作)。
+  // ============================================================
+  function readEasyAuthPrincipal(req) {
+    const idp = req.get('x-ms-client-principal-idp') || '';      // 'aad' | 'google' 等
+    const name = req.get('x-ms-client-principal-name') || '';    // 通常はメール
+    const b64 = req.get('x-ms-client-principal') || '';
+    if (!idp && !name && !b64) {
+      return { authenticated: false };
+    }
+    let email = name;
+    let claims = [];
+    if (b64) {
+      try {
+        const json = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+        claims = json.claims || [];
+        if (!email) {
+          const c = claims.find((x) => /(emailaddress|email|preferred_username|upn)$/i.test(x.typ || ''));
+          if (c) email = c.val;
+        }
+      } catch (e) { /* ignore malformed header */ }
+    }
+    return {
+      authenticated: true,
+      provider: idp,
+      email: (email || '').toLowerCase(),
+      name,
+      claims
+    };
+  }
+
+  // Google 任意許可 + M365 社内(テナントは Easy Auth 側で限定済み)。
+  // GOOGLE_ALLOWED_DOMAINS を設定した場合のみ Google をドメインで絞る(空=任意許可)。
+  // EASY_AUTH_MODE=off(既定)なら何もしない(ローカル/ウォール未使用時)。
+  function easyAuthGate(req, res, next) {
+    const mode = (process.env.EASY_AUTH_MODE || 'off').toLowerCase();
+    if (mode === 'off') return next();
+    if (req.path === '/health' || req.path.startsWith('/auth/')) return next();
+    const p = readEasyAuthPrincipal(req);
+    if (!p.authenticated) {
+      // ウォール有効時は本来ここに来ない(未認証は ACA がリダイレクト)。保険として 401。
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    req.principal = p;
+    const googleDomains = (process.env.GOOGLE_ALLOWED_DOMAINS || '')
+      .split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
+    if (p.provider === 'google' && googleDomains.length) {
+      const domain = p.email.includes('@') ? p.email.split('@').pop() : '';
+      if (!googleDomains.includes(domain)) {
+        return res.status(403).json({ error: 'Google account not permitted' });
+      }
+    }
+    return next();
+  }
+
   return {
     m365AuthConfig,
+    readEasyAuthPrincipal,
+    easyAuthGate,
     getBearerToken,
     validateM365Token,
     requireAdmin,

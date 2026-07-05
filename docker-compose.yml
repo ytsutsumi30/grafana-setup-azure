@@ -42,6 +42,8 @@ services:
       WRITE_AUTH_MODE: "${WRITE_AUTH_MODE:-off}"       # off | warn | enforce
       ADMIN_API_TOKEN: "${ADMIN_API_TOKEN:-}"          # 危険EP/enforce時の管理者トークン
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-}" # 空=クロスオリジン拒否
+      EASY_AUTH_MODE: "${EASY_AUTH_MODE:-off}"         # off | allowlist (ACA Easy Auth 連携)
+      GOOGLE_ALLOWED_DOMAINS: "${GOOGLE_ALLOWED_DOMAINS:-}" # 空=Google任意許可
       TZ: Asia/Tokyo
     depends_on:
       postgres:
