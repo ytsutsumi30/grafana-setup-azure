@@ -38,6 +38,7 @@ const systemConfigRoutes = require('./routes/system-config');
 const productsRoutes = require('./routes/products');
 const shippingInspectionsRoutes = require('./routes/shipping-inspections');
 const shippingInstructionsRoutes = require('./routes/shipping-instructions');
+const shippingLotsRoutes = require('./routes/shipping-lots');
 const databaseRoutes = require('./routes/database');
 
 // ログ設定(共有ロガー)
@@ -189,6 +190,8 @@ app.use('/shipping-inspections', shippingInspectionsRoutes);
 app.use('/api/shipping-inspections', shippingInspectionsRoutes);
 app.use('/shipping-instructions', shippingInstructionsRoutes);
 app.use('/api/shipping-instructions', shippingInstructionsRoutes);
+app.use('/shipping-instruction-lines', shippingLotsRoutes);
+app.use('/api/shipping-instruction-lines', shippingLotsRoutes);
 app.use('/database', databaseRoutes(requireAdmin));
 app.use('/api/database', databaseRoutes(requireAdmin));
 app.use('/api/ocr-ai', ocrAiRoutes);

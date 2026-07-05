@@ -28,7 +28,7 @@ chk 200 GET /api/health
 echo "[2] 本番ページ(17) = 200"
 for p in index database delivery-locations inspectors inventory maintenance monitoring \
          pps product-components production-plans products qc-analysis qc-dashboard \
-         qr-inspection3 qr-inspection ocr-v2-enhanced shipping-instructions shipping-locations system-config; do
+         qr-inspection3 qr-inspection ocr-v2-enhanced shipping-quantity shipping-instructions shipping-locations system-config; do
   chk 200 GET "/$p.html"
 done
 
@@ -51,6 +51,7 @@ chk 200 GET /api/inspectors
 chk 200 GET /api/new-qc/projects
 chk 200 GET /api/qc-tools/pareto
 chk 200 GET /api/monitoring/inventory-health
+chk 200 GET /api/shipping-instructions/1/lines
 chk 200 GET /api/products
 chk 200 GET /api/shipping-instructions
 chk 200 GET /api/shipping-inspections
