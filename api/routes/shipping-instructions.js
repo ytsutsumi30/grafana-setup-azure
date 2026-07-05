@@ -911,6 +911,47 @@ router.get('/:id/pps-status', async (req, res) => {
     }
 });
 
-// エラーハンドリング
+// 出荷指示の明細(製品)一覧 + 進捗(指示数/出荷済み)
+router.get('/:id/lines', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT l.id, l.shipping_instruction_id, l.product_id, l.quantity,
+                   l.shipped_quantity, l.status,
+                   p.product_code, p.product_name,
+                   (l.quantity - l.shipped_quantity) AS remaining_quantity
+            FROM shipping_instruction_lines l
+            JOIN products p ON p.id = l.product_id
+            WHERE l.shipping_instruction_id = $1
+            ORDER BY l.id
+        `, [id]);
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching shipping instruction lines:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// 明細の追加(1指示にN製品)
+router.post('/:id/lines', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { product_id, quantity } = req.body;
+        if (!product_id || !quantity || quantity <= 0) {
+            return res.status(400).json({ error: 'product_id と正の quantity が必要です' });
+        }
+        const result = await pool.query(`
+            INSERT INTO shipping_instruction_lines (shipping_instruction_id, product_id, quantity)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (shipping_instruction_id, product_id)
+            DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP
+            RETURNING *
+        `, [id, product_id, quantity]);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error adding shipping instruction line:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 module.exports = router;

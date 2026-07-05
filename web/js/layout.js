@@ -23,7 +23,8 @@
     'pps':                 { title: 'PPS フロー', subtitle: 'ピッキング・梱包' },
     'qr-inspection':       { title: 'QR検品', subtitle: 'QRコード読み取り検品', home: true },
     'database':            { title: 'データベース', subtitle: '統計・バックアップ' },
-    'system-config':       { title: 'システム設定', subtitle: '動作設定' }
+    'system-config':       { title: 'システム設定', subtitle: '動作設定' },
+    'shipping-quantity':   { title: '出荷数入力', subtitle: '製品・ロット別の出荷数割り当て', home: true }
   };
 
   function applyTheme() {

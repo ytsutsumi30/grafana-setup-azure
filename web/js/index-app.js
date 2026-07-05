@@ -406,6 +406,9 @@ function createShipmentCard(item) {
                 <button class="btn btn-info btn-sm flex-grow-1 flex-md-grow-0" data-role="start-ocr">
                     <i class="fas fa-camera me-1"></i>OCR検品
                 </button>
+                <button class="btn btn-success btn-sm flex-grow-1 flex-md-grow-0" data-role="start-shipqty">
+                    <i class="fas fa-boxes-packing me-1"></i>出荷数入力
+                </button>
                 <button class="btn btn-outline-secondary btn-sm flex-grow-1 flex-md-grow-0" data-role="view-details">
                     <i class="fas fa-eye me-1"></i>詳細表示
                 </button>
@@ -435,6 +438,8 @@ function createShipmentCard(item) {
     card.querySelector('[data-role="start-inspection"]').addEventListener('click', () => openInspection(item));
     card.querySelector('[data-role="start-qr"]').addEventListener('click', () => openQRInspection(item));
     card.querySelector('[data-role="start-ocr"]').addEventListener('click', () => openOCRInspection(item));
+    const shipQtyBtn = card.querySelector('[data-role="start-shipqty"]');
+    if (shipQtyBtn) shipQtyBtn.addEventListener('click', () => { window.location.href = `shipping-quantity.html?id=${item.id}`; });
     card.querySelector('[data-role="view-details"]').addEventListener('click', () => openDetails(item));
 
     return card;
