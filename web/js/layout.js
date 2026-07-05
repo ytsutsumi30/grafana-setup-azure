@@ -134,30 +134,41 @@
     }
   }
 
-  // 認証UI: Easy Auth の状態を /api/auth/whoami で取得し、ヘッダー右にメニューを出す。
-  // ローカル(ウォール無し)は authenticated:false → 認証UIは非表示。
+  // 認証UI(自前 OIDC / 案C): /api/auth/whoami で状態取得。
+  // ウォール有効かつ未認証なら login.html へ誘導。認証済みは user+ログアウト、
+  // 未認証(ウォール無効=ローカル等)はログイン導線を出す。
   function setupAuthUI() {
-    fetch('/api/auth/whoami', { headers: { 'Accept': 'application/json' } })
+    fetch('/api/auth/whoami', { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (p) {
-        if (!p) return;
-        var slot = document.querySelector('.app-header .col-auto') || document.body;
+      .then(function (info) {
+        if (!info) return;
+        // ウォール有効 & 未認証 → ログイン画面へ(login.html 自体は除外)
+        if (info.wallEnabled && !info.authenticated &&
+            location.pathname.indexOf('login.html') === -1) {
+          location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname + location.search);
+          return;
+        }
+        var slot = document.querySelector('.app-header .col-auto');
+        if (!slot) return;
         var box = document.createElement('span');
         box.className = 'app-auth ms-2';
-        if (p.authenticated) {
-          var who = p.email || p.name || 'ユーザー';
+        if (info.authenticated && info.user) {
+          var who = info.user.email || info.user.name || 'ユーザー';
           box.innerHTML =
             '<span class="text-white-50 me-2 small"><i class="fas fa-user me-1"></i>' + who + '</span>' +
-            '<a class="btn btn-outline-light btn-sm" href="/.auth/logout?post_logout_redirect_uri=/index.html">ログアウト</a>';
+            '<a class="btn btn-outline-light btn-sm" href="/api/auth/logout?redirect=/index.html">ログアウト</a>';
+        } else if (info.providers && (info.providers.microsoft || info.providers.google)) {
+          var r = encodeURIComponent(location.pathname);
+          var h = '';
+          if (info.providers.microsoft) h += '<a class="btn btn-outline-light btn-sm me-1" href="/api/auth/login/microsoft?redirect=' + r + '"><i class="fab fa-microsoft me-1"></i>M365</a>';
+          if (info.providers.google) h += '<a class="btn btn-outline-light btn-sm" href="/api/auth/login/google?redirect=' + r + '"><i class="fab fa-google me-1"></i>Google</a>';
+          box.innerHTML = h;
         } else {
-          // ウォール有効かどうかはローカルでは不明。ログイン導線のみ提供(押下時に ACA が処理)。
-          box.innerHTML =
-            '<a class="btn btn-outline-light btn-sm me-1" href="/.auth/login/aad?post_login_redirect_uri=/index.html"><i class="fab fa-microsoft me-1"></i>M365</a>' +
-            '<a class="btn btn-outline-light btn-sm" href="/.auth/login/google?post_login_redirect_uri=/index.html"><i class="fab fa-google me-1"></i>Google</a>';
+          return; // プロバイダ未設定(ローカル等)は何も出さない
         }
-        if (slot.classList && slot.classList.contains('col-auto')) slot.appendChild(box);
+        slot.appendChild(box);
       })
-      .catch(function () { /* whoami 不在(旧デプロイ等)は無視 */ });
+      .catch(function () { /* whoami 不在は無視 */ });
   }
 
   // 共通トースト(silent fail を避けるための通知)
