@@ -189,3 +189,24 @@ D5(server.js 分割)は段階実施中。振る舞い不変・各段階スモー
 
 教訓: 最後尾ドメインの抽出では終端がEOFまで伸び、404ハンドラ/app.listen を巻き込む。
 末尾の起動処理(app.use('*')・app.listen・SIGTERM/SIGINT)は server.js に残すこと。
+
+## Phase 3c 進捗 (2026-07-06 追記) — D5 実質完了
+
+非連続・密結合ドメインを、次の ^app. 行を境界にした複数ブロック抽出器で分離。
+重複ルート定義(first-wins)とサブルート特異性(/summary, /detail, /:id/components)を保持。
+
+完了(追加):
+- routes 追加: products(6), shipping-instructions(15), shipping-inspections(2), database(5・注入型)
+- server.js: 1,967 → 426 行(初期 5,783 から約93%削減、計20ルーター + lib 4本)
+
+server.js に残置(妥当):
+- アプリ起動・ミドルウェア(helmet/cors/rate-limit/write-auth/requireAdmin)
+- M365 認証ヘルパーと /auth/m365/* 2EP、/health、/db-test、404、app.listen
+
+さらに詰めるなら M365 認証群を lib/auth.js へ切り出し可能(server.js を ~200 行台に)。
+ただし残りは本質的にブートストラップであり、現状で D5 の目的(保守性・レビュー容易性)は達成。
+
+## D5 サマリー
+- server.js 5,783 → 426 行(-93%)
+- 抽出ルーター 20、共有 lib 4(db/logger/config + OCR既存)
+- 全段階 スモーク ALL PASS、振る舞い不変(既存の500はローカルseed起因で変化なし)
