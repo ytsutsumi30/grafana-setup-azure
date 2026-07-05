@@ -161,6 +161,30 @@ resource "azurerm_container_app" "api" {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.main.connection_string
       }
+      env {
+        name  = "M365_AUTH_ENABLED"
+        value = tostring(var.m365_auth_enabled)
+      }
+      env {
+        name  = "M365_AUTH_REQUIRED"
+        value = tostring(var.m365_auth_required)
+      }
+      env {
+        name  = "M365_AUTH_TENANT_ID"
+        value = var.m365_auth_tenant_id
+      }
+      env {
+        name  = "M365_AUTH_CLIENT_ID"
+        value = var.m365_auth_client_id
+      }
+      env {
+        name  = "M365_AUTH_SCOPES"
+        value = var.m365_auth_scopes
+      }
+      env {
+        name  = "M365_AUTH_ALLOWED_DOMAINS"
+        value = var.m365_auth_allowed_domains
+      }
 
       dynamic "env" {
         for_each = var.enable_aws_textract ? toset(["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]) : toset([])

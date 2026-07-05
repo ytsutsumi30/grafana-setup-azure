@@ -92,6 +92,44 @@ variable "documentai_processor_id" {
   sensitive   = true
 }
 
+variable "m365_auth_enabled" {
+  description = "Enable Microsoft 365 delegated authentication through MSAL and Microsoft Graph."
+  type        = bool
+  default     = false
+}
+
+variable "m365_auth_required" {
+  description = "Require Microsoft 365 delegated authentication for application API calls."
+  type        = bool
+  default     = false
+}
+
+variable "m365_auth_tenant_id" {
+  description = "Microsoft Entra tenant ID for delegated Microsoft 365 sign-in."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "m365_auth_client_id" {
+  description = "Microsoft Entra application client ID for the browser MSAL app."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "m365_auth_scopes" {
+  description = "Microsoft Graph delegated scopes requested by the browser client."
+  type        = string
+  default     = "User.Read"
+}
+
+variable "m365_auth_allowed_domains" {
+  description = "Optional comma-separated list of email domains allowed to use the app."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Common tags."
   type        = map(string)

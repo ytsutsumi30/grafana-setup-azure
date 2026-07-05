@@ -10,3 +10,10 @@ supabase_db_password = "REPLACE_WITH_SUPABASE_DB_PASSWORD"
 
 enable_aws_textract    = false
 enable_gcp_document_ai = false
+
+m365_auth_enabled         = false
+m365_auth_required        = false
+m365_auth_tenant_id       = "REPLACE_WITH_ENTRA_TENANT_ID"
+m365_auth_client_id       = "REPLACE_WITH_ENTRA_CLIENT_ID"
+m365_auth_scopes          = "User.Read"
+m365_auth_allowed_domains = ""

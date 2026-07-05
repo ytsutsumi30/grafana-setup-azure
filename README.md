@@ -36,6 +36,7 @@ shipping-inspection-poc-api.internal.lemonmushroom-c9d1cf36.japaneast.azureconta
 - Database: Supabase PostgreSQL via Session Pooler
 - IaC: Terraform under `infra/terraform`
 - Monitoring: Log Analytics + Application Insights
+- Optional auth: Microsoft 365 delegated sign-in with MSAL and Microsoft Graph
 - Deferred: Grafana/Prometheus and GCP Document AI
 
 ## Terraform Deployment
@@ -55,9 +56,16 @@ cd ~/grafana-setup-azure
 
 Keep `terraform.tfvars`, Terraform state files, and Supabase credentials out of Git.
 
+## Local Docker
+
+Run: docker compose up -d --build
+
+Open http://localhost:8080. See docs/docker-local.md for details.
+
 ## Documentation
 
 - `docs/endpoints.md`: current endpoints and validation commands
 - `docs/terraform-deployment.md`: Terraform workflow
 - `docs/supabase-migration.md`: Supabase setup and schema migration
+- `docs/m365-delegated-auth.md`: Microsoft 365 delegated authentication setup
 - `docs/gcp-document-ai-deferred-plan.md`: deferred GCP plan
