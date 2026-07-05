@@ -225,3 +225,16 @@ server.js に残置(妥当):
   ブラウザ有り環境/CI で実行可能(README に手順)。
 - 既存: tests/smoke/smoke.sh(HTTP回帰ガード)。
 - 注意: レート制限(100/15分)によりスイート連続実行で429。api 再起動でリセット。
+
+## D8 進捗 (2026-07-06) — PWA/オフライン対応
+
+- web/sw.js: アプリシェル cache-first、API GET network-first(失敗時キャッシュ)、更新系は非キャッシュ。
+- web/js/offline-queue.js: IndexedDB キュー。submit() はオンライン即送信/失敗時キュー、online で自動再送。
+  4xx はキューから除去、5xx・ネットワーク失敗は再送継続。
+- layout.js が全17ページに manifest リンク・theme-color・SW登録・オフラインバナー・未送信件数を注入
+  (各ページ無編集で一括適用)。manifest の古い説明/ start_url を修正。
+- 検証: PWA資産の配信・content-type・全ページ200・スモーク ALL PASS。
+  実オフライン挙動(SWキャッシュ・IndexedDB・バナー)はブラウザ必須のため E2E spec に用意
+  (WSLサンドボックスは未実行、ブラウザ環境/CIで実行可)。
+- 残(任意): 検品POSTを OfflineQueue.submit 経由に置換すると現場オフライン投入が完成。
+  現状は基盤導入まで(qr-inspection3 の送信箇所差し替えは次段)。
