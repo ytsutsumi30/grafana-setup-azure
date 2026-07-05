@@ -103,6 +103,11 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// 認証状態取得(Easy Auth の principal を返す。ローカルは authenticated:false)
+app.get('/auth/whoami', (req, res) => {
+    res.json(auth.readEasyAuthPrincipal(req));
+});
+
 app.get('/auth/m365/config', (req, res) => {
     res.json({
         enabled: m365AuthConfig.enabled,
@@ -133,6 +138,9 @@ app.get('/auth/m365/me', async (req, res) => {
 
 // M365 required 時の全体強制(lib/auth の requiredAuth)
 app.use(auth.requiredAuth);
+
+// Easy Auth ゲート(EASY_AUTH_MODE=off 既定で no-op。ウォール有効時に allowlist 適用)
+app.use(auth.easyAuthGate);
 
 // === OCR API（AWS Textract） ===
 app.use('/api/ocr-ai', ocrAiRoutes);

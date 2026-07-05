@@ -112,6 +112,7 @@
     ensurePwaHead();
     registerSW();
     setupOfflineUI();
+    setupAuthUI();
     var page = document.body.getAttribute('data-page');
     // ヘッダー挿入は data-layout="auto" のページのみ(部分移行ページの二重ヘッダーを防ぐ)
     if (page && document.body.getAttribute('data-layout') === 'auto' && !document.querySelector('.app-header')) {
@@ -131,6 +132,32 @@
       c.className = 'app-toast-container';
       document.body.appendChild(c);
     }
+  }
+
+  // 認証UI: Easy Auth の状態を /api/auth/whoami で取得し、ヘッダー右にメニューを出す。
+  // ローカル(ウォール無し)は authenticated:false → 認証UIは非表示。
+  function setupAuthUI() {
+    fetch('/api/auth/whoami', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (p) {
+        if (!p) return;
+        var slot = document.querySelector('.app-header .col-auto') || document.body;
+        var box = document.createElement('span');
+        box.className = 'app-auth ms-2';
+        if (p.authenticated) {
+          var who = p.email || p.name || 'ユーザー';
+          box.innerHTML =
+            '<span class="text-white-50 me-2 small"><i class="fas fa-user me-1"></i>' + who + '</span>' +
+            '<a class="btn btn-outline-light btn-sm" href="/.auth/logout?post_logout_redirect_uri=/index.html">ログアウト</a>';
+        } else {
+          // ウォール有効かどうかはローカルでは不明。ログイン導線のみ提供(押下時に ACA が処理)。
+          box.innerHTML =
+            '<a class="btn btn-outline-light btn-sm me-1" href="/.auth/login/aad?post_login_redirect_uri=/index.html"><i class="fab fa-microsoft me-1"></i>M365</a>' +
+            '<a class="btn btn-outline-light btn-sm" href="/.auth/login/google?post_login_redirect_uri=/index.html"><i class="fab fa-google me-1"></i>Google</a>';
+        }
+        if (slot.classList && slot.classList.contains('col-auto')) slot.appendChild(box);
+      })
+      .catch(function () { /* whoami 不在(旧デプロイ等)は無視 */ });
   }
 
   // 共通トースト(silent fail を避けるための通知)
