@@ -150,3 +150,23 @@ prj3-frontend スキルの「API 呼び出し」「現場向け画面の基準�
 - プロンプト冒頭で「<skill名> スキルを使って」と明示する (上記プロンプトは明示済み)
 - `claude` 起動直後に `/context` 等でスキル読込を確認、または ls .claude/skills で配置確認
 - description の追記 (docs/skills-install-guide.md Step 6) で自動発動率を上げる
+
+---
+
+## Phase 3 進捗 (2026-07-06 時点)
+
+D5(server.js 分割)は段階実施中。振る舞い不変・各段階スモークALL PASSを維持。
+
+完了:
+- api/lib/db.js・api/lib/logger.js に共有プール/ロガーを抽出
+- routes/reports.js(4EP)・routes/qc-tools.js(6EP)・routes/monitoring.js(14EP)を分離
+  - requireAdmin が必要なルーターは注入型(factory)で結線
+- server.js: 5,783 → 4,536 行
+
+未完(次回の抽出候補、いずれも routes/ への分離):
+- products / shipping-instructions / qr-inspections / inspectors / inventory
+- new-qc / pps・lot-inventory・picking・packing / delivery-locations / shipping-locations
+- production-plans / product-components / database・logs
+- system-config は共有可変状態 systemConfig に結合のため、状態の lib 化と併せて対応
+
+目標(server.js ≤ 200 行)は未達。継続時は 1 ドメイン=1 コミット+スモークの方式を踏襲する。

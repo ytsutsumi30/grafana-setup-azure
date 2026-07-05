@@ -42,6 +42,10 @@ for p in safari qr-inspection index-org camera-test order; do
   chk 404 GET "/$p.html"
 done
 
+echo "[4b] 分離ルーターの疎通(200)"
+chk 200 GET /api/reports/dashboard-stats
+chk 200 GET /api/reports/recent-inspections
+
 echo "[5] 危険EPは保護継続(403)"
 chk 403 GET  /api/database/backups
 chk 403 POST /api/database/restore '{"sql":"SELECT 1"}'
