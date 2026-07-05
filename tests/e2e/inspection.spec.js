@@ -50,4 +50,23 @@ test.describe('出荷検品システム 主要フロー', () => {
     // テーブルまたは行が描画される(データ有無に関わらずテーブル要素は存在)
     await expect(page.locator('table')).toBeVisible();
   });
+
+  test('PWA: manifest リンクと Service Worker が登録される', async ({ page }) => {
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
+    await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
+    const swReady = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return false;
+      const reg = await navigator.serviceWorker.getRegistration();
+      return !!reg;
+    });
+    expect(swReady, 'service worker should be registered').toBeTruthy();
+  });
+
+  test('PWA: オフライン化でバナーが表示され、ページは維持される', async ({ page, context }) => {
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
+    await context.setOffline(true);
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await expect(page.locator('#app-offline-banner')).toBeVisible();
+    await context.setOffline(false);
+  });
 });
