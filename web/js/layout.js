@@ -53,7 +53,65 @@
     return header;
   }
 
+  // PWA: manifest リンクと theme-color を注入(各ページを編集せず一括適用)
+  function ensurePwaHead() {
+    if (!document.querySelector('link[rel="manifest"]')) {
+      var l = document.createElement('link');
+      l.rel = 'manifest'; l.href = 'manifest.json';
+      document.head.appendChild(l);
+    }
+    if (!document.querySelector('meta[name="theme-color"]')) {
+      var m = document.createElement('meta');
+      m.name = 'theme-color'; m.content = '#0d6efd';
+      document.head.appendChild(m);
+    }
+  }
+
+  // Service Worker 登録(オフライン対応)
+  function registerSW() {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  }
+
+  // オフラインバナー + 未送信件数インジケータ
+  function setupOfflineUI() {
+    var banner = document.createElement('div');
+    banner.id = 'app-offline-banner';
+    banner.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;z-index:1090;' +
+      'background:var(--color-status-pending);color:#212529;text-align:center;' +
+      'padding:0.4rem 1rem;font-size:0.9rem;font-weight:600;';
+    banner.innerHTML = '<i class="fas fa-wifi"></i> オフライン: 操作は継続できます。送信は復帰後に自動再送されます ' +
+      '<span id="app-pending-count"></span>';
+    document.body.appendChild(banner);
+    function render() { banner.style.display = navigator.onLine ? 'none' : 'block'; }
+    window.addEventListener('online', render);
+    window.addEventListener('offline', render);
+    render();
+    function subscribe() {
+      if (window.OfflineQueue && typeof window.OfflineQueue.onChange === 'function') {
+        window.OfflineQueue.onChange(function (count) {
+          var el = document.getElementById('app-pending-count');
+          if (el) el.textContent = count > 0 ? '(未送信 ' + count + ' 件)' : '';
+        });
+      }
+    }
+    if (window.OfflineQueue) {
+      subscribe();
+    } else {
+      var s = document.createElement('script');
+      s.src = 'js/offline-queue.js';
+      s.onload = subscribe;
+      document.head.appendChild(s);
+    }
+  }
+
   function mount() {
+    ensurePwaHead();
+    registerSW();
+    setupOfflineUI();
     var page = document.body.getAttribute('data-page');
     // ヘッダー挿入は data-layout="auto" のページのみ(部分移行ページの二重ヘッダーを防ぐ)
     if (page && document.body.getAttribute('data-layout') === 'auto' && !document.querySelector('.app-header')) {
