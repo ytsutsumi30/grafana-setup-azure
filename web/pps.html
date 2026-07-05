@@ -22,8 +22,8 @@
             font-weight: 700; font-size: 1rem;
         }
         .step-card { border-left: 5px solid #dee2e6; transition: border-color .2s; }
-        .step-card.step-active  { border-left-color: #0d6efd; }
-        .step-card.step-done    { border-left-color: #198754; }
+        .step-card.step-active  { border-left-color: var(--color-primary); }
+        .step-card.step-done    { border-left-color: var(--color-status-ok); }
         .step-card.step-pending { border-left-color: #6c757d; opacity: .6; }
         .step-card.step-warning { border-left-color: #fd7e14; }
 
@@ -48,11 +48,11 @@
         .scan-input-area { background: #fff; border-radius: .5rem; padding: 1rem; }
         #scanInput {
             font-size: 1.1rem; letter-spacing: .1em;
-            border: 2px solid #0d6efd;
+            border: 2px solid var(--color-primary);
         }
         .log-item { font-size: .85rem; border-bottom: 1px solid #f0f0f0; padding: .3rem 0; }
-        .log-item.err { color: #dc3545; }
-        .log-item.ok  { color: #198754; }
+        .log-item.err { color: var(--color-status-ng); }
+        .log-item.ok  { color: var(--color-status-ok); }
     </style>
     <script src="js/m365-auth.js"></script>
 </head>

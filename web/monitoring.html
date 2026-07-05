@@ -52,20 +52,20 @@
             right: 1.5rem;
             top: 1.5rem;
         }
-        .alert-critical { border-left: 4px solid #dc3545; }
-        .alert-warning { border-left: 4px solid #ffc107; }
+        .alert-critical { border-left: 4px solid var(--color-status-ng); }
+        .alert-warning { border-left: 4px solid var(--color-status-pending); }
         .alert-info { border-left: 4px solid #17a2b8; }
         .alert-success { border-left: 4px solid #28a745; }
 
         .health-status-critical {
-            background: #dc3545;
+            background: var(--color-status-ng);
             color: white;
             padding: 0.25rem 0.75rem;
             border-radius: 1rem;
             font-size: 0.85rem;
         }
         .health-status-warning {
-            background: #ffc107;
+            background: var(--color-status-pending);
             color: #000;
             padding: 0.25rem 0.75rem;
             border-radius: 1rem;
@@ -88,8 +88,8 @@
 
         .performance-excellent { color: #28a745; font-weight: bold; }
         .performance-good { color: #17a2b8; font-weight: bold; }
-        .performance-fair { color: #ffc107; font-weight: bold; }
-        .performance-needs_improvement { color: #dc3545; font-weight: bold; }
+        .performance-fair { color: var(--color-status-pending); font-weight: bold; }
+        .performance-needs_improvement { color: var(--color-status-ng); font-weight: bold; }
 
         .chart-container {
             position: relative;
