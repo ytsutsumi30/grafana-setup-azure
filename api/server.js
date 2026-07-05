@@ -51,6 +51,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 const auth = require('./lib/auth')(logger);
+const cookieParser = require('cookie-parser');
+const oidc = require('./lib/oidc')(logger);
 const { m365AuthConfig, getBearerToken, validateM365Token, requireAdmin } = auth;
 
 // システム設定(共有・可変)
@@ -68,6 +70,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
 // レート制限（プロキシ対応）
@@ -103,10 +106,11 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// 認証状態取得(Easy Auth の principal を返す。ローカルは authenticated:false)
-app.get('/auth/whoami', (req, res) => {
-    res.json(auth.readEasyAuthPrincipal(req));
-});
+// --- 自前 OIDC(案C): Google / Microsoft SSO ---
+app.get('/auth/whoami', oidc.whoami);
+app.get('/auth/login/:provider', oidc.login);
+app.get('/auth/callback/:provider', oidc.callback);
+app.get('/auth/logout', oidc.logout);
 
 app.get('/auth/m365/config', (req, res) => {
     res.json({
@@ -139,8 +143,8 @@ app.get('/auth/m365/me', async (req, res) => {
 // M365 required 時の全体強制(lib/auth の requiredAuth)
 app.use(auth.requiredAuth);
 
-// Easy Auth ゲート(EASY_AUTH_MODE=off 既定で no-op。ウォール有効時に allowlist 適用)
-app.use(auth.easyAuthGate);
+// OIDC ウォール(AUTH_WALL=on かつ SESSION_SECRET・プロバイダ設定時のみ有効。既定は no-op)
+app.use(oidc.wall);
 
 // === OCR API（AWS Textract） ===
 app.use('/api/ocr-ai', ocrAiRoutes);
