@@ -1,0 +1,56 @@
+/*
+ * prj3 デザイントークン (出荷検品システム共通)
+ * 色・サイズは必ずこの変数を参照する。ページ個別のハードコードを禁止。
+ * ダークテーマは [data-theme="dark"] の変数上書きのみで成立させる。
+ */
+:root {
+  /* ブランド */
+  --color-primary: #0d6efd;
+  --color-primary-dark: #0a58ca;
+  --color-primary-contrast: #ffffff;
+
+  /* ステータス(全画面共通) */
+  --color-status-ok: #198754;        /* 合格・完了 */
+  --color-status-ng: #dc3545;        /* 不合格・エラー */
+  --color-status-pending: #ffc107;   /* 待ち・保留 */
+  --color-status-progress: #0dcaf0;  /* 進行中 */
+  --color-status-hold: #6c757d;      /* 保留・無効 */
+
+  /* 面・文字 */
+  --color-bg: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-text: #212529;
+  --color-text-muted: #6c757d;
+  --color-border: #dee2e6;
+
+  /* タイポグラフィ */
+  --font-family-base: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.25rem;
+
+  /* 現場向けタッチサイズ */
+  --touch-target-min: 48px;    /* すべてのボタンの最小 */
+  --touch-target-field: 64px;  /* 現場操作(OK/NG/完了)の最小 */
+
+  /* レイアウト */
+  --radius-card: 0.75rem;
+  --radius-pill: 2rem;
+  --shadow-card: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+  --header-gradient: linear-gradient(135deg, #0d6efd, #4dabf7);
+}
+
+[data-theme="dark"] {
+  --color-primary: #4dabf7;
+  --color-primary-dark: #339af0;
+  --color-status-ok: #2fb380;
+  --color-status-ng: #ff6b6b;
+  --color-status-pending: #ffd43b;
+  --color-status-progress: #3bc9db;
+  --color-bg: #121417;
+  --color-surface: #1e2126;
+  --color-text: #e9ecef;
+  --color-text-muted: #adb5bd;
+  --color-border: #343a40;
+  --shadow-card: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+  --header-gradient: linear-gradient(135deg, #1c3d5a, #2b6cb0);
+}

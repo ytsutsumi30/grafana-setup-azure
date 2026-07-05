@@ -1,0 +1,74 @@
+/*
+ * prj3 共通コンポーネント
+ * トークン(tokens.css)を参照する。Bootstrap を土台に、共通の見た目を上書き。
+ */
+body {
+  font-family: var(--font-family-base);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* 共通ページヘッダー(layout.js が挿入) */
+.app-header {
+  background: var(--header-gradient);
+  color: #fff;
+  padding: 1.25rem 0;
+  margin-bottom: 1.5rem;
+}
+.app-header h1 { margin: 0; font-size: 1.5rem; }
+.app-header .subtitle { margin: 0.25rem 0 0; opacity: 0.85; font-size: 0.9rem; }
+.app-header a, .app-header a:hover { color: #fff; }
+
+/* ホームボタン(常設) */
+.app-home-btn {
+  min-height: var(--touch-target-min);
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+
+/* カード */
+.app-card {
+  background: var(--color-surface);
+  border: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.5rem;
+}
+
+/* ステータスバッジ(色は必ずトークン参照) */
+.badge-ok      { background-color: var(--color-status-ok); color: #fff; }
+.badge-ng      { background-color: var(--color-status-ng); color: #fff; }
+.badge-pending { background-color: var(--color-status-pending); color: #212529; }
+.badge-progress{ background-color: var(--color-status-progress); color: #212529; }
+.badge-hold    { background-color: var(--color-status-hold); color: #fff; }
+.status-badge {
+  font-size: 0.85rem; padding: 0.4rem 0.9rem; border-radius: var(--radius-pill);
+}
+
+/* タッチターゲット: 主要ボタンは最低 48px、現場操作は 64px */
+.btn { min-height: var(--touch-target-min); }
+.btn-field {
+  min-height: var(--touch-target-field);
+  font-size: var(--font-size-lg); font-weight: 600;
+}
+
+/* 画面下部の sticky アクションバー(現場操作を親指圏に固定) */
+.app-action-bar {
+  position: sticky; bottom: 0; z-index: 20;
+  background: var(--color-surface);
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+/* トースト(showToast が使用) */
+.app-toast-container {
+  position: fixed; top: 1rem; right: 1rem; z-index: 1080;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.app-toast {
+  min-width: 240px; padding: 0.75rem 1rem; border-radius: 0.5rem;
+  color: #fff; box-shadow: var(--shadow-card); font-size: 0.9rem;
+}
+.app-toast.ok   { background: var(--color-status-ok); }
+.app-toast.ng   { background: var(--color-status-ng); }
+.app-toast.info { background: var(--color-primary); }
