@@ -44,7 +44,7 @@
         }
         .affinity-card {
             background: #fff3cd;
-            border: 1px solid #ffc107;
+            border: 1px solid var(--color-status-pending);
             border-radius: 0.5rem;
             padding: 0.75rem;
             margin: 0.5rem;
@@ -53,7 +53,7 @@
         }
         .relation-node {
             background: #d1ecf1;
-            border: 2px solid #0dcaf0;
+            border: 2px solid var(--color-status-progress);
             border-radius: 50%;
             width: 120px;
             height: 120px;
@@ -66,7 +66,7 @@
         }
         .tree-node {
             background: #d1e7dd;
-            border: 2px solid #198754;
+            border: 2px solid var(--color-status-ok);
             border-radius: 0.5rem;
             padding: 0.75rem;
             margin: 0.25rem;
@@ -82,11 +82,11 @@
             background: #f8f9fa;
         }
         .matrix-cell.strong {
-            background: #198754;
+            background: var(--color-status-ok);
             color: white;
         }
         .matrix-cell.medium {
-            background: #ffc107;
+            background: var(--color-status-pending);
         }
         .matrix-cell.weak {
             background: #f8f9fa;

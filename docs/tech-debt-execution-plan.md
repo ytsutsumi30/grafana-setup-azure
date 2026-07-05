@@ -210,3 +210,9 @@ server.js に残置(妥当):
 - server.js 5,783 → 426 行(-93%)
 - 抽出ルーター 20、共有 lib 4(db/logger/config + OCR既存)
 - 全段階 スモーク ALL PASS、振る舞い不変(既存の500はローカルseed起因で変化なし)
+
+## D2 仕上げ 進捗 (2026-07-06)
+
+- CRUD 6ページ(delivery-locations/shipping-locations/production-plans/shipping-instructions/inspectors/product-components)のインラインstyle(~46行/枚)を components.css へ集約。ページ側は --page-accent 指定のみ。
+- 残11ページの <style> 内ステータス/ブランド色hex(37箇所)を tokens 変数へ置換。色定義の単一化(ダークテーマ対応)完了。
+- 残: index/monitoring/qr-inspection3 等の「ページ固有レイアウト」インラインstyleはページ機能に密結合のため残置(色はトークン化済み)。完全ゼロ化は各ページの個別対応が必要だが、D2の主目的(ステータス色の統一・単一ソース化)は達成。

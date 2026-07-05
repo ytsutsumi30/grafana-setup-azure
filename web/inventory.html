@@ -37,7 +37,7 @@
         }
         .required-field::after {
             content: " *";
-            color: #dc3545;
+            color: var(--color-status-ng);
         }
         .loading-overlay {
             position: fixed;
@@ -63,11 +63,11 @@
             font-weight: bold;
         }
         .stock-low {
-            color: #ffc107;
+            color: var(--color-status-pending);
             font-weight: bold;
         }
         .stock-out {
-            color: #dc3545;
+            color: var(--color-status-ng);
             font-weight: bold;
         }
     </style>
