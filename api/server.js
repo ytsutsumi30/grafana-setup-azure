@@ -20,32 +20,11 @@ const ocrEnhanceRoutes = require('./routes/ocr-enhance');
 const ocrAiRoutes = require('./routes/ocr-ai');
 const ocrFeedbackRoutes = require('./routes/ocr-feedback');
 
-// ログ設定
-const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
-    transports: [
-        new winston.transports.Console(),
-        new winston.transports.File({ filename: 'error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'combined.log' })
-    ]
-});
+// ログ設定(共有ロガー)
+const logger = require('./lib/logger');
 
-// データベース接続設定
-const pool = new Pool({
-    host: process.env.DB_HOST || 'postgres',
-    port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'production_db',
-    user: process.env.DB_USER || 'production_user',
-    password: process.env.DB_PASSWORD || 'production_pass',
-    // SSL設定: 環境変数で制御（ローカルPostgreSQLではSSL無効）
-    ssl: process.env.DB_SSL === 'true' ? {
-        rejectUnauthorized: false // RDS自己署名証明書対応
-    } : false
-});
+// データベース接続設定(共有プール)
+const pool = require('./lib/db');
 
 // Express アプリケーション設定
 const app = express();
