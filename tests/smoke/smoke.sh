@@ -51,6 +51,10 @@ chk 200 GET /api/inspectors
 chk 200 GET /api/new-qc/projects
 chk 200 GET /api/qc-tools/pareto
 chk 200 GET /api/monitoring/inventory-health
+chk 200 GET /api/products
+chk 200 GET /api/shipping-instructions
+chk 200 GET /api/shipping-inspections
+chk 200 GET /api/system-config
 
 echo "[5] 危険EPは保護継続(403)"
 chk 403 GET  /api/database/backups
