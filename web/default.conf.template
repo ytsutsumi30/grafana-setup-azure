@@ -49,6 +49,13 @@ server {
         add_header Expires "0" always;
     }
 
+    # 退避済み(_archive)・実験ページは明示的に 404。
+    # SPA フォールバックで index.html が返るのを防ぎ、旧 URL を確実に廃止する。
+    location ~ ^/(ItemPicking|QRPOC|android|aws-system-diagram|camera-test|exhibition-flyer|index-org|index-original|itemqr|logs|ocr-enhanced-demo|ocr-enhanced|ocr-v2-enhanced|ocr|order|qr-ins-android|qr-ins|qr-inspection-backup-20251017-040209|qr-inspection-v2\.1|qr-inspection|qr-inspection2|qr|safari|safari2|safari3|safari31|safari4|shipping-inspection-mockup|shipping-instruction-maintenance|shipping-instruction-mockup2)\.html$ {
+        return 404;
+    }
+    location /_archive/ { return 404; }
+
     location / {
         try_files $uri $uri/ /index.html;
         add_header Cache-Control "no-cache, no-store, must-revalidate, proxy-revalidate, max-age=0" always;
