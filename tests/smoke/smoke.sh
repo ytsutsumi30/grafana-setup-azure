@@ -28,7 +28,7 @@ chk 200 GET /api/health
 echo "[2] 本番ページ(17) = 200"
 for p in index database delivery-locations inspectors inventory maintenance monitoring \
          pps product-components production-plans products qc-analysis qc-dashboard \
-         qr-inspection3 shipping-instructions shipping-locations system-config; do
+         qr-inspection3 qr-inspection ocr-v2-enhanced shipping-instructions shipping-locations system-config; do
   chk 200 GET "/$p.html"
 done
 
@@ -38,7 +38,7 @@ for j in index-app qr-scanner qr-scanner-worker.min m365-auth monitoring-dashboa
 done
 
 echo "[4] 退避ページ = 404 (整理後に有効)"
-for p in safari qr-inspection index-org camera-test order; do
+for p in safari qr-inspection2 index-org camera-test order; do
   chk 404 GET "/$p.html"
 done
 
