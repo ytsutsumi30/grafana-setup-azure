@@ -238,3 +238,14 @@ server.js に残置(妥当):
   (WSLサンドボックスは未実行、ブラウザ環境/CIで実行可)。
 - 残(任意): 検品POSTを OfflineQueue.submit 経由に置換すると現場オフライン投入が完成。
   現状は基盤導入まで(qr-inspection3 の送信箇所差し替えは次段)。
+
+## D5 総仕上げ (2026-07-06)
+
+- api/lib/auth.js に M365 認証群(設定・Graph検証・requireAdmin・writeAuth・requiredAuth)を集約。
+  logger 注入型ファクトリ。server.js は require して結線するのみ。
+- server.js: 426 → 241 行(初期 5,783 から約96%削減)。内容はブートストラップ(require/ミドルウェア/
+  ルーターマウント/auth・health・db-test ルート/404/listen)に収斂。
+- 検証: 認証挙動不変(config200/me404/restore403/enforce 401・通過)、スモークALL PASS、コントラクト28/28。
+
+## D5 最終
+- server.js 5,783 → 241 行(-96%)、ルーター20 + 共有lib5(db/logger/config/auth + OCR既存)。

@@ -50,129 +50,8 @@ const pool = require('./lib/db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const m365AuthConfig = {
-    enabled: process.env.M365_AUTH_ENABLED === 'true' &&
-        Boolean(process.env.M365_AUTH_TENANT_ID) &&
-        Boolean(process.env.M365_AUTH_CLIENT_ID),
-    required: process.env.M365_AUTH_REQUIRED === 'true',
-    tenantId: process.env.M365_AUTH_TENANT_ID || '',
-    clientId: process.env.M365_AUTH_CLIENT_ID || '',
-    scopes: (process.env.M365_AUTH_SCOPES || 'User.Read')
-        .split(/[,\s]+/)
-        .map((scope) => scope.trim())
-        .filter(Boolean),
-    allowedDomains: (process.env.M365_AUTH_ALLOWED_DOMAINS || '')
-        .split(',')
-        .map((domain) => domain.trim().toLowerCase())
-        .filter(Boolean)
-};
-
-const graphTokenCache = new Map();
-
-function getBearerToken(req) {
-    const auth = req.get('Authorization') || '';
-    if (!auth.toLowerCase().startsWith('bearer ')) {
-        return '';
-    }
-    return auth.slice(7).trim();
-}
-
-function getTokenCacheKey(token) {
-    return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-function normalizeGraphUser(user) {
-    return {
-        id: user.id,
-        displayName: user.displayName,
-        mail: user.mail || user.userPrincipalName || '',
-        userPrincipalName: user.userPrincipalName || '',
-        jobTitle: user.jobTitle || '',
-        officeLocation: user.officeLocation || ''
-    };
-}
-
-function isAllowedM365User(user) {
-    if (!m365AuthConfig.allowedDomains.length) {
-        return true;
-    }
-    const address = String(user.mail || user.userPrincipalName || '').toLowerCase();
-    const domain = address.includes('@') ? address.split('@').pop() : '';
-    return m365AuthConfig.allowedDomains.includes(domain);
-}
-
-async function validateM365Token(token) {
-    if (!token) {
-        return null;
-    }
-
-    const cacheKey = getTokenCacheKey(token);
-    const cached = graphTokenCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-        return cached.user;
-    }
-
-    const response = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,jobTitle,officeLocation', {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!response.ok) {
-        logger.warn('M365 token validation failed', { status: response.status });
-        return null;
-    }
-
-    const user = normalizeGraphUser(await response.json());
-    if (!isAllowedM365User(user)) {
-        logger.warn('M365 user rejected by allowed domain policy', {
-            userPrincipalName: user.userPrincipalName,
-            mail: user.mail
-        });
-        return null;
-    }
-
-    graphTokenCache.set(cacheKey, {
-        user,
-        expiresAt: Date.now() + 60 * 1000
-    });
-    return user;
-}
-
-// 管理者専用エンドポイント保護ミドルウェア
-// 危険なエンドポイント(/database/*, /logs/*, sample-data)を保護する。
-// M365認証が有効な場合はM365ユーザー(allowedDomains適用済み)を要求し、
-// 無効な場合はADMIN_API_TOKEN(x-admin-token ヘッダ)で保護する。
-// どちらも未設定の場合は安全側に倒して 403 で拒否する(既定オフ)。
-async function requireAdmin(req, res, next) {
-    try {
-        if (m365AuthConfig.enabled) {
-            const user = await validateM365Token(getBearerToken(req));
-            if (!user) {
-                return res.status(401).json({ error: 'Unauthorized' });
-            }
-            req.user = user;
-            return next();
-        }
-        const adminToken = process.env.ADMIN_API_TOKEN || '';
-        if (adminToken) {
-            const provided = req.get('x-admin-token') || '';
-            // 長さ非依存の定数時間比較
-            const a = Buffer.from(provided);
-            const b = Buffer.from(adminToken);
-            if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
-                return next();
-            }
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-        // 認証手段が未設定 → 危険エンドポイントは既定で無効
-        logger.warn('Admin endpoint blocked: no M365 auth and no ADMIN_API_TOKEN configured', {
-            path: req.originalUrl
-        });
-        return res.status(403).json({ error: 'This endpoint is disabled (no admin auth configured)' });
-    } catch (err) {
-        logger.error('requireAdmin error', { err: err.message });
-        return res.status(500).json({ error: 'Internal server error' });
-    }
-}
+const auth = require('./lib/auth')(logger);
+const { m365AuthConfig, getBearerToken, validateM365Token, requireAdmin } = auth;
 
 // システム設定(共有・可変)
 const systemConfig = require('./lib/config');
@@ -215,55 +94,9 @@ app.use((req, res, next) => {
     next();
 });
 
-// 更新系(POST/PUT/PATCH/DELETE)への認証 段階導入ミドルウェア
-// WRITE_AUTH_MODE で挙動を切り替える(既定 off = POC の書き込みを維持):
-//   off     : 認証チェックなし(従来通り)
-//   warn    : トークンがあれば検証して req.user に載せる。なくても通すが warn ログを出す(移行観察用)
-//   enforce : 有効な認証(M365トークン or ADMIN_API_TOKEN)がなければ 401(本番想定)
-// 認証手段: M365 有効時は Bearer トークン、無効時は x-admin-token(ADMIN_API_TOKEN)。
-const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-// 認証不要の更新系エンドポイント(存在すればここに追加。現状なし)
-const WRITE_AUTH_EXEMPT = [];
-
-async function resolveAuthenticatedUser(req) {
-    if (m365AuthConfig.enabled) {
-        const user = await validateM365Token(getBearerToken(req));
-        return user || null;
-    }
-    const adminToken = process.env.ADMIN_API_TOKEN || '';
-    if (adminToken) {
-        const provided = req.get('x-admin-token') || '';
-        const a = Buffer.from(provided);
-        const b = Buffer.from(adminToken);
-        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
-            return { id: 'admin-token', displayName: 'Admin (token)' };
-        }
-    }
-    return null;
-}
-
-app.use(async (req, res, next) => {
-    if (!WRITE_METHODS.has(req.method)) return next();
-    const mode = (process.env.WRITE_AUTH_MODE || 'off').toLowerCase();
-    if (mode === 'off') return next();
-    if (WRITE_AUTH_EXEMPT.some(p => req.path.startsWith(p))) return next();
-    try {
-        const user = await resolveAuthenticatedUser(req);
-        if (user) {
-            req.user = user;
-            return next();
-        }
-        if (mode === 'warn') {
-            logger.warn('Unauthenticated write (warn mode)', { method: req.method, path: req.path, ip: req.ip });
-            return next();
-        }
-        // enforce
-        return res.status(401).json({ error: 'Unauthorized' });
-    } catch (err) {
-        logger.error('write-auth middleware error', { err: err.message });
-        return res.status(500).json({ error: 'Internal server error' });
-    }
-});
+// 更新系(POST/PUT/PATCH/DELETE)の段階認証(lib/auth の writeAuth)
+// WRITE_AUTH_MODE=off|warn|enforce で制御(既定 off)。
+app.use(auth.writeAuth);
 
 // ヘルスチェック
 app.get('/health', (req, res) => {
@@ -298,26 +131,8 @@ app.get('/auth/m365/me', async (req, res) => {
     }
 });
 
-app.use(async (req, res, next) => {
-    if (!m365AuthConfig.enabled || !m365AuthConfig.required) {
-        return next();
-    }
-    if (req.method === 'OPTIONS' || req.path === '/health' || req.path.startsWith('/auth/m365/')) {
-        return next();
-    }
-
-    try {
-        const user = await validateM365Token(getBearerToken(req));
-        if (!user) {
-            return res.status(401).json({ error: 'M365 sign-in is required' });
-        }
-        req.m365User = user;
-        return next();
-    } catch (error) {
-        logger.error('M365 authentication middleware error:', error);
-        return res.status(502).json({ error: 'Microsoft Graph validation failed' });
-    }
-});
+// M365 required 時の全体強制(lib/auth の requiredAuth)
+app.use(auth.requiredAuth);
 
 // === OCR API（AWS Textract） ===
 app.use('/api/ocr-ai', ocrAiRoutes);
