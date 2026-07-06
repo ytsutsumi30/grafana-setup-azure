@@ -31,6 +31,25 @@
       <div class="col-lg-5">
         <h5 class="mb-2"><i class="fas fa-box-open me-2"></i>製品(明細)</h5>
         <div id="lines"></div>
+
+        <!-- 製品を追加 -->
+        <div class="app-card p-3 mt-2">
+          <div class="fw-semibold mb-2 small"><i class="fas fa-plus me-1"></i>製品を追加</div>
+          <div class="row g-2 align-items-end">
+            <div class="col">
+              <label class="form-label small mb-0">製品</label>
+              <select id="add-product" class="form-select form-select-sm"><option value="">選択…</option></select>
+            </div>
+            <div class="col-auto">
+              <label class="form-label small mb-0">指示数</label>
+              <input id="add-qty" type="number" min="1" class="form-control form-control-sm" style="max-width:100px" placeholder="数量">
+            </div>
+            <div class="col-auto">
+              <button id="btn-add-line" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i></button>
+            </div>
+          </div>
+          <div id="add-line-msg" class="small mt-1"></div>
+        </div>
       </div>
 
       <!-- 右: 選択製品のロット・出荷数入力 -->
@@ -119,15 +138,60 @@
             '<span class="badge ' + (l.status==='completed'?'badge-ok':l.status==='partial'?'badge-pending':'bg-secondary') + '">' + l.status + '</span></div>' +
             '<div class="small text-muted">' + l.product_code + '</div>' +
             '<div class="d-flex justify-content-between small mt-1"><span>出荷 ' + l.shipped_quantity + ' / 指示 ' + l.quantity + '</span><span>残 ' + l.remaining_quantity + '</span></div>' +
-            '<div class="progress mt-1"><div class="progress-bar" style="width:' + pct + '%"></div></div></div>';
+            '<div class="progress mt-1"><div class="progress-bar" style="width:' + pct + '%"></div></div>' +
+            (l.shipped_quantity === 0 ? '<div class="text-end mt-1"><button class="btn btn-outline-danger btn-sm py-0" data-del-line="' + l.id + '"><i class="fas fa-trash"></i></button></div>' : '') +
+            '</div>';
         }).join('');
         Array.prototype.forEach.call(box.querySelectorAll('.line-card'), function (el) {
-          el.addEventListener('click', function () {
+          el.addEventListener('click', function (ev) {
+            if (ev.target.closest('[data-del-line]')) return;
             box.querySelectorAll('.line-card').forEach(function (x){x.classList.remove('active');});
             el.classList.add('active');
             selectLine(JSON.parse(el.getAttribute('data-line')));
           });
         });
+        Array.prototype.forEach.call(box.querySelectorAll('[data-del-line]'), function (b) {
+          b.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            if (!confirm('この明細を削除しますか?')) return;
+            api('/shipping-instructions/lines/' + b.getAttribute('data-del-line'), { method: 'DELETE' })
+              .then(function (r) {
+                if (!r.ok) { if (window.showToast) showToast((r.body && r.body.error) || '削除できません', 'ng'); return; }
+                if (window.showToast) showToast('明細を削除しました', 'ok');
+                document.getElementById('lot-panel').classList.add('d-none');
+                document.getElementById('lot-empty').classList.remove('d-none');
+                currentLine = null; loadLines();
+              });
+          });
+        });
+      });
+    }
+
+    // 製品選択肢を読み込み
+    function loadProductOptions() {
+      api('/products').then(function (r) {
+        var sel = document.getElementById('add-product');
+        (r.body || []).forEach(function (p) {
+          var o = document.createElement('option');
+          o.value = p.id; o.textContent = p.product_code + ' ' + p.product_name;
+          sel.appendChild(o);
+        });
+      });
+    }
+
+    function addLine() {
+      var pid = document.getElementById('add-product').value;
+      var qty = parseInt(document.getElementById('add-qty').value, 10);
+      var msg = document.getElementById('add-line-msg');
+      if (!pid || !qty || qty <= 0) { msg.className='small mt-1 text-danger'; msg.textContent='製品と正の指示数を入力してください'; return; }
+      api('/shipping-instructions/' + instructionId + '/lines', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: parseInt(pid,10), quantity: qty })
+      }).then(function (r) {
+        if (!r.ok) { msg.className='small mt-1 text-danger'; msg.textContent=(r.body && r.body.error) || '追加に失敗しました'; return; }
+        msg.className='small mt-1 text-success'; msg.textContent='明細を追加しました';
+        document.getElementById('add-product').value=''; document.getElementById('add-qty').value='';
+        loadLines();
       });
     }
 
@@ -232,10 +296,11 @@
       el.classList.add('d-none');
     }
     document.getElementById('btn-allocate').addEventListener('click', allocate);
+    document.getElementById('btn-add-line').addEventListener('click', addLine);
 
     if (!instructionId) {
       document.getElementById('instruction-head').innerHTML = '<div class="text-danger">出荷指示IDが指定されていません(?id=)</div>';
-    } else { loadHead(); loadLines(); }
+    } else { loadHead(); loadLines(); loadProductOptions(); }
   })();
   </script>
 </body>

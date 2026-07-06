@@ -70,6 +70,7 @@
                                 <th>顧客名</th>
                                 <th>優先度</th>
                                 <th>ステータス</th>
+                                <th>出荷進捗</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -335,7 +336,13 @@
                         <td>${instruction.customer_name ? escapeHtml(instruction.customer_name) : '<span class="text-muted">-</span>'}</td>
                         <td>${priorityBadge}</td>
                         <td>${statusBadge}</td>
+                        <td style="min-width:150px"><div class="progress-cell" data-progress-id="${instruction.id}">
+                            <span class="text-muted small">…</span>
+                        </div></td>
                         <td>
+                            <a class="btn btn-sm btn-success btn-action me-1" href="shipping-quantity.html?id=${instruction.id}" title="出荷数入力">
+                                <i class="fas fa-boxes-packing"></i>
+                            </a>
                             <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="openEditModal(${instruction.id})" title="編集">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -346,6 +353,30 @@
                     </tr>
                 `;
             }).join('');
+
+            // 各行の出荷進捗を非同期取得して描画
+            instructions.forEach(inst => loadRowProgress(inst.id));
+        }
+
+        // 行ごとの出荷進捗
+        async function loadRowProgress(id) {
+            const cell = document.querySelector(`.progress-cell[data-progress-id="${id}"]`);
+            if (!cell) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/shipping-instructions/${id}/progress`);
+                if (!res.ok) throw new Error();
+                const p = await res.json();
+                if (p.line_count === 0) { cell.innerHTML = '<span class="text-muted small">明細なし</span>'; return; }
+                const barClass = p.status === 'completed' ? 'bg-success'
+                    : (p.status === 'partial' ? 'bg-warning' : 'bg-secondary');
+                cell.innerHTML = `
+                    <div class="progress" style="height: 1rem;">
+                        <div class="progress-bar ${barClass}" style="width:${p.percent}%">${p.percent}%</div>
+                    </div>
+                    <div class="small text-muted mt-1">${p.shipped_quantity} / ${p.total_quantity}(${p.completed_lines}/${p.line_count}明細完了)</div>`;
+            } catch (e) {
+                cell.innerHTML = '<span class="text-muted small">-</span>';
+            }
         }
 
         // 優先度バッジ

@@ -954,4 +954,47 @@ router.post('/:id/lines', async (req, res) => {
     }
 });
 
+// 明細の削除(出荷済みがある場合は拒否)
+router.delete('/lines/:lineId', async (req, res) => {
+    try {
+        const { lineId } = req.params;
+        const line = await pool.query('SELECT * FROM shipping_instruction_lines WHERE id = $1', [lineId]);
+        if (line.rows.length === 0) return res.status(404).json({ error: 'Line not found' });
+        if (line.rows[0].shipped_quantity > 0) {
+            return res.status(409).json({ error: '出荷済みの明細は削除できません(先に割り当てを取り消してください)' });
+        }
+        await pool.query('DELETE FROM shipping_instruction_lines WHERE id = $1', [lineId]);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('Error deleting shipping instruction line:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// 出荷指示の進捗集計(明細合計から算出)
+router.get('/:id/progress', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const r = await pool.query(`
+            SELECT
+                COUNT(*)::int AS line_count,
+                COALESCE(SUM(quantity),0)::int AS total_quantity,
+                COALESCE(SUM(shipped_quantity),0)::int AS shipped_quantity,
+                COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_lines
+            FROM shipping_instruction_lines
+            WHERE shipping_instruction_id = $1
+        `, [id]);
+        const row = r.rows[0];
+        const pct = row.total_quantity > 0
+            ? Math.round(row.shipped_quantity / row.total_quantity * 100) : 0;
+        const status = row.line_count === 0 ? 'none'
+            : (row.completed_lines === row.line_count ? 'completed'
+               : (row.shipped_quantity > 0 ? 'partial' : 'pending'));
+        res.json({ ...row, percent: pct, status });
+    } catch (error) {
+        logger.error('Error fetching instruction progress:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
