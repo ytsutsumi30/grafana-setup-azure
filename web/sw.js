@@ -5,7 +5,7 @@
  * - API の更新系(POST/PUT/PATCH/DELETE)はキャッシュせず、失敗はアプリ側キューへ委ねる
  * キャッシュ版を上げるときは CACHE_VERSION を変更する。
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = 'prj3-shell-' + CACHE_VERSION;
 const API_CACHE = 'prj3-api-' + CACHE_VERSION;
 
@@ -71,7 +71,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // アプリシェル(HTML/CSS/JS/vendor): cache-first、無ければ取得してキャッシュ
+  // HTML(ページ遷移・.html): network-first。常に最新UIを表示し、オフライン時のみキャッシュ。
+  const isHtml = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/';
+  if (isHtml) {
+    event.respondWith(
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(SHELL_CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match(req).then((c) => c || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // 静的アセット(CSS/JS/vendor): cache-first、無ければ取得してキャッシュ
   event.respondWith(
     caches.match(req).then((cached) =>
       cached || fetch(req).then((res) => {
