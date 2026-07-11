@@ -3,7 +3,7 @@
 
   const CONFIG_URL = '/api/auth/m365/config';
   const ME_URL = '/api/auth/m365/me';
-  const MSAL_CDN = 'https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js';
+  const MSAL_SCRIPT = '/vendor/msal/msal-browser.min.js';
   const originalFetch = window.fetch.bind(window);
 
   let config = null;
@@ -20,7 +20,7 @@
     if (url.origin !== window.location.origin) return false;
     if (url.pathname === CONFIG_URL || url.pathname === ME_URL) return false;
     return url.pathname.startsWith('/api/') ||
-      /^\/(products|production-plans|shipping-locations|delivery-locations|shipping-instructions|shipping-inspections|product-components|qr-inspections|inspectors|reports|qc-tools|inventory|database|logs|new-qc|monitoring|lot-inventory|picking-instructions|packing-records|system-config|ocr)(\/|$)/.test(url.pathname);
+      /^\/(products|production-plans|shipping-locations|delivery-locations|shipping-instructions|shipping-instruction-lines|shipping-inspections|shipping-lots|product-components|qr-inspections|inspectors|reports|qc-tools|inventory|database|logs|new-qc|monitoring|lot-inventory|picking-instructions|packing-records|system-config|ocr)(\/|$)/.test(url.pathname);
   }
 
   function loadScript(src) {
@@ -30,7 +30,7 @@
       script.src = src;
       script.async = true;
       script.onload = resolve;
-      script.onerror = () => reject(new Error('MSAL script load failed'));
+      script.onerror = () => reject(new Error('MSAL script load failed: ' + src));
       document.head.appendChild(script);
     });
   }
@@ -116,6 +116,29 @@
     });
   }
 
+  async function showFatalAuthError(message) {
+    ensureStyle();
+    await new Promise((resolve) => {
+      if (document.body) return resolve();
+      document.addEventListener('DOMContentLoaded', resolve, { once: true });
+    });
+    let overlay = document.getElementById('m365-auth-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'm365-auth-overlay';
+      overlay.className = 'm365-auth-overlay';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `
+      <div class="m365-auth-panel">
+        <h2>Microsoft 365 認証エラー</h2>
+        <p>${message}</p>
+        <button type="button" id="m365-auth-reload">再読み込み</button>
+      </div>
+    `;
+    document.getElementById('m365-auth-reload').onclick = () => window.location.reload();
+  }
+
   async function signIn() {
     if (!msalApp || !config || !config.enabled) return null;
     if (loginPromise) return loginPromise;
@@ -164,7 +187,7 @@
       window.m365AuthConfig = config;
       if (!config.enabled) return;
 
-      await loadScript(MSAL_CDN);
+      await loadScript(MSAL_SCRIPT);
       msalApp = new window.msal.PublicClientApplication({
         auth: {
           clientId: config.clientId,
@@ -187,6 +210,9 @@
       }
     } catch (e) {
       console.warn('[M365 Auth] initialization failed', e);
+      if (config && config.enabled && config.required) {
+        await showFatalAuthError('Microsoft 365 認証ライブラリの読み込みに失敗しました。画面を再読み込みしてください。');
+      }
     }
   }
 

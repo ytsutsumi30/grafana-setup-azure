@@ -1,0 +1,2724 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>出荷検品・製造業務 POC NotebookLM 統合ソース</title><style>
+@page { size: A4; margin: 16mm 14mm; }
+body { font-family: "Yu Gothic", "Meiryo", "Segoe UI", sans-serif; color:#202124; line-height:1.55; font-size:10.5pt; }
+h1 { font-size:20pt; margin: 0 0 10px; padding-bottom:6px; border-bottom:2px solid #1a73e8; page-break-after: avoid; }
+h2 { font-size:15pt; margin:20px 0 8px; color:#174ea6; page-break-after: avoid; }
+h3 { font-size:12.5pt; margin:14px 0 6px; color:#185abc; page-break-after: avoid; }
+h4 { font-size:11pt; margin:10px 0 4px; color:#3c4043; page-break-after: avoid; }
+p { margin: 3px 0 6px; }
+.bullet { margin-left: 1em; text-indent: -1em; }
+.bullet::before { content: "- "; color:#1a73e8; }
+.numbered { margin-left: 1em; }
+code { font-family: Consolas, "Yu Gothic", monospace; background:#f1f3f4; padding:1px 3px; border-radius:3px; font-size:9.5pt; }
+pre { background:#f8f9fa; border:1px solid #dadce0; padding:8px; white-space:pre-wrap; word-break:break-word; border-radius:4px; font-size:8.5pt; }
+hr { border:0; border-top:1px solid #dadce0; margin:18px 0; }
+.gap { height: 4px; }
+</style></head><body><h1>出荷検品・製造業務 POC NotebookLM 統合ソース</h1>
+<div class="gap"></div>
+<p>このファイルは NotebookLM へ 1 ソースとして投入するため、NotebookLM 連携パックの主要資料を結合したものです。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: 00-notebooklm-project-brief.md</h1>
+<div class="gap"></div>
+<h1>NotebookLM 用プロジェクト概要</h1>
+<div class="gap"></div>
+<p>この資料群は、出荷検品アプリを起点に、製造業向けの在庫・ロット・QR・入庫・受注・出荷・棚卸・OCR・製造・トレーサビリティへ拡張している POC の最新資料です。</p>
+<div class="gap"></div>
+<h2>現在の主目的</h2>
+<div class="gap"></div>
+<p class="bullet">出荷検品アプリ本体の完成度を上げる。</p>
+<p class="bullet">QR コード、ロット、在庫移動、監査ログを中心に業務イベントを細かく記録する。</p>
+<p class="bullet">出荷完了後の履歴、帳票、監査ログ、理由付き修正まで扱えるようにする。</p>
+<p class="bullet">製造業向けの受発注、入庫、在庫、棚卸、製造指図、トレーサビリティへ段階拡張する。</p>
+<p class="bullet">Azure Container Apps と Supabase を POC 基盤とし、Grafana Cloud で最小監視を行う。</p>
+<div class="gap"></div>
+<h2>推奨実装順</h2>
+<div class="gap"></div>
+<p class="numbered">在庫・ロット・QR 共通基盤</p>
+<p class="numbered">発注・入庫</p>
+<p class="numbered">受注・出荷指示生成</p>
+<p class="numbered">棚卸</p>
+<p class="numbered">Grafana Cloud 最小監視</p>
+<p class="numbered">OCR 取込</p>
+<p class="numbered">製造指図・工程実績</p>
+<p class="numbered">トレーサビリティ</p>
+<div class="gap"></div>
+<h2>画面実装の現在地</h2>
+<div class="gap"></div>
+<p class="bullet">トレーサビリティ検索画面を追加済み。</p>
+<p class="bullet">在庫・ロット・QR 共通基盤画面を追加済み。</p>
+<p class="bullet">発注・入庫画面を追加済み。</p>
+<p class="bullet">受注・出荷指示生成画面を追加済み。</p>
+<p class="bullet">各画面は <code>web/</code> 配下の静的 HTML、Vanilla JS、CSS で構成。</p>
+<p class="bullet">共通ヘッダー、テーマ切替、M365 ログイン UI、PWA/Service Worker は <code>web/js/layout.js</code> と <code>web/sw.js</code> が担う。</p>
+<div class="gap"></div>
+<h2>重要な設計方針</h2>
+<div class="gap"></div>
+<p class="bullet">基本文書は日本語。</p>
+<p class="bullet">図表や構成説明が必要な資料は HTML First で作る。</p>
+<p class="bullet">現場向け画面は 48px 以上のタッチターゲットを維持する。</p>
+<p class="bullet">スキャン・検品・入庫などの操作は、ロット・QR・業務イベント・監査ログへつながる設計にする。</p>
+<p class="bullet">POC では画面側制御を優先し、API は段階的に厳格化する。</p>
+<p class="bullet">更新系 API の認証方針は M365 ログインと Bearer token 運用に寄せていく。</p>
+<div class="gap"></div>
+<h2>NotebookLM に期待する使い方</h2>
+<div class="gap"></div>
+<p class="bullet">現在の仕様を要約する。</p>
+<p class="bullet">Phase ごとの残作業を洗い出す。</p>
+<p class="bullet">画面、API、DB、監査ログ、監視の抜け漏れを指摘する。</p>
+<p class="bullet">現場レビュー向けの説明資料や FAQ を作る。</p>
+<p class="bullet">次スプリントの実装タスクを優先順位付きで整理する。</p>
+<div class="gap"></div>
+<h2>NotebookLM で最初に聞くとよい質問</h2>
+<div class="gap"></div>
+<p class="bullet">この POC の現在の業務スコープを、出荷検品、在庫、受発注、製造、監視に分けて要約してください。</p>
+<p class="bullet">推奨実装順に対して、完了済み、未完了、リスクが高い項目を表にしてください。</p>
+<p class="bullet">出荷検品アプリを現場レビューするための説明台本を作ってください。</p>
+<p class="bullet">QR 個体 ID とロット番号を分離する場合の設計変更点を整理してください。</p>
+<p class="bullet">Azure Container Apps、Supabase、M365 認証、Grafana Cloud の構成上の注意点を整理してください。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: source-index.md</h1>
+<div class="gap"></div>
+<h1>NotebookLM ソース索引</h1>
+<div class="gap"></div>
+<h2>最初に読む資料</h2>
+<div class="gap"></div>
+<p class="numbered"><code>00-README.md</code></p>
+<p>   - プロジェクトの概要、起動方法、主要機能の入口。</p>
+<p class="numbered"><code>01-business-expansion-roadmap.md</code></p>
+<p>   - 出荷検品以外の在庫、受発注、棚卸、OCR、製造、トレーサビリティへの拡張計画。</p>
+<p class="numbered"><code>02-shipping-inspection-next-plan.md</code></p>
+<p>   - 出荷検品アプリ本体の次期改善計画。</p>
+<div class="gap"></div>
+<h2>Phase 別設計資料</h2>
+<div class="gap"></div>
+<p class="numbered"><code>03-inventory-foundation-phase1-plan.md</code></p>
+<p>   - 在庫、ロット、QR 共通基盤。</p>
+<p class="numbered"><code>04-purchase-receiving-phase2-plan.md</code></p>
+<p>   - 発注、入庫、QR/ロット入庫。</p>
+<p class="numbered"><code>05-sales-order-shipping-phase3-plan.md</code></p>
+<p>   - 受注、出荷指示生成。</p>
+<p class="numbered"><code>06-inventory-count-phase4-plan.md</code></p>
+<p>   - 棚卸。</p>
+<p class="numbered"><code>07-ocr-import-phase5-plan.md</code></p>
+<p>   - OCR 取込。</p>
+<p class="numbered"><code>08-manufacturing-orders-phase6-plan.md</code></p>
+<p>   - 製造指図、工程実績、材料投入、完成品入庫。</p>
+<p class="numbered"><code>09-traceability-phase7-plan.md</code></p>
+<p>    - ロット、QR、伝票、製造指図の横断トレース。</p>
+<div class="gap"></div>
+<h2>運用・基盤資料</h2>
+<div class="gap"></div>
+<p class="numbered"><code>10-grafana-cloud-minimal-monitoring.md</code></p>
+<p>    - Grafana Cloud 最小監視。</p>
+<p class="numbered"><code>11-m365-delegated-auth.md</code></p>
+<p>    - M365 ログイン、代理認証。</p>
+<p class="numbered"><code>12-azure-container-apps.md</code></p>
+<p>    - Azure Container Apps ホスティング。</p>
+<p class="numbered"><code>13-supabase-migration.md</code></p>
+<p>    - Supabase 移行。</p>
+<p class="numbered"><code>14-testing-ci.md</code></p>
+<p>    - テスト、CI、検証方針。</p>
+<p class="numbered"><code>15-endpoints.md</code></p>
+<p>    - API エンドポイント一覧。</p>
+<div class="gap"></div>
+<h2>NotebookLM での読み方</h2>
+<div class="gap"></div>
+<p class="bullet">業務全体を知りたい場合は、最初に <code>00</code> から <code>02</code> を参照する。</p>
+<p class="bullet">実装順を確認する場合は、<code>03</code> から <code>09</code> を参照する。</p>
+<p class="bullet">Azure、Supabase、M365、Grafana の構成確認は <code>10</code> から <code>13</code> を参照する。</p>
+<p class="bullet">テストや API の確認は <code>14</code> と <code>15</code> を参照する。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/00-README.md</h1>
+<div class="gap"></div>
+<h1>出荷検品 POC on Azure Container Apps</h1>
+<div class="gap"></div>
+<p>このリポジトリは、出荷検品 / 生産管理アプリを Azure Container Apps + Supabase へ移行した POC です。</p>
+<div class="gap"></div>
+<p>基本ドキュメントは日本語で作成します。システム構成、業務フロー、ロードマップなど図表が必要な資料は HTML First で作成します。詳細は <code>docs/documentation-policy.md</code> を参照してください。</p>
+<div class="gap"></div>
+<h2>Current Endpoint</h2>
+<div class="gap"></div>
+<p>Public web endpoint:</p>
+<div class="gap"></div>
+<pre><code>https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<p>Useful API checks through the web reverse proxy:</p>
+<div class="gap"></div>
+<pre><code>WEB_URL="https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io"
+curl "$WEB_URL/health"
+curl "$WEB_URL/api/health"
+curl "$WEB_URL/api/db-test"
+curl "$WEB_URL/api/products"
+curl "$WEB_URL/api/shipping-instructions"
+curl "$WEB_URL/api/inspectors"
+</code></pre>
+<div class="gap"></div>
+<p>Internal API FQDN:</p>
+<div class="gap"></div>
+<pre><code>shipping-inspection-poc-api.internal.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<h2>Deployment Stack</h2>
+<div class="gap"></div>
+<p class="bullet">Azure region: <code>japaneast</code></p>
+<p class="bullet">Runtime: Azure Container Apps</p>
+<p class="bullet">Registry: Azure Container Registry</p>
+<p class="bullet">Database: Supabase PostgreSQL via Session Pooler</p>
+<p class="bullet">IaC: Terraform under <code>infra/terraform</code></p>
+<p class="bullet">Monitoring: Log Analytics + Application Insights</p>
+<p class="bullet">Optional auth: Microsoft 365 delegated sign-in with MSAL and Microsoft Graph</p>
+<p class="bullet">Deferred: Grafana/Prometheus and GCP Document AI</p>
+<div class="gap"></div>
+<h2>Terraform Deployment</h2>
+<div class="gap"></div>
+<pre><code>cd infra/terraform
+terraform plan
+terraform apply
+</code></pre>
+<div class="gap"></div>
+<p>After infrastructure changes or image changes:</p>
+<div class="gap"></div>
+<pre><code>cd ~/grafana-setup-azure
+./scripts/deploy-images-terraform.sh
+</code></pre>
+<div class="gap"></div>
+<p>Keep <code>terraform.tfvars</code>, Terraform state files, and Supabase credentials out of Git.</p>
+<div class="gap"></div>
+<h2>Local Docker</h2>
+<div class="gap"></div>
+<p>Run: docker compose up -d --build</p>
+<div class="gap"></div>
+<p>Open http://localhost:8080. See docs/docker-local.md for details.</p>
+<div class="gap"></div>
+<h2>Validation</h2>
+<div class="gap"></div>
+<p>GitHub Actions runs API syntax checks, API unit tests, dependency audit, Docker smoke tests, and API contract tests.</p>
+<div class="gap"></div>
+<p>Run the same checks locally:</p>
+<div class="gap"></div>
+<pre><code>npm --prefix api run check:syntax
+npm --prefix api test
+npm --prefix api run audit
+docker compose up -d --build
+BASE=http://localhost:8080 bash tests/smoke/smoke.sh
+BASE=http://localhost:8080 node --test tests/api/contract.test.js
+</code></pre>
+<div class="gap"></div>
+<p>See <code>docs/testing-ci.md</code> for CI details and contract-test cautions.</p>
+<div class="gap"></div>
+<p>For field review data readiness:</p>
+<div class="gap"></div>
+<pre><code>./scripts/check-field-review-data.sh
+</code></pre>
+<div class="gap"></div>
+<p>To seed local field-review demo data:</p>
+<div class="gap"></div>
+<pre><code>./scripts/seed-field-review-data.sh
+</code></pre>
+<div class="gap"></div>
+<p>To reset local field-review demo data before a manual UI review:</p>
+<div class="gap"></div>
+<pre><code>./scripts/reset-field-review-data.sh
+</code></pre>
+<div class="gap"></div>
+<p>To validate the seeded review data through the API:</p>
+<div class="gap"></div>
+<pre><code>./scripts/check-field-review-api.sh
+</code></pre>
+<div class="gap"></div>
+<p>To run the local field-review API rehearsal:</p>
+<div class="gap"></div>
+<pre><code>./scripts/run-field-review-api-scenario.sh
+</code></pre>
+<div class="gap"></div>
+<p>To collect local field-review evidence:</p>
+<div class="gap"></div>
+<pre><code>./scripts/collect-field-review-evidence.sh
+</code></pre>
+<div class="gap"></div>
+<p>Evidence is written under <code>review-evidence/</code>, which is local output and is ignored by Git.</p>
+<div class="gap"></div>
+<h2>Documentation</h2>
+<div class="gap"></div>
+<p class="bullet"><code>docs/documentation-policy.md</code>: 日本語ドキュメントと HTML First の作成方針</p>
+<p class="bullet"><code>docs/business-expansion-roadmap.html</code>: HTML First roadmap for business expansion</p>
+<p class="bullet"><code>docs/endpoints.md</code>: current endpoints and validation commands</p>
+<p class="bullet"><code>docs/testing-ci.md</code>: local validation, CI, and contract-test cautions</p>
+<p class="bullet"><code>docs/field-review-checklist.md</code>: field review checklist for PPS, QR inspection, reports, and audit logs</p>
+<p class="bullet"><code>docs/field-review-scenario.md</code>: step-by-step field review operation scenario</p>
+<p class="bullet"><code>docs/field-review-demo-data.md</code>: demo data preparation notes for field review</p>
+<p class="bullet"><code>docs/field-review-runbook.md</code>: field review day runbook and command order</p>
+<p class="bullet"><code>docs/business-expansion-roadmap.md</code>: roadmap for inventory, purchasing, sales orders, manufacturing, traceability, and monitoring</p>
+<p class="bullet"><code>docs/inventory-foundation-phase1-plan.md</code>: detailed Phase 1 plan for inventory, lot, QR, transactions, and operation events</p>
+<p class="bullet"><code>docs/purchase-receiving-phase2-plan.md</code>: Phase 2 plan for purchasing, receiving orders, QR receiving inspection, and inventory reflection</p>
+<p class="bullet"><code>docs/sales-order-shipping-phase3-plan.md</code>: Phase 3 plan for sales orders and shipping instruction generation</p>
+<p class="bullet"><code>docs/inventory-count-phase4-plan.md</code>: Phase 4 plan for inventory count, variance, and adjustment approval</p>
+<p class="bullet"><code>docs/grafana-cloud-minimal-monitoring.md</code>: Grafana Cloud minimal monitoring API and dashboard import notes</p>
+<p class="bullet"><code>docs/ocr-import-phase5-plan.md</code>: Phase 5 plan for OCR import, sales order candidates, and delivery note matching</p>
+<p class="bullet"><code>docs/manufacturing-orders-phase6-plan.md</code>: Phase 6 plan for work orders, operations, material consumption, and finished goods receipt</p>
+<p class="bullet"><code>docs/traceability-phase7-plan.md</code>: Phase 7 plan for cross-document lot and QR traceability</p>
+<p class="bullet"><code>docs/terraform-deployment.md</code>: Terraform workflow</p>
+<p class="bullet"><code>docs/supabase-migration.md</code>: Supabase setup and schema migration</p>
+<p class="bullet"><code>docs/m365-delegated-auth.md</code>: Microsoft 365 delegated authentication setup</p>
+<p class="bullet"><code>docs/gcp-document-ai-deferred-plan.md</code>: deferred GCP plan</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/01-business-expansion-roadmap.md</h1>
+<div class="gap"></div>
+<h1>出荷検品アプリ 業務拡張ロードマップ</h1>
+<div class="gap"></div>
+<p>作成日: 2026-07-08</p>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>既存の出荷検品アプリを核に、受注、発注、入庫、在庫、棚卸、製造指図、トレーサビリティ、監視まで段階的に拡張する。</p>
+<div class="gap"></div>
+<p>この文書は、以下の既存計画を横断し、今後の実装順序を決めるためのロードマップとする。</p>
+<div class="gap"></div>
+<p class="bullet"><code>docs/documentation-policy.md</code></p>
+<p class="bullet"><code>docs/business-expansion-roadmap.html</code></p>
+<p class="bullet"><code>docs/plans.html</code></p>
+<p class="bullet"><code>docs/shipping-inspection-next-plan.md</code></p>
+<p class="bullet"><code>docs/manufacturing-inventory-plan.md</code></p>
+<p class="bullet"><code>docs/manufacturing-order-plan.md</code></p>
+<p class="bullet"><code>docs/grafana-embedding-plan.md</code></p>
+<p class="bullet"><code>docs/field-review-runbook.md</code></p>
+<p class="bullet"><code>docs/inventory-foundation-phase1-plan.md</code></p>
+<p class="bullet"><code>docs/purchase-receiving-phase2-plan.md</code></p>
+<p class="bullet"><code>docs/sales-order-shipping-phase3-plan.md</code></p>
+<p class="bullet"><code>docs/inventory-count-phase4-plan.md</code></p>
+<p class="bullet"><code>docs/grafana-cloud-minimal-monitoring.md</code></p>
+<p class="bullet"><code>docs/ocr-import-phase5-plan.md</code></p>
+<p class="bullet"><code>docs/manufacturing-orders-phase6-plan.md</code></p>
+<p class="bullet"><code>docs/traceability-phase7-plan.md</code></p>
+<div class="gap"></div>
+<h2>既存計画の確認結果</h2>
+<div class="gap"></div>
+<p><code>docs/plans.html</code> は、2026-07-05 時点の拡張計画ポータルであり、次の領域を整理済み。</p>
+<div class="gap"></div>
+<p class="bullet">入庫、在庫、棚卸</p>
+<p class="bullet">受発注、製造指図</p>
+<p class="bullet">Grafana 埋め込み</p>
+<p class="bullet">UI 改善</p>
+<p class="bullet">Skills 導入</p>
+<div class="gap"></div>
+<p>ただし、その後に出荷検品側で次の実装が進んでいる。</p>
+<div class="gap"></div>
+<p class="bullet">複数品目、複数ロットの PPS / QR 検品</p>
+<p class="bullet">QR 個体 ID 分離</p>
+<p class="bullet">出荷監査イベント</p>
+<p class="bullet">出荷履歴</p>
+<p class="bullet">出荷検品結果票、ロット別出荷実績票</p>
+<p class="bullet">現場レビュー用データ、API リハーサル、証跡収集</p>
+<div class="gap"></div>
+<p>したがって、今後の拡張は <code>plans.html</code> の大枠を維持しつつ、出荷検品で確立した設計を他業務へ横展開する。</p>
+<div class="gap"></div>
+<h2>基本方針</h2>
+<div class="gap"></div>
+<p class="numbered">いきなり ERP 全体を作らない。</p>
+<p class="numbered">現在動いている出荷検品を業務イベント、ロット、QR、履歴、帳票の参照実装とする。</p>
+<p class="numbered">在庫台帳を先に固め、受注、発注、製造指図は在庫台帳へ接続する。</p>
+<p class="numbered">QR は全業務で共通の現物識別子として扱う。</p>
+<p class="numbered">監査ログと業務イベントを全業務で共通化する。</p>
+<p class="numbered">POC ではロールを細かく分けず、M365 ログインユーザーを同一権限として扱う。</p>
+<p class="numbered">Azure Container Apps + Supabase を継続し、Grafana Cloud は監視、OSS Grafana は将来の画面埋め込み候補とする。</p>
+<p class="numbered">基本文書は日本語で作成し、図表が必要なロードマップ、構成図、業務フローは HTML First で作成する。</p>
+<div class="gap"></div>
+<h2>拡張後の業務全体像</h2>
+<div class="gap"></div>
+<pre><code>受注
+  -&gt; 出荷指示
+  -&gt; ロット引当
+  -&gt; PPS / QR 検品
+  -&gt; 出荷完了
+  -&gt; 出荷履歴 / 帳票 / 監査ログ
+
+発注
+  -&gt; 入庫予定
+  -&gt; QR 入庫検品
+  -&gt; ロット / QR 在庫
+  -&gt; 納品書 OCR 照合
+  -&gt; 発注残更新
+
+製造指図
+  -&gt; BOM 展開
+  -&gt; 部品 QR 消費
+  -&gt; 工程 QR 打刻
+  -&gt; 完成品ロット作成
+  -&gt; 完成品入庫
+
+棚卸
+  -&gt; 棚卸計画
+  -&gt; QR スキャン棚卸
+  -&gt; 差異確認
+  -&gt; 承認後在庫調整
+
+横断
+  -&gt; ロットトレーサビリティ
+  -&gt; 業務イベント
+  -&gt; Grafana Cloud 監視
+</code></pre>
+<div class="gap"></div>
+<h2>現在の実装資産</h2>
+<div class="gap"></div>
+<h3>そのまま再利用する資産</h3>
+<div class="gap"></div>
+<p>| 資産 | 再利用先 |</p>
+<p>|------|----------|</p>
+<p>| <code>products</code> | 品目マスタの初期版 |</p>
+<p>| <code>product_components</code> | BOM / 構成マスタの初期版 |</p>
+<p>| <code>lot_inventory</code> | ロット在庫の暫定台帳 |</p>
+<p>| <code>qr_units</code> | QR 個体 ID 管理 |</p>
+<p>| <code>shipping_instruction_lines</code> | 複数明細伝票の実装例 |</p>
+<p>| <code>shipping_lot_allocations</code> | ロット引当の実装例 |</p>
+<p>| <code>picking_records</code> | QR スキャン実績の実装例 |</p>
+<p>| <code>shipping_audit_events</code> | 業務イベント監査ログの実装例 |</p>
+<p>| <code>shipping-history.html</code> | 履歴画面の実装例 |</p>
+<p>| <code>shipping-report.html</code> | HTML 帳票の実装例 |</p>
+<p>| M365 認証 | 全業務画面/API の認証基盤 |</p>
+<div class="gap"></div>
+<h3>整理が必要な資産</h3>
+<div class="gap"></div>
+<p>| 領域 | 課題 |</p>
+<p>|------|------|</p>
+<p>| <code>inventory</code> と <code>lot_inventory</code> | 既存の簡易在庫とロット在庫が並立している |</p>
+<p>| <code>production_plans</code> | 生産計画はあるが、製造指図、工程実績、部品消費と未接続 |</p>
+<p>| OCR ルート | 注文書、納品書の業務確認画面が未整備 |</p>
+<p>| <code>monitoring</code> | 既存の分析 API はあるが、業務イベント統合メトリクスが未整備 |</p>
+<p>| <code>docs/plans.html</code> | 出荷検品 Phase 1-5 完了後の状態が未反映 |</p>
+<div class="gap"></div>
+<h2>優先順位</h2>
+<div class="gap"></div>
+<h3>最優先: 在庫台帳の確立</h3>
+<div class="gap"></div>
+<p>受注、発注、製造指図のどれを作っても、最終的には在庫に接続する。</p>
+<div class="gap"></div>
+<p>そのため、最初に以下を固める。</p>
+<div class="gap"></div>
+<p class="bullet">品目</p>
+<p class="bullet">ロット</p>
+<p class="bullet">QR 管理単位</p>
+<p class="bullet">保管場所</p>
+<p class="bullet">在庫ステータス</p>
+<p class="bullet">在庫変動履歴</p>
+<p class="bullet">業務イベント</p>
+<div class="gap"></div>
+<h3>次点: 発注から入庫</h3>
+<div class="gap"></div>
+<p>入庫は在庫を増やす入口であり、出荷検品の QR パターンを流用しやすい。</p>
+<div class="gap"></div>
+<p>POC では、発注管理を最初から高度化せず、まず発注明細から入庫予定を作る。</p>
+<div class="gap"></div>
+<h3>次点: 受注から出荷指示</h3>
+<div class="gap"></div>
+<p>出荷検品はすでに動いているため、受注から出荷指示を生成できると、販売側の業務フローが閉じる。</p>
+<div class="gap"></div>
+<h3>後続: 製造指図</h3>
+<div class="gap"></div>
+<p>製造指図は BOM、部品消費、工程、完成品入庫が絡むため、在庫台帳が安定してから着手する。</p>
+<div class="gap"></div>
+<h2>フェーズ計画</h2>
+<div class="gap"></div>
+<h3>Phase 0: 現状整理と設計確定</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>出荷検品で確立したパターンを、在庫、受発注、製造へ横展開するための土台を決める。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>docs/plans.html</code> の位置づけを「旧統合ビュー」として整理する。</p>
+<p class="bullet">このロードマップを実装順序の基準にする。</p>
+<p class="bullet">現行 DB の棚卸を行う。</p>
+<p class="bullet"><code>inventory</code>、<code>lot_inventory</code>、<code>qr_units</code> の統合方針を決める。</p>
+<p class="bullet"><code>shipping_audit_events</code> を拡張するか、共通 <code>operation_events</code> を新設するか決める。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">DB 統合方針が決まっている。</p>
+<p class="bullet">新規テーブル名、既存テーブル流用方針が決まっている。</p>
+<p class="bullet">出荷検品以外の最初の実装対象が確定している。</p>
+<div class="gap"></div>
+<h3>Phase 1: 在庫・ロット・QR 共通基盤</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>すべての業務が参照する在庫台帳を作る。</p>
+<div class="gap"></div>
+<p>詳細設計:</p>
+<div class="gap"></div>
+<p class="bullet"><code>docs/inventory-foundation-phase1-plan.md</code></p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>locations</code> を追加する。</p>
+<p class="bullet"><code>inventory_transactions</code> を追加する。</p>
+<p class="bullet"><code>inventory_balances</code> を追加する。</p>
+<p class="bullet"><code>lot_inventory</code> と <code>qr_units</code> を新台帳へ接続する。</p>
+<p class="bullet">入出庫、移動、調整の履歴を追記型で記録する。</p>
+<p class="bullet">QR 単位のステータスを統一する。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>GET    /api/inventory/balances
+GET    /api/inventory/transactions
+GET    /api/lots
+GET    /api/lots/:id
+GET    /api/qr-units/:qrCode
+POST   /api/inventory-moves
+POST   /api/inventory-adjustments
+</code></pre>
+<div class="gap"></div>
+<p>優先画面:</p>
+<div class="gap"></div>
+<p class="bullet">在庫一覧</p>
+<p class="bullet">ロット別在庫</p>
+<p class="bullet">QR 単位在庫</p>
+<p class="bullet">在庫変動履歴</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">品目、ロット、QR、保管場所、ステータス別に在庫を確認できる。</p>
+<p class="bullet">在庫変動が追記型で残る。</p>
+<p class="bullet">出荷検品のロット引当が新しい在庫履歴と矛盾しない。</p>
+<div class="gap"></div>
+<h3>Phase 2: 発注・入庫</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>発注から入庫予定、QR 入庫検品、在庫反映までを作る。</p>
+<div class="gap"></div>
+<p>詳細設計:</p>
+<div class="gap"></div>
+<p class="bullet"><code>docs/purchase-receiving-phase2-plan.md</code></p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>suppliers</code> を追加する。</p>
+<p class="bullet"><code>purchase_orders</code> / <code>purchase_order_lines</code> を追加する。</p>
+<p class="bullet"><code>receiving_orders</code> / <code>receiving_order_lines</code> を追加する。</p>
+<p class="bullet">入庫時にロットと QR を作成する。</p>
+<p class="bullet">QR 入庫検品で合格、保留、不合格を記録する。</p>
+<p class="bullet">入庫結果を <code>inventory_transactions</code> に反映する。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>GET    /api/suppliers
+POST   /api/suppliers
+GET    /api/purchase-orders
+POST   /api/purchase-orders
+POST   /api/purchase-orders/:id/create-receiving-order
+GET    /api/receiving-orders
+POST   /api/receiving-orders/:id/scan
+PATCH  /api/receiving-orders/:id/complete
+</code></pre>
+<div class="gap"></div>
+<p>優先画面:</p>
+<div class="gap"></div>
+<p class="bullet">発注一覧</p>
+<p class="bullet">発注登録</p>
+<p class="bullet">入庫予定一覧</p>
+<p class="bullet">QR 入庫検品</p>
+<p class="bullet">入庫履歴</p>
+<div class="gap"></div>
+<p>POC で後回し:</p>
+<div class="gap"></div>
+<p class="bullet">承認ワークフロー</p>
+<p class="bullet">分納の詳細請求処理</p>
+<p class="bullet">単価差異の会計連携</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">発注から入庫予定を生成できる。</p>
+<p class="bullet">QR スキャンで入庫検品できる。</p>
+<p class="bullet">合格入庫が利用可能在庫として増える。</p>
+<p class="bullet">入庫イベントが監査ログに残る。</p>
+<div class="gap"></div>
+<h3>Phase 3: 受注・出荷指示生成</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>受注から既存の出荷検品へ接続する。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>customers</code> を追加する。</p>
+<p class="bullet"><code>sales_orders</code> / <code>sales_order_lines</code> を追加する。</p>
+<p class="bullet">受注残を表示する。</p>
+<p class="bullet">受注明細から <code>shipping_instructions</code> と <code>shipping_instruction_lines</code> を生成する。</p>
+<p class="bullet">生成後は既存 PPS / QR 検品フローへ渡す。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>GET    /api/customers
+POST   /api/customers
+GET    /api/sales-orders
+POST   /api/sales-orders
+GET    /api/sales-orders/backlog
+POST   /api/sales-orders/:id/create-shipping-instructions
+</code></pre>
+<div class="gap"></div>
+<p>優先画面:</p>
+<div class="gap"></div>
+<p class="bullet">受注一覧</p>
+<p class="bullet">受注登録</p>
+<p class="bullet">受注残一覧</p>
+<p class="bullet">出荷指示生成</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">受注を登録できる。</p>
+<p class="bullet">受注残を確認できる。</p>
+<p class="bullet">受注から出荷指示を生成できる。</p>
+<p class="bullet">生成された出荷指示を既存 PPS / QR 検品で処理できる。</p>
+<div class="gap"></div>
+<h3>Phase 4: 棚卸</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>QR を使って現物確認し、理論在庫との差異を扱う。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>inventory_counts</code> / <code>inventory_count_lines</code> を追加する。</p>
+<p class="bullet">棚卸対象を保管場所、品目、ロットで指定する。</p>
+<p class="bullet">QR スキャンで実在庫を記録する。</p>
+<p class="bullet">未スキャン QR、不明 QR、数量差異を検出する。</p>
+<p class="bullet">承認後に在庫調整を反映する。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>POST   /api/inventory-counts
+GET    /api/inventory-counts
+GET    /api/inventory-counts/:id
+POST   /api/inventory-counts/:id/scans
+GET    /api/inventory-counts/:id/differences
+PATCH  /api/inventory-counts/:id/close
+</code></pre>
+<div class="gap"></div>
+<p>優先画面:</p>
+<div class="gap"></div>
+<p class="bullet">棚卸計画一覧</p>
+<p class="bullet">QR 棚卸</p>
+<p class="bullet">差異確認</p>
+<p class="bullet">調整承認</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">QR 棚卸ができる。</p>
+<p class="bullet">未スキャンと不明 QR を検出できる。</p>
+<p class="bullet">差異が承認後に在庫へ反映される。</p>
+<div class="gap"></div>
+<h3>Phase 5: OCR 取込</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>注文書と納品書の入力負荷を下げる。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>ocr_documents</code> を追加する。</p>
+<p class="bullet">注文書 OCR 取込を受注登録へ接続する。</p>
+<p class="bullet">納品書 OCR 取込を発注明細照合へ接続する。</p>
+<p class="bullet">OCR 結果は必ず確認、修正画面を経由する。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>POST   /api/ocr-documents
+GET    /api/ocr-documents/:id
+PATCH  /api/ocr-documents/:id
+POST   /api/ocr-documents/:id/confirm-as-sales-order
+POST   /api/ocr-documents/:id/match-delivery-note
+</code></pre>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">注文書 OCR から受注候補を作れる。</p>
+<p class="bullet">納品書 OCR と発注明細を照合できる。</p>
+<p class="bullet">修正前後の差分が記録される。</p>
+<div class="gap"></div>
+<h3>Phase 6: 製造指図・工程実績</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>製造現場の進捗、部品消費、完成品ロットを管理する。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>work_orders</code> を追加する。</p>
+<p class="bullet"><code>work_order_operations</code> を追加する。</p>
+<p class="bullet"><code>work_order_components</code> を追加する。</p>
+<p class="bullet"><code>operation_results</code> を追加する。</p>
+<p class="bullet"><code>material_consumptions</code> を追加する。</p>
+<p class="bullet">BOM は既存 <code>product_components</code> を初期版として流用する。</p>
+<p class="bullet">部品 QR を消費し、完成品ロットを入庫する。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>GET    /api/work-orders
+POST   /api/work-orders
+PATCH  /api/work-orders/:id/release
+POST   /api/operation-results/scan
+POST   /api/material-consumptions/scan
+PATCH  /api/work-orders/:id/complete
+</code></pre>
+<div class="gap"></div>
+<p>優先画面:</p>
+<div class="gap"></div>
+<p class="bullet">製造指図一覧</p>
+<p class="bullet">指図詳細</p>
+<p class="bullet">工程 QR 打刻</p>
+<p class="bullet">部品消費スキャン</p>
+<p class="bullet">製造進捗ボード</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">製造指図を発行できる。</p>
+<p class="bullet">工程開始、完了を QR で記録できる。</p>
+<p class="bullet">部品 QR 消費が在庫履歴へ反映される。</p>
+<p class="bullet">完成品ロットを作成し、在庫へ入庫できる。</p>
+<div class="gap"></div>
+<h3>Phase 7: トレーサビリティ</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>ロット起点で、入庫、製造、出荷、顧客まで追跡する。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet">ロット正展開 API を作る。</p>
+<p class="bullet">ロット逆展開 API を作る。</p>
+<p class="bullet">受注番号、発注番号、製造指図番号、出荷指示番号で横断検索する。</p>
+<p class="bullet">出荷履歴画面のパターンを流用してトレース画面を作る。</p>
+<div class="gap"></div>
+<p>優先 API:</p>
+<div class="gap"></div>
+<pre><code>GET /api/traceability/lot/:lotId/backward
+GET /api/traceability/lot/:lotId/forward
+GET /api/traceability/search
+</code></pre>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">製品ロットから使用部品ロットを追える。</p>
+<p class="bullet">部品ロットから出荷先を追える。</p>
+<p class="bullet">受注、発注、製造指図、出荷指示を横断表示できる。</p>
+<div class="gap"></div>
+<h3>Phase 8: Grafana Cloud / 監視</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>技術監視と業務監視を統合する。</p>
+<div class="gap"></div>
+<p>実施内容:</p>
+<div class="gap"></div>
+<p class="bullet"><code>/metrics</code> を追加する。</p>
+<p class="bullet">業務イベントからメトリクスを作る。</p>
+<p class="bullet">Grafana Cloud に送る。</p>
+<p class="bullet">現場向けには必要に応じて OSS Grafana 埋め込みを検討する。</p>
+<div class="gap"></div>
+<p>優先メトリクス:</p>
+<div class="gap"></div>
+<pre><code>shipping_completed_total
+qr_scan_ng_total
+inventory_transactions_total
+receiving_completed_total
+inventory_count_difference_total
+sales_order_backlog_count
+purchase_order_backlog_count
+work_order_delayed_count
+ocr_correction_fields_total
+</code></pre>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">API / DB のヘルスを監視できる。</p>
+<p class="bullet">出荷、入庫、棚卸、受注残、発注残、工程遅延を Grafana Cloud で確認できる。</p>
+<p class="bullet">主要アラートが設定されている。</p>
+<div class="gap"></div>
+<h2>実装順序の推奨</h2>
+<div class="gap"></div>
+<p>POC として最も現実的な順序は次の通り。</p>
+<div class="gap"></div>
+<p class="numbered">Phase 0: 現状整理と設計確定</p>
+<p class="numbered">Phase 1: 在庫・ロット・QR 共通基盤</p>
+<p class="numbered">Phase 2: 発注・入庫</p>
+<p class="numbered">Phase 3: 受注・出荷指示生成</p>
+<p class="numbered">Phase 4: 棚卸</p>
+<p class="numbered">Phase 8 の一部: Grafana Cloud 最小監視</p>
+<p class="numbered">Phase 5: OCR 取込</p>
+<p class="numbered">Phase 6: 製造指図・工程実績</p>
+<p class="numbered">Phase 7: トレーサビリティ</p>
+<div class="gap"></div>
+<p>理由:</p>
+<div class="gap"></div>
+<p class="bullet">在庫基盤がないと、発注、入庫、製造、棚卸がすべて暫定実装になる。</p>
+<p class="bullet">入庫は出荷検品の QR スキャン設計を流用しやすい。</p>
+<p class="bullet">受注は既存出荷指示へ接続すれば効果が早い。</p>
+<p class="bullet">製造指図は部品消費と完成品入庫が絡むため、後段にする。</p>
+<div class="gap"></div>
+<h2>直近 4 週間の次アクション</h2>
+<div class="gap"></div>
+<h3>Week 1: 設計確定</h3>
+<div class="gap"></div>
+<p class="bullet">現行 DB テーブルの棚卸。</p>
+<p class="bullet"><code>inventory</code> と <code>lot_inventory</code> の統合方針を決定。</p>
+<p class="bullet"><code>shipping_audit_events</code> と <code>operation_events</code> の関係を決定。</p>
+<p class="bullet">Phase 1 の DB スキーマを作成。</p>
+<div class="gap"></div>
+<h3>Week 2: 在庫基盤</h3>
+<div class="gap"></div>
+<p class="bullet"><code>locations</code>、<code>inventory_transactions</code>、<code>inventory_balances</code> を追加。</p>
+<p class="bullet">既存 <code>lot_inventory</code> / <code>qr_units</code> から初期在庫を同期するスクリプトを作成。</p>
+<p class="bullet">在庫 API の読み取り系を追加。</p>
+<p class="bullet">契約テストを追加。</p>
+<div class="gap"></div>
+<h3>Week 3: 発注・入庫 MVP</h3>
+<div class="gap"></div>
+<p class="bullet"><code>suppliers</code>、<code>purchase_orders</code>、<code>purchase_order_lines</code> を追加。</p>
+<p class="bullet">発注一覧、発注登録 API を追加。</p>
+<p class="bullet">入庫予定生成 API を追加。</p>
+<p class="bullet">QR 入庫検品の最小 API を追加。</p>
+<div class="gap"></div>
+<h3>Week 4: 画面とレビュー</h3>
+<div class="gap"></div>
+<p class="bullet">発注一覧、入庫予定一覧、QR 入庫検品画面を追加。</p>
+<p class="bullet">ローカルレビュー用デモデータを追加。</p>
+<p class="bullet">API 通し実行スクリプトを追加。</p>
+<p class="bullet">現場レビュー Runbook を作成。</p>
+<div class="gap"></div>
+<h2>重要な設計判断</h2>
+<div class="gap"></div>
+<h3>在庫台帳</h3>
+<div class="gap"></div>
+<p>既存の <code>lot_inventory</code> は出荷検品のロット引当で使われているため、すぐに廃止しない。</p>
+<div class="gap"></div>
+<p>POC では次の順で移行する。</p>
+<div class="gap"></div>
+<p class="numbered"><code>lot_inventory</code> を既存互換ロット在庫として維持。</p>
+<p class="numbered"><code>inventory_transactions</code> を追加し、以後の増減を追記型にする。</p>
+<p class="numbered"><code>inventory_balances</code> を追加し、集計済み現在庫を持つ。</p>
+<p class="numbered">出荷、入庫、棚卸、製造消費をすべて <code>inventory_transactions</code> へ寄せる。</p>
+<p class="numbered">安定後に <code>lot_inventory</code> をビューまたは互換テーブル扱いへ下げる。</p>
+<div class="gap"></div>
+<h3>業務イベント</h3>
+<div class="gap"></div>
+<p>出荷検品では <code>shipping_audit_events</code> が実装済み。</p>
+<div class="gap"></div>
+<p>全業務共通では <code>operation_events</code> を追加するのが望ましい。</p>
+<div class="gap"></div>
+<p>移行方針:</p>
+<div class="gap"></div>
+<p class="bullet">出荷検品は当面 <code>shipping_audit_events</code> を維持する。</p>
+<p class="bullet">新規業務は <code>operation_events</code> に記録する。</p>
+<p class="bullet">Grafana Cloud 用メトリクスは両方を集約する。</p>
+<p class="bullet">将来、<code>shipping_audit_events</code> を <code>operation_events</code> へ統合する。</p>
+<div class="gap"></div>
+<h3>QR 管理</h3>
+<div class="gap"></div>
+<p>QR コードはロット番号ではなく、現物識別子として扱う。</p>
+<div class="gap"></div>
+<p>原則:</p>
+<div class="gap"></div>
+<p class="bullet">QR は短い ID のみを保持する。</p>
+<p class="bullet">業務情報は DB で引く。</p>
+<p class="bullet">QR は品目、ロット、数量、保管場所、状態に紐づく。</p>
+<p class="bullet">QR スキャンは OK / NG / duplicate / unknown を必ずイベント化する。</p>
+<div class="gap"></div>
+<h3>帳票</h3>
+<div class="gap"></div>
+<p>出荷検品と同じく、POC では HTML 印刷とブラウザ PDF 保存を正式運用とする。</p>
+<div class="gap"></div>
+<p>後続の候補:</p>
+<div class="gap"></div>
+<p class="bullet">発注書</p>
+<p class="bullet">入庫検品票</p>
+<p class="bullet">棚卸差異票</p>
+<p class="bullet">製造指図票</p>
+<p class="bullet">工程実績票</p>
+<p class="bullet">ロットトレーサビリティ票</p>
+<div class="gap"></div>
+<h2>後回しにする項目</h2>
+<div class="gap"></div>
+<p class="bullet">EDI / ERP 連携</p>
+<p class="bullet">原価計算</p>
+<p class="bullet">請求、売掛、買掛</p>
+<p class="bullet">多段階承認</p>
+<p class="bullet">本格 MRP</p>
+<p class="bullet">小日程計画、負荷山積み</p>
+<p class="bullet">設備保全</p>
+<p class="bullet">CAPA / NCR</p>
+<p class="bullet">ラベルプリンタ機種別の専用制御</p>
+<div class="gap"></div>
+<h2>次に実装するなら</h2>
+<div class="gap"></div>
+<p>最初の実装アクションは、Phase 1 の在庫・ロット・QR 共通基盤とする。</p>
+<div class="gap"></div>
+<p>具体的には次の順で進める。</p>
+<div class="gap"></div>
+<p class="numbered">DB スキーマ案を <code>postgres/migrations</code> と <code>supabase-schema.sql</code> に追加する。</p>
+<p class="numbered"><code>inventory_transactions</code> へ出荷検品のロット引当、QR 検品、出荷完了イベントを接続する。</p>
+<p class="numbered"><code>inventory_balances</code> を再計算するローカルスクリプトを作る。</p>
+<p class="numbered">読み取り API と契約テストを追加する。</p>
+<p class="numbered">在庫一覧、ロット別在庫、QR 単位在庫画面を追加する。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/02-shipping-inspection-next-plan.md</h1>
+<div class="gap"></div>
+<h1>出荷検品アプリ 次期改善計画</h1>
+<div class="gap"></div>
+<p>作成日: 2026-07-07</p>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>出荷検品アプリ本体の完成度を上げ、出荷指示から出荷完了後の履歴、帳票、監査ログまでを一連の業務フローとして扱えるようにする。</p>
+<div class="gap"></div>
+<p>今回の改善では、既存の POC 実装を活かしながら、複数品目、複数ロット、QR 検品、出荷実績の信頼性を高める。</p>
+<div class="gap"></div>
+<h2>改善方針</h2>
+<div class="gap"></div>
+<p class="bullet">主軸は出荷検品アプリ本体の完成度向上とする。</p>
+<p class="bullet">対象範囲は、出荷指示選択から出荷完了後の履歴、帳票、監査ログまでとする。</p>
+<p class="bullet">POC の速度を優先し、状態遷移の厳密な拒否はまず画面側で制御する。</p>
+<p class="bullet">API は当面緩めに保つが、業務イベントの監査ログは API 側で記録する。</p>
+<p class="bullet">QR 検品の正は、出荷指示に対して確定済みのロット引当とする。</p>
+<p class="bullet">既存の単一品目データも、1 明細、1 引当として互換表示、互換検品できるようにする。</p>
+<div class="gap"></div>
+<h2>対象業務フロー</h2>
+<div class="gap"></div>
+<pre><code>出荷指示選択
+  -&gt; 品目選択
+  -&gt; ロット選択
+  -&gt; 出荷数量入力
+  -&gt; 数量確定
+  -&gt; 全品目の数量確定確認
+  -&gt; PPS 開始
+  -&gt; QR スキャン
+  -&gt; スキャン直後の数量入力
+  -&gt; QR 検品 OK / NG 登録
+  -&gt; 確定済みロット引当数量の全数 OK 確認
+  -&gt; 出荷完了
+  -&gt; 履歴確認
+  -&gt; 帳票出力
+  -&gt; 監査ログ確認
+</code></pre>
+<div class="gap"></div>
+<h2>決定済み業務仕様</h2>
+<div class="gap"></div>
+<h3>出荷指示と品目</h3>
+<div class="gap"></div>
+<p class="bullet">1 つの出荷指示は 1 から N 件の品目を含む。</p>
+<p class="bullet">1 つの品目は 1 から N 件のロットを含む。</p>
+<p class="bullet">品目を選択すると、対象品目のロットを表示する。</p>
+<p class="bullet">適正ロットを選択し、出荷数量を入力する。</p>
+<p class="bullet">数量を確定した後、未確定品目が残っている場合は次の品目のロット選択と数量入力へ誘導する。</p>
+<p class="bullet">出荷指示内の全品目が数量確定済みになったら、PPS / 出荷作業へ進める。</p>
+<div class="gap"></div>
+<h3>ロット引当</h3>
+<div class="gap"></div>
+<p class="bullet">QR 検品の照合基準は、数量確定時に作成されたロット引当とする。</p>
+<p class="bullet">PPS 開始前のロット変更は通常操作として扱う。</p>
+<p class="bullet">PPS 開始後のロット変更は、明示的な変更操作として扱い、変更前後を監査ログへ記録する。</p>
+<p class="bullet">出荷完了後の数量、ロット修正も POC では可能にする。</p>
+<p class="bullet">出荷完了後の修正では、理由入力と監査ログ記録を必須にする。</p>
+<div class="gap"></div>
+<h3>QR 検品</h3>
+<div class="gap"></div>
+<p class="bullet">QR 単位数量は POC では持たない。</p>
+<p class="bullet">QR スキャンごとに数量を入力する。</p>
+<p class="bullet">数量入力は QR スキャン直後に行う。</p>
+<p class="bullet">入力数量は 1 以上、残引当数量以下とする。</p>
+<p class="bullet">検品 OK 数量は、スキャンごとの入力数量の合計で判定する。</p>
+<p class="bullet">同じ QR の二重スキャンは警告し、追加カウントしない。</p>
+<p class="bullet">二重スキャンは監査ログに <code>duplicate_scan</code> として記録する。</p>
+<p class="bullet">未引当ロットまたは別品目の QR をスキャンした場合は NG として記録し、検品数量には加算しない。</p>
+<div class="gap"></div>
+<h3>NG 判定</h3>
+<div class="gap"></div>
+<p>NG 判定では、理由分類とコメントを記録する。</p>
+<div class="gap"></div>
+<p>想定する NG 理由分類:</p>
+<div class="gap"></div>
+<p class="bullet">品目違い</p>
+<p class="bullet">ロット違い</p>
+<p class="bullet">数量超過</p>
+<p class="bullet">期限切れ</p>
+<p class="bullet">QR 不明</p>
+<p class="bullet">破損</p>
+<p class="bullet">ラベル不鮮明</p>
+<p class="bullet">その他</p>
+<div class="gap"></div>
+<p>写真添付は今回の改善対象外とする。</p>
+<div class="gap"></div>
+<h3>出荷完了条件</h3>
+<div class="gap"></div>
+<p>出荷完了条件は、確定済みロット引当の全数量が QR 検品 OK になっていることとする。</p>
+<div class="gap"></div>
+<p>以下の状態では、画面側で出荷完了を抑止または警告する。</p>
+<div class="gap"></div>
+<p class="bullet">未検品数量がある</p>
+<p class="bullet">NG が未解決のまま残っている</p>
+<p class="bullet">引当数量を超える入力がある</p>
+<p class="bullet">未引当ロットまたは別品目のスキャンがある</p>
+<div class="gap"></div>
+<p>POC 方針として API 側の厳密な拒否は後回しにするが、将来的には API 側でも不正遷移を拒否する。</p>
+<div class="gap"></div>
+<h3>完了後修正</h3>
+<div class="gap"></div>
+<p>出荷完了後も、数量、ロットの修正を可能とする。</p>
+<div class="gap"></div>
+<p>ただし、通常編集ではなく、完了後修正専用の操作として扱う。</p>
+<div class="gap"></div>
+<p>必須項目:</p>
+<div class="gap"></div>
+<p class="bullet">修正理由</p>
+<p class="bullet">修正対象の出荷指示</p>
+<p class="bullet">修正対象の品目</p>
+<p class="bullet">修正前ロット、修正後ロット</p>
+<p class="bullet">修正前数量、修正後数量</p>
+<p class="bullet">操作ユーザー</p>
+<p class="bullet">操作日時</p>
+<div class="gap"></div>
+<p>帳票を再出力する場合は、再発行または修正版であることが分かる表示を付ける。</p>
+<div class="gap"></div>
+<h2>M365 認証と権限</h2>
+<div class="gap"></div>
+<p>次期改善では、M365 ログイン済みユーザーは全員同じ権限として扱う。</p>
+<div class="gap"></div>
+<p>ロール分離はまだ行わない。</p>
+<div class="gap"></div>
+<p>ただし、監査ログには以下を記録する。</p>
+<div class="gap"></div>
+<p class="bullet">user_id</p>
+<p class="bullet">display_name</p>
+<p class="bullet">email</p>
+<div class="gap"></div>
+<p>将来の拡張候補:</p>
+<div class="gap"></div>
+<p class="bullet">operator</p>
+<p class="bullet">supervisor</p>
+<p class="bullet">viewer</p>
+<p class="bullet">M365 グループ連携</p>
+<div class="gap"></div>
+<h2>監査ログ設計</h2>
+<div class="gap"></div>
+<p>監査ログは業務イベント単位で細かく記録する。</p>
+<div class="gap"></div>
+<p>対象イベント:</p>
+<div class="gap"></div>
+<p class="bullet">出荷指示を開いた</p>
+<p class="bullet">品目を選択した</p>
+<p class="bullet">ロットを選択した</p>
+<p class="bullet">数量を確定した</p>
+<p class="bullet">PPS を開始した</p>
+<p class="bullet">ロット変更を行った</p>
+<p class="bullet">QR をスキャンした</p>
+<p class="bullet">QR の二重スキャンを検出した</p>
+<p class="bullet">検品 OK を登録した</p>
+<p class="bullet">検品 NG を登録した</p>
+<p class="bullet">出荷完了した</p>
+<p class="bullet">出荷完了後修正を行った</p>
+<p class="bullet">帳票を出力した</p>
+<div class="gap"></div>
+<p>想定テーブル:</p>
+<div class="gap"></div>
+<pre><code>shipping_audit_events
+- id
+- shipping_instruction_id
+- line_id
+- allocation_id
+- event_type
+- event_status
+- item_id
+- product_id
+- lot_id
+- qr_code
+- quantity
+- before_data
+- after_data
+- reason_code
+- comment
+- user_id
+- user_email
+- user_name
+- occurred_at
+- created_at
+</code></pre>
+<div class="gap"></div>
+<p><code>before_data</code> と <code>after_data</code> は JSON とし、ロット変更や完了後修正の差分を保持する。</p>
+<div class="gap"></div>
+<h2>帳票設計</h2>
+<div class="gap"></div>
+<p>帳票は HTML 印刷とブラウザの PDF 保存を正式運用とする。</p>
+<div class="gap"></div>
+<p>サーバー側 PDF 生成は当面行わない。</p>
+<div class="gap"></div>
+<p>正式対象帳票:</p>
+<div class="gap"></div>
+<p class="numbered">出荷検品結果票</p>
+<p class="numbered">ロット別出荷実績票</p>
+<div class="gap"></div>
+<h3>出荷検品結果票</h3>
+<div class="gap"></div>
+<p>主な表示項目:</p>
+<div class="gap"></div>
+<p class="bullet">出荷指示番号</p>
+<p class="bullet">出荷先</p>
+<p class="bullet">出荷予定日</p>
+<p class="bullet">品目一覧</p>
+<p class="bullet">ロット一覧</p>
+<p class="bullet">引当数量</p>
+<p class="bullet">QR 検品 OK 数量</p>
+<p class="bullet">NG 件数</p>
+<p class="bullet">NG 理由とコメント</p>
+<p class="bullet">作業者</p>
+<p class="bullet">出荷完了日時</p>
+<p class="bullet">帳票出力日時</p>
+<p class="bullet">再発行または修正版の表示</p>
+<div class="gap"></div>
+<h3>ロット別出荷実績票</h3>
+<div class="gap"></div>
+<p>主な表示項目:</p>
+<div class="gap"></div>
+<p class="bullet">出荷指示番号</p>
+<p class="bullet">品目コード</p>
+<p class="bullet">品目名</p>
+<p class="bullet">ロット番号</p>
+<p class="bullet">引当数量</p>
+<p class="bullet">検品 OK 数量</p>
+<p class="bullet">出荷数量</p>
+<p class="bullet">QR / スキャン履歴</p>
+<p class="bullet">修正履歴</p>
+<p class="bullet">作業者</p>
+<p class="bullet">出力日時</p>
+<div class="gap"></div>
+<h2>履歴画面設計</h2>
+<div class="gap"></div>
+<p>検品履歴は、出荷指示単位を入口にする。</p>
+<div class="gap"></div>
+<p>画面上では以下の階層で確認できるようにする。</p>
+<div class="gap"></div>
+<pre><code>出荷指示
+  -&gt; 品目
+  -&gt; ロット
+  -&gt; QR / スキャン単位
+</code></pre>
+<div class="gap"></div>
+<p>主な機能:</p>
+<div class="gap"></div>
+<p class="bullet">出荷指示単位の履歴検索</p>
+<p class="bullet">品目別の検品状況表示</p>
+<p class="bullet">ロット別の検品状況表示</p>
+<p class="bullet">QR / スキャン単位の履歴表示</p>
+<p class="bullet">NG 理由、コメント、二重スキャン、完了後修正を表示</p>
+<p class="bullet">帳票出力履歴を表示</p>
+<div class="gap"></div>
+<h2>既存単一品目データとの互換方針</h2>
+<div class="gap"></div>
+<p>新設計では <code>shipping_instruction_lines</code> とロット引当を正とする。</p>
+<div class="gap"></div>
+<p>ただし、既存の単一品目データも利用できるようにする。</p>
+<div class="gap"></div>
+<p>互換方針:</p>
+<div class="gap"></div>
+<p class="bullet">既存 <code>shipping_instructions.product_id</code> と <code>shipping_instructions.quantity</code> は、1 明細として読み替える。</p>
+<p class="bullet">既存データに明細がない場合は、表示時に仮想明細として扱う。</p>
+<p class="bullet">既存データにロット引当がない場合は、必要に応じて 1 引当として扱える互換レイヤーを用意する。</p>
+<p class="bullet">新規作成、数量確定、PPS、QR 検品は新設計データを優先する。</p>
+<div class="gap"></div>
+<h2>実装ロードマップ</h2>
+<div class="gap"></div>
+<h3>Phase 1: PPS / QR 検品の複数品目・複数ロット対応</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>PPS と QR 検品を、確定済みロット引当を正とする処理へ修正する。</p>
+<div class="gap"></div>
+<p>主な作業:</p>
+<div class="gap"></div>
+<p class="bullet">PPS 画面の単一品目前提を除去する。</p>
+<p class="bullet">出荷指示の明細、ロット引当、検品済み数量をまとめて取得する API を整備する。</p>
+<p class="bullet">QR スキャン時に、確定済みロット引当に含まれるかを判定する。</p>
+<p class="bullet">スキャン直後に数量入力モーダルを表示する。</p>
+<p class="bullet">入力数量を残引当数量以下に制限する。</p>
+<p class="bullet">二重スキャンを警告し、追加カウントしない。</p>
+<p class="bullet">未引当ロット、別品目を NG として記録し、数量には加算しない。</p>
+<p class="bullet">既存単一品目データを 1 明細、1 引当として扱う互換処理を追加する。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">複数品目、複数ロットの出荷指示で PPS が動作する。</p>
+<p class="bullet">QR 検品がロット引当を基準に判定される。</p>
+<p class="bullet">二重スキャン、未引当ロット、別品目スキャンが期待どおりに扱われる。</p>
+<p class="bullet">既存単一品目データでも PPS / QR 検品が動作する。</p>
+<div class="gap"></div>
+<h3>Phase 1.5: QR 個体 ID 分離設計</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>現在の POC では、QR 入力値をロット番号に近い値として扱っている。将来、箱、パレット、袋、容器、個品などの現物単位で QR ラベルを管理するため、ロット番号と QR 個体 ID を分離する。</p>
+<div class="gap"></div>
+<p>このフェーズでは、すぐに全画面を QR 個体 ID 前提へ移行するのではなく、既存のロット番号スキャン互換を維持しながら、次期拡張に耐えるデータ設計と API 境界を定義する。</p>
+<div class="gap"></div>
+<p>管理階層:</p>
+<div class="gap"></div>
+<pre><code>品目
+  -&gt; ロット
+    -&gt; QR 管理単位
+</code></pre>
+<div class="gap"></div>
+<p>例:</p>
+<div class="gap"></div>
+<pre><code>品目: PROD001
+ロット: LOT-2026-0002
+QR 個体 ID: QR-20260707-000001
+QR 個体 ID: QR-20260707-000002
+QR 個体 ID: QR-20260707-000003
+</code></pre>
+<div class="gap"></div>
+<p>想定テーブル:</p>
+<div class="gap"></div>
+<pre><code>qr_units
+- id
+- qr_code
+- product_id
+- lot_inventory_id
+- lot_number
+- quantity
+- unit_type
+- status
+- location
+- issued_at
+- last_scanned_at
+- created_at
+- updated_at
+</code></pre>
+<div class="gap"></div>
+<p><code>quantity</code> は将来の箱単位、パレット単位管理に備えて持つ。ただし、今回の POC 方針では QR 単位数量を検品数量の正とはせず、スキャン直後に入力された数量を正とする。</p>
+<div class="gap"></div>
+<p>想定ステータス:</p>
+<div class="gap"></div>
+<pre><code>created
+available
+allocated
+picked
+packed
+inspected
+shipped
+cancelled
+lost
+invalid
+</code></pre>
+<div class="gap"></div>
+<p>QR 検品時の判定順序:</p>
+<div class="gap"></div>
+<pre><code>QR コードを読む
+  -&gt; qr_units を検索
+  -&gt; product_id / lot_number / lot_inventory_id を取得
+  -&gt; shipping_lot_allocations に含まれるか確認
+  -&gt; 同一 QR の二重スキャンでないか確認
+  -&gt; 入力数量が残引当数量以内か確認
+  -&gt; OK / NG を記録
+</code></pre>
+<div class="gap"></div>
+<p>互換方針:</p>
+<div class="gap"></div>
+<p class="bullet"><code>qr_units</code> に該当する QR がある場合は、QR 個体 ID として扱う。</p>
+<p class="bullet"><code>qr_units</code> に該当がなく、入力値が <code>lot_inventory.lot_number</code> に一致する場合は、既存互換としてロット番号スキャン扱いにする。</p>
+<p class="bullet">互換モードで登録されたスキャンには、将来区別できるように <code>scan_source = 'lot_number_compat'</code> 相当の情報を残す。</p>
+<p class="bullet">新規発行する QR ラベルは、原則として <code>qr_units.qr_code</code> を使う。</p>
+<div class="gap"></div>
+<p>主な作業:</p>
+<div class="gap"></div>
+<p class="bullet"><code>qr_units</code> テーブル定義を追加する。</p>
+<p class="bullet">QR 個体 ID から品目、ロット、保管場所を解決する API を設計する。</p>
+<p class="bullet">PPS のスキャン API で、まず <code>qr_units</code> を検索し、なければロット番号互換にフォールバックする。</p>
+<p class="bullet">二重スキャン判定を <code>lot_number</code> だけでなく <code>qr_code</code> 単位でも行えるようにする。</p>
+<p class="bullet">QR 発行、再発行、無効化の業務ルールを定義する。</p>
+<p class="bullet">将来の QR ラベル印刷画面に備え、QR 発行単位を品目、ロット、数量、単位種別で指定できるようにする。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">QR 個体 ID とロット番号を分離したデータ設計が確定している。</p>
+<p class="bullet">既存のロット番号スキャン互換を維持する方針が明文化されている。</p>
+<p class="bullet">PPS / QR 検品 API の QR 解決順序が定義されている。</p>
+<p class="bullet">将来の QR ラベル発行、再発行、無効化に必要な項目が整理されている。</p>
+<div class="gap"></div>
+<p>実装状況 2026-07-07:</p>
+<div class="gap"></div>
+<p class="bullet"><code>qr_units</code> テーブル定義を追加済み。</p>
+<p class="bullet"><code>picking_records</code> に <code>qr_code</code> と <code>scan_source</code> を追加済み。</p>
+<p class="bullet">PPS スキャン API は、<code>qr_units.qr_code</code> を優先して品目、ロット、保管場所を解決する。</p>
+<p class="bullet"><code>qr_units</code> に該当がない入力値は、既存のロット番号スキャン互換として扱う。</p>
+<p class="bullet">同じロット内の別 QR 個体 ID は別スキャンとして扱い、同一 QR 個体 ID の再スキャンだけを重複扱いにする。</p>
+<p class="bullet">残作業は、QR ラベル発行、再発行、無効化の画面/API と、監査ログへの本格連携。</p>
+<div class="gap"></div>
+<h3>Phase 2: 業務イベント監査ログ</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>出荷検品の主要な業務イベントを追跡できるようにする。</p>
+<div class="gap"></div>
+<p>主な作業:</p>
+<div class="gap"></div>
+<p class="bullet"><code>shipping_audit_events</code> テーブルを追加する。</p>
+<p class="bullet">API に監査ログ記録ヘルパーを追加する。</p>
+<p class="bullet">数量確定、PPS 開始、QR スキャン、検品 OK / NG、出荷完了、帳票出力を記録する。</p>
+<p class="bullet">M365 ログインユーザー情報を監査ログに紐づける。</p>
+<p class="bullet">二重スキャンとロット変更を監査ログに記録する。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">出荷指示単位で主要イベントを追跡できる。</p>
+<p class="bullet">操作ユーザー、操作日時、イベント内容が残る。</p>
+<p class="bullet">変更系イベントで変更前後のデータが残る。</p>
+<div class="gap"></div>
+<p>実装状況 2026-07-07:</p>
+<div class="gap"></div>
+<p class="bullet"><code>shipping_audit_events</code> テーブル定義を追加済み。</p>
+<p class="bullet">API 共通の監査ログ記録ヘルパー <code>api/lib/audit.js</code> を追加済み。</p>
+<p class="bullet">数量確定イベント <code>quantity_confirmed</code> を記録済み。</p>
+<p class="bullet">ロット引当取消イベント <code>lot_allocation_cancelled</code> を記録済み。</p>
+<p class="bullet">PPS 開始イベント <code>pps_started</code> を記録済み。</p>
+<p class="bullet">QR / ロットスキャン OK イベント <code>qr_scan_ok</code> を記録済み。</p>
+<p class="bullet">QR / ロットスキャン NG イベント <code>qr_scan_ng</code> を記録済み。</p>
+<p class="bullet">二重スキャンイベント <code>qr_scan_duplicate</code> を記録済み。</p>
+<p class="bullet">ピッキング完了イベント <code>picking_completed</code> を記録済み。</p>
+<p class="bullet">M365 認証済みの場合は <code>user_id</code>, <code>user_email</code>, <code>user_name</code> を記録する。</p>
+<p class="bullet">監査ログ記録は best effort とし、ログ保存失敗で業務処理を止めない。</p>
+<p class="bullet">残作業は、出荷完了、完了後修正、帳票出力、履歴画面での監査ログ表示。</p>
+<div class="gap"></div>
+<h3>Phase 3: 出荷完了条件と完了後修正フロー</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>確定済みロット引当の全数量が QR 検品 OK になった場合のみ、出荷完了へ進めるようにする。</p>
+<div class="gap"></div>
+<p>主な作業:</p>
+<div class="gap"></div>
+<p class="bullet">出荷完了判定ロジックを画面側に追加する。</p>
+<p class="bullet">未検品数量、NG、数量超過を画面で警告する。</p>
+<p class="bullet">出荷完了操作を追加または改善する。</p>
+<p class="bullet">完了後修正専用の画面またはモーダルを追加する。</p>
+<p class="bullet">完了後修正で理由入力を必須にする。</p>
+<p class="bullet">完了後修正の変更前後を監査ログに記録する。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">全引当数量が検品 OK でない場合、画面上で出荷完了へ進めない。</p>
+<p class="bullet">出荷完了後の数量、ロット修正が専用操作として実行できる。</p>
+<p class="bullet">修正理由と監査ログが必ず残る。</p>
+<div class="gap"></div>
+<p>実装状況 2026-07-07:</p>
+<div class="gap"></div>
+<p class="bullet">出荷完了判定 API <code>GET /shipping-instructions/:id/completion-status</code> を追加済み。</p>
+<p class="bullet">出荷完了 API <code>PATCH /shipping-instructions/:id/complete-shipment</code> を追加済み。</p>
+<p class="bullet">出荷完了条件は、最新 PPS / ピッキングが完了済み、梱包が完了済み、確定済みロット引当数量がすべてスキャン OK 数量に達していることとした。</p>
+<p class="bullet">出荷完了時に <code>shipping_instructions.status</code> を <code>shipped</code> へ更新する。</p>
+<p class="bullet">出荷完了イベント <code>shipment_completed</code> を監査ログに記録する。</p>
+<p class="bullet">完了後修正 API <code>POST /shipping-instructions/:id/post-completion-corrections</code> を追加済み。</p>
+<p class="bullet">完了後修正では、対象ロット引当、修正後ロット番号、修正後数量、理由コード、コメントを受け付ける。</p>
+<p class="bullet">完了後修正イベント <code>post_completion_corrected</code> を監査ログに記録し、変更前後を <code>before_data</code> / <code>after_data</code> に保持する。</p>
+<p class="bullet">PPS 画面に出荷完了ボタンと完了後修正モーダルを追加済み。</p>
+<p class="bullet">完了後修正により現在のロット引当と過去のスキャン履歴が一致しない場合は、出荷済み状態を維持しつつ警告として表示する。</p>
+<p class="bullet">残作業は、完了後修正の一覧表示、修正版帳票表示、履歴画面での監査ログ参照。</p>
+<div class="gap"></div>
+<h3>Phase 4: 出荷履歴画面</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>出荷指示単位から品目、ロット、QR / スキャン単位まで履歴を確認できるようにする。</p>
+<div class="gap"></div>
+<p>主な作業:</p>
+<div class="gap"></div>
+<p class="bullet">出荷履歴画面を追加する。</p>
+<p class="bullet">出荷指示単位の検索、一覧を追加する。</p>
+<p class="bullet">品目別、ロット別の検品状況を表示する。</p>
+<p class="bullet">QR / スキャン単位の履歴を表示する。</p>
+<p class="bullet">NG 理由、コメント、二重スキャン、完了後修正を表示する。</p>
+<p class="bullet">帳票出力履歴を表示する。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">出荷指示単位で一連の検品履歴を追跡できる。</p>
+<p class="bullet">品目、ロット、QR / スキャン単位で詳細を確認できる。</p>
+<p class="bullet">監査ログと検品履歴が画面上で参照できる。</p>
+<div class="gap"></div>
+<p>実装状況 2026-07-07:</p>
+<div class="gap"></div>
+<p class="bullet">出荷履歴 API <code>GET /shipping-instructions/:id/history</code> を追加済み。</p>
+<p class="bullet">履歴 API は、出荷指示、品目明細、ロット引当、最新 PPS / ピッキング、梱包、QR / スキャン記録、監査ログ、出荷完了判定をまとめて返す。</p>
+<p class="bullet">出荷履歴画面 <code>shipping-history.html</code> を追加済み。</p>
+<p class="bullet">画面では、出荷指示一覧検索、選択中出荷指示の概要、品目タブ、ロットタブ、QR/スキャンタブ、監査ログタブを表示する。</p>
+<p class="bullet">ホーム画面から出荷履歴へ遷移できる導線を追加済み。</p>
+<p class="bullet">Service Worker のキャッシュ対象に出荷履歴画面と専用 JS を追加済み。</p>
+<p class="bullet">監査ログタブでは、完了後修正の変更前後、帳票出力の帳票種別、発行ラベル、版数を表示する。</p>
+<p class="bullet">履歴画面から出荷検品結果票、ロット別出荷実績票へ遷移できる。</p>
+<div class="gap"></div>
+<h3>Phase 5: HTML 印刷帳票</h3>
+<div class="gap"></div>
+<p>目的:</p>
+<div class="gap"></div>
+<p>出荷完了後の証跡として、出荷検品結果票とロット別出荷実績票を HTML 印刷で出力できるようにする。</p>
+<div class="gap"></div>
+<p>主な作業:</p>
+<div class="gap"></div>
+<p class="bullet">出荷検品結果票画面を追加する。</p>
+<p class="bullet">ロット別出荷実績票画面を追加する。</p>
+<p class="bullet">印刷用 CSS を整備する。</p>
+<p class="bullet">ブラウザの PDF 保存で崩れないレイアウトにする。</p>
+<p class="bullet">再発行、修正版の表示を追加する。</p>
+<p class="bullet">帳票出力イベントを監査ログに記録する。</p>
+<div class="gap"></div>
+<p>完了条件:</p>
+<div class="gap"></div>
+<p class="bullet">出荷検品結果票を HTML 印刷できる。</p>
+<p class="bullet">ロット別出荷実績票を HTML 印刷できる。</p>
+<p class="bullet">ブラウザの PDF 保存で実用できる。</p>
+<p class="bullet">帳票出力履歴が監査ログに残る。</p>
+<div class="gap"></div>
+<p>実装状況 2026-07-07:</p>
+<div class="gap"></div>
+<p class="bullet">帳票ページ <code>shipping-report.html</code> を追加済み。</p>
+<p class="bullet">帳票専用 JS <code>web/js/pages/shipping-report.js</code> を追加済み。</p>
+<p class="bullet">帳票専用 CSS <code>web/css/pages/shipping-report.css</code> を追加済み。</p>
+<p class="bullet">出荷検品結果票 <code>type=inspection_result</code> を追加済み。</p>
+<p class="bullet">ロット別出荷実績票 <code>type=lot_shipment</code> を追加済み。</p>
+<p class="bullet">帳票は履歴 API <code>GET /shipping-instructions/:id/history</code> のデータを使って HTML 描画する。</p>
+<p class="bullet">履歴画面から各帳票へ遷移する導線を追加済み。</p>
+<p class="bullet">帳票出力イベント API <code>POST /shipping-instructions/:id/report-events</code> を追加済み。</p>
+<p class="bullet">帳票印刷ボタン押下時に <code>report_printed</code> を監査ログへ記録する。</p>
+<p class="bullet">帳票出力イベント API は、出荷指示 ID と帳票種別単位で既存発行件数を確認し、<code>issue_number</code> と <code>revision_label</code> を監査ログへ記録する。</p>
+<p class="bullet">帳票番号は <code>IR-出荷指示番号-YYYYMMDD-版数</code>、<code>LR-出荷指示番号-YYYYMMDD-版数</code> の形式で表示する。</p>
+<p class="bullet">帳票内に帳票発行履歴を表示し、現在出力する版も含めて確認できる。</p>
+<p class="bullet">完了後修正が存在する場合、初回出力は <code>修正版</code>、再出力は <code>修正版・再発行N</code> として表示する。</p>
+<p class="bullet">Service Worker のキャッシュ対象に帳票画面、帳票 JS、帳票 CSS を追加済み。</p>
+<p class="bullet">残作業は、帳票テンプレートの現場レビュー反映。</p>
+<div class="gap"></div>
+<h2>テスト観点</h2>
+<div class="gap"></div>
+<h3>API テスト</h3>
+<div class="gap"></div>
+<p class="bullet">複数品目の出荷指示を取得できる。</p>
+<p class="bullet">複数ロット引当を取得できる。</p>
+<p class="bullet">既存単一品目データを互換取得できる。</p>
+<p class="bullet">QR スキャン結果がロット引当に基づいて判定される。</p>
+<p class="bullet">未引当ロット、別品目が NG になる。</p>
+<p class="bullet">二重スキャンが追加カウントされない。</p>
+<p class="bullet">出荷完了条件の判定値が正しい。</p>
+<p class="bullet">監査ログがイベントごとに記録される。</p>
+<div class="gap"></div>
+<h3>画面テスト</h3>
+<div class="gap"></div>
+<p class="bullet">出荷指示から品目選択、ロット選択、数量確定まで進める。</p>
+<p class="bullet">未確定品目が残っている場合、次の品目へ誘導される。</p>
+<p class="bullet">全品目確定後、PPS / 出荷作業へ進める。</p>
+<p class="bullet">PPS で複数品目、複数ロットが表示される。</p>
+<p class="bullet">QR スキャン直後に数量入力できる。</p>
+<p class="bullet">未引当ロット、別品目、二重スキャンで期待どおり警告される。</p>
+<p class="bullet">全引当数量が OK になった場合のみ出荷完了できる。</p>
+<p class="bullet">出荷履歴で品目、ロット、QR / スキャン単位まで確認できる。</p>
+<p class="bullet">帳票を印刷表示できる。</p>
+<div class="gap"></div>
+<h3>回帰テスト</h3>
+<div class="gap"></div>
+<p class="bullet">既存単一品目の出荷指示が表示できる。</p>
+<p class="bullet">既存単一品目の PPS / QR 検品が動作する。</p>
+<p class="bullet">M365 ログイン後に API 呼び出しが動作する。</p>
+<p class="bullet">未認証の場合、保護対象 API が 401 を返す。</p>
+<p class="bullet">既存のスモークテストが通る。</p>
+<p class="bullet">既存の API 契約テストが通る。</p>
+<div class="gap"></div>
+<h2>後回しにする項目</h2>
+<div class="gap"></div>
+<p class="bullet">API 側での厳密な状態遷移拒否</p>
+<p class="bullet">M365 ロール分離</p>
+<p class="bullet">M365 グループ連携</p>
+<p class="bullet">サーバー側 PDF 生成</p>
+<p class="bullet">NG 写真添付</p>
+<p class="bullet">在庫引落との完全連携</p>
+<p class="bullet">Grafana Cloud の業務メトリクスダッシュボード詳細化</p>
+<div class="gap"></div>
+<h2>次の実装アクション</h2>
+<div class="gap"></div>
+<p>Phase 1 から Phase 5 までの主要実装は完了済み。</p>
+<div class="gap"></div>
+<p>次の優先アクションは、運用品質と現場レビュー対応を進める。</p>
+<div class="gap"></div>
+<p>優先順:</p>
+<div class="gap"></div>
+<p class="numbered">帳票テンプレートの現場レビュー反映</p>
+<p class="numbered">PPS / QR 検品画面の実機操作レビュー</p>
+<p class="numbered">完了後修正と監査ログの業務承認フロー確認</p>
+<p class="numbered">出荷履歴画面の検索条件、絞り込み、ページング改善</p>
+<p class="numbered">CI と API 契約テストを GitHub 上で継続運用</p>
+<p class="numbered">Grafana Cloud へ業務メトリクスを送る設計詳細化</p>
+<div class="gap"></div>
+<p>実装済み機能の現状:</p>
+<div class="gap"></div>
+<p class="bullet">複数品目、複数ロット引当ベースの PPS / QR 検品に対応済み。</p>
+<p class="bullet">QR 個体 ID 分離設計を文書化済み。</p>
+<p class="bullet">業務イベント単位の監査ログを追加済み。</p>
+<p class="bullet">出荷完了と完了後修正を追加済み。</p>
+<p class="bullet">出荷履歴画面を追加済み。</p>
+<p class="bullet">HTML 印刷帳票と帳票出力履歴を追加済み。</p>
+<p class="bullet">API 依存関係の脆弱性対応、Node 20 化、CI、契約テストを追加済み。</p>
+<p class="bullet">現場レビュー用チェックリスト <code>docs/field-review-checklist.md</code> を追加済み。</p>
+<p class="bullet">現場レビュー操作シナリオ <code>docs/field-review-scenario.md</code> を追加済み。</p>
+<p class="bullet">現場レビュー用デモデータ準備メモ <code>docs/field-review-demo-data.md</code> を追加済み。</p>
+<p class="bullet">現場レビュー用デモデータ投入スクリプトと API 確認スクリプトを追加済み。</p>
+<p class="bullet">現場レビュー用のローカル API 通し実行スクリプトを追加済み。</p>
+<p class="bullet">現場レビュー用データを未着手状態へ戻すリセットスクリプトを追加済み。</p>
+<p class="bullet">現場レビュー当日の Runbook <code>docs/field-review-runbook.md</code> を追加済み。</p>
+<p class="bullet">現場レビュー証跡収集スクリプトを追加済み。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/03-inventory-foundation-phase1-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 1 在庫・ロット・QR 共通基盤 実装計画</h1>
+<div class="gap"></div>
+<p>作成日: 2026-07-08</p>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>出荷検品で利用しているロット、QR、スキャン、監査ログの仕組みを、入庫、発注、受注、棚卸、製造指図にも使える共通在庫基盤へ拡張する。</p>
+<div class="gap"></div>
+<p>この Phase 1 は <code>docs/business-expansion-roadmap.md</code> の最初の実装対象である。</p>
+<div class="gap"></div>
+<p>ドキュメント方針は <code>docs/documentation-policy.md</code> に従う。構成図、データフロー図、画面遷移図が必要な説明資料は HTML First で別途作成する。</p>
+<div class="gap"></div>
+<h2>現状</h2>
+<div class="gap"></div>
+<p>現在の在庫関連テーブルは大きく 2 系統に分かれている。</p>
+<div class="gap"></div>
+<p>| 系統 | テーブル | 用途 |</p>
+<p>|------|----------|------|</p>
+<p>| 簡易在庫 | <code>inventory</code> | 製品別の現在庫、引当、保管場所 |</p>
+<p>| 出荷検品ロット | <code>lot_inventory</code> | PPS / QR 検品で使うロット別在庫 |</p>
+<p>| QR 個体 | <code>qr_units</code> | QR 個体 ID とロットの紐付け |</p>
+<p>| 出荷引当 | <code>shipping_lot_allocations</code> | 出荷指示明細ごとのロット引当 |</p>
+<p>| 出荷スキャン | <code>picking_records</code> | QR / ロットのスキャン実績 |</p>
+<p>| 出荷監査 | <code>shipping_audit_events</code> | 出荷業務イベント |</p>
+<div class="gap"></div>
+<p>課題:</p>
+<div class="gap"></div>
+<p class="bullet"><code>inventory</code> と <code>lot_inventory</code> が分離しており、どちらを正とするか曖昧。</p>
+<p class="bullet">在庫増減の履歴が追記型で統一されていない。</p>
+<p class="bullet">入庫、棚卸、製造消費に使える共通 <code>inventory_transactions</code> がない。</p>
+<p class="bullet">出荷以外の業務イベントを記録する共通 <code>operation_events</code> がない。</p>
+<p class="bullet">保管場所が文字列であり、保管場所マスタとして扱えていない。</p>
+<div class="gap"></div>
+<h2>方針</h2>
+<div class="gap"></div>
+<p class="numbered">既存の <code>lot_inventory</code> はすぐに廃止しない。</p>
+<p class="numbered">新規の在庫増減は <code>inventory_transactions</code> に追記する。</p>
+<p class="numbered">現在庫は <code>inventory_balances</code> に集計する。</p>
+<p class="numbered"><code>lot_inventory</code> は当面、出荷検品互換のロット在庫として維持する。</p>
+<p class="numbered"><code>qr_units</code> は全業務共通の QR 管理単位として拡張する。</p>
+<p class="numbered">出荷検品の <code>shipping_audit_events</code> は維持し、新規業務は <code>operation_events</code> に記録する。</p>
+<p class="numbered">Grafana Cloud 用メトリクスは <code>shipping_audit_events</code> と <code>operation_events</code> の両方から集約する。</p>
+<div class="gap"></div>
+<h2>追加テーブル案</h2>
+<div class="gap"></div>
+<h3><code>locations</code></h3>
+<div class="gap"></div>
+<p>保管場所マスタ。</p>
+<div class="gap"></div>
+<pre><code>CREATE TABLE IF NOT EXISTS locations (
+    id SERIAL PRIMARY KEY,
+    location_code VARCHAR(50) UNIQUE NOT NULL,
+    location_name VARCHAR(255) NOT NULL,
+    area_name VARCHAR(100),
+    location_type VARCHAR(50) DEFAULT 'warehouse',
+    is_active BOOLEAN DEFAULT true,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<div class="gap"></div>
+<h3><code>inventory_transactions</code></h3>
+<div class="gap"></div>
+<p>在庫変動履歴。原則として更新しない。</p>
+<div class="gap"></div>
+<pre><code>CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id SERIAL PRIMARY KEY,
+    transaction_type VARCHAR(50) NOT NULL,
+    transaction_status VARCHAR(30) NOT NULL DEFAULT 'posted',
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    quantity_delta INTEGER NOT NULL,
+    quantity_after INTEGER,
+    source_type VARCHAR(80),
+    source_id INTEGER,
+    source_line_id INTEGER,
+    reason_code VARCHAR(80),
+    comment TEXT,
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<div class="gap"></div>
+<p>想定 <code>transaction_type</code>:</p>
+<div class="gap"></div>
+<pre><code>initial_balance
+receiving
+shipping_allocation
+shipping_cancel
+shipping_complete
+inventory_move_out
+inventory_move_in
+inventory_adjustment
+inventory_count_adjustment
+manufacturing_consumption
+manufacturing_completion
+hold
+release_hold
+defective
+</code></pre>
+<div class="gap"></div>
+<h3><code>inventory_balances</code></h3>
+<div class="gap"></div>
+<p>品目、ロット、QR、保管場所、ステータス別の現在庫。</p>
+<div class="gap"></div>
+<pre><code>CREATE TABLE IF NOT EXISTS inventory_balances (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    inventory_status VARCHAR(30) NOT NULL DEFAULT 'available',
+    quantity INTEGER NOT NULL DEFAULT 0,
+    last_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, lot_number, qr_unit_id, location_code, inventory_status)
+);
+</code></pre>
+<div class="gap"></div>
+<p>想定 <code>inventory_status</code>:</p>
+<div class="gap"></div>
+<pre><code>available
+allocated
+inspection
+on_hold
+defective
+consumed
+shipped
+lost
+adjusted
+</code></pre>
+<div class="gap"></div>
+<h3><code>operation_events</code></h3>
+<div class="gap"></div>
+<p>出荷以外も含む共通業務イベント。</p>
+<div class="gap"></div>
+<pre><code>CREATE TABLE IF NOT EXISTS operation_events (
+    id SERIAL PRIMARY KEY,
+    event_domain VARCHAR(50) NOT NULL,
+    event_type VARCHAR(80) NOT NULL,
+    event_status VARCHAR(30) NOT NULL DEFAULT 'success',
+    product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    qr_code VARCHAR(255),
+    quantity INTEGER,
+    source_type VARCHAR(80),
+    source_id INTEGER,
+    source_line_id INTEGER,
+    before_data JSONB,
+    after_data JSONB,
+    reason_code VARCHAR(80),
+    comment TEXT,
+    user_id VARCHAR(255),
+    user_email VARCHAR(255),
+    user_name VARCHAR(255),
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<div class="gap"></div>
+<p>想定 <code>event_domain</code>:</p>
+<div class="gap"></div>
+<pre><code>shipping
+receiving
+inventory
+purchase
+sales
+manufacturing
+cycle_count
+ocr
+system
+</code></pre>
+<div class="gap"></div>
+<h2>既存テーブルへの追加案</h2>
+<div class="gap"></div>
+<h3><code>lot_inventory</code></h3>
+<div class="gap"></div>
+<p>既存互換を保つため、破壊的変更はしない。</p>
+<div class="gap"></div>
+<p>追加候補:</p>
+<div class="gap"></div>
+<pre><code>ALTER TABLE lot_inventory ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;
+ALTER TABLE lot_inventory ADD COLUMN IF NOT EXISTS inventory_status VARCHAR(30) DEFAULT 'available';
+</code></pre>
+<div class="gap"></div>
+<h3><code>qr_units</code></h3>
+<div class="gap"></div>
+<p>QR 管理単位を全業務で使うため、状態と所在を少し広げる。</p>
+<div class="gap"></div>
+<p>追加候補:</p>
+<div class="gap"></div>
+<pre><code>ALTER TABLE qr_units ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;
+ALTER TABLE qr_units ADD COLUMN IF NOT EXISTS current_quantity INTEGER;
+ALTER TABLE qr_units ADD COLUMN IF NOT EXISTS last_transaction_id INTEGER;
+</code></pre>
+<div class="gap"></div>
+<h2>互換移行方針</h2>
+<div class="gap"></div>
+<h3>Step 1: 保管場所初期化</h3>
+<div class="gap"></div>
+<p><code>lot_inventory.location</code> と <code>inventory.location</code> から <code>locations</code> を作る。</p>
+<div class="gap"></div>
+<pre><code>lot_inventory.location = 'A-1-01'
+  -&gt; locations.location_code = 'A-1-01'
+</code></pre>
+<div class="gap"></div>
+<h3>Step 2: 初期在庫トランザクション作成</h3>
+<div class="gap"></div>
+<p>既存 <code>lot_inventory</code> から <code>inventory_transactions</code> に <code>initial_balance</code> を作る。</p>
+<div class="gap"></div>
+<pre><code>lot_inventory.quantity = 80
+  -&gt; inventory_transactions.quantity_delta = 80
+  -&gt; inventory_balances.quantity = 80
+</code></pre>
+<div class="gap"></div>
+<h3>Step 3: 出荷検品との接続</h3>
+<div class="gap"></div>
+<p>既存の出荷ロット引当は現在 <code>shipping_lot_allocations</code> 作成時に <code>lot_inventory.quantity</code> を減らしている。</p>
+<div class="gap"></div>
+<p>Phase 1 では、互換挙動を保ちつつ次のイベントを追加する。</p>
+<div class="gap"></div>
+<p>| 操作 | transaction_type |</p>
+<p>|------|------------------|</p>
+<p>| ロット引当確定 | <code>shipping_allocation</code> |</p>
+<p>| ロット引当取消 | <code>shipping_cancel</code> |</p>
+<p>| 出荷完了 | <code>shipping_complete</code> |</p>
+<p>| 完了後修正 | <code>inventory_adjustment</code> |</p>
+<div class="gap"></div>
+<h3>Step 4: 集計再作成スクリプト</h3>
+<div class="gap"></div>
+<p>POC では、まず <code>inventory_balances</code> を再作成するローカルスクリプトを用意する。</p>
+<div class="gap"></div>
+<pre><code>./scripts/rebuild-inventory-balances.sh
+</code></pre>
+<div class="gap"></div>
+<p>将来は API トランザクション内で <code>inventory_balances</code> を更新する。</p>
+<div class="gap"></div>
+<h2>API 設計</h2>
+<div class="gap"></div>
+<h3>読み取り</h3>
+<div class="gap"></div>
+<pre><code>GET /api/inventory/balances
+GET /api/inventory/balances?product_id=1
+GET /api/inventory/balances?lot_number=REVIEW-P1-L1
+GET /api/inventory/balances?location_code=R-1-01
+GET /api/inventory/transactions
+GET /api/inventory/transactions?product_id=1
+GET /api/inventory/transactions?source_type=shipping_instruction
+GET /api/qr-units/:qrCode
+</code></pre>
+<div class="gap"></div>
+<h3>更新</h3>
+<div class="gap"></div>
+<pre><code>POST /api/inventory-moves
+POST /api/inventory-adjustments
+POST /api/inventory/rebuild-balances
+</code></pre>
+<div class="gap"></div>
+<p>POC では <code>POST /api/inventory/rebuild-balances</code> は管理用またはローカル限定とし、通常画面からは呼ばない。</p>
+<div class="gap"></div>
+<h2>画面設計</h2>
+<div class="gap"></div>
+<h3>在庫一覧</h3>
+<div class="gap"></div>
+<p>表示項目:</p>
+<div class="gap"></div>
+<p class="bullet">品目コード</p>
+<p class="bullet">品目名</p>
+<p class="bullet">ロット番号</p>
+<p class="bullet">QR コード</p>
+<p class="bullet">保管場所</p>
+<p class="bullet">在庫ステータス</p>
+<p class="bullet">数量</p>
+<p class="bullet">最終更新日時</p>
+<div class="gap"></div>
+<h3>在庫変動履歴</h3>
+<div class="gap"></div>
+<p>表示項目:</p>
+<div class="gap"></div>
+<p class="bullet">発生日時</p>
+<p class="bullet">変動種別</p>
+<p class="bullet">品目</p>
+<p class="bullet">ロット</p>
+<p class="bullet">QR</p>
+<p class="bullet">保管場所</p>
+<p class="bullet">数量増減</p>
+<p class="bullet">参照伝票</p>
+<p class="bullet">理由</p>
+<p class="bullet">操作ユーザー</p>
+<div class="gap"></div>
+<h3>QR 単位在庫</h3>
+<div class="gap"></div>
+<p>表示項目:</p>
+<div class="gap"></div>
+<p class="bullet">QR コード</p>
+<p class="bullet">品目</p>
+<p class="bullet">ロット</p>
+<p class="bullet">数量</p>
+<p class="bullet">保管場所</p>
+<p class="bullet">ステータス</p>
+<p class="bullet">最終スキャン日時</p>
+<div class="gap"></div>
+<h2>テスト方針</h2>
+<div class="gap"></div>
+<h3>DB テスト</h3>
+<div class="gap"></div>
+<p class="bullet"><code>locations</code> が既存 location 文字列から作成される。</p>
+<p class="bullet"><code>inventory_transactions</code> に初期在庫が作成される。</p>
+<p class="bullet"><code>inventory_balances</code> の合計が <code>lot_inventory.quantity</code> と一致する。</p>
+<p class="bullet">同じ再作成スクリプトを複数回実行しても二重計上しない。</p>
+<div class="gap"></div>
+<h3>API 契約テスト</h3>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/inventory/balances</code> が配列を返す。</p>
+<p class="bullet"><code>GET /api/inventory/transactions</code> が配列を返す。</p>
+<p class="bullet"><code>GET /api/qr-units/:qrCode</code> が QR とロット情報を返す。</p>
+<p class="bullet">M365 必須環境では未認証時に <code>401</code> になる。</p>
+<div class="gap"></div>
+<h3>現場レビュー</h3>
+<div class="gap"></div>
+<p class="bullet"><code>REVIEW-MULTI-001</code> のロット引当が在庫履歴に現れる。</p>
+<p class="bullet">QR OK / NG / duplicate が業務イベントとして追える。</p>
+<p class="bullet">出荷完了後の在庫状態を確認できる。</p>
+<div class="gap"></div>
+<h2>実装タスク</h2>
+<div class="gap"></div>
+<p class="numbered"><code>postgres/migrations</code> に Phase 1 スキーマを追加する。完了: <code>postgres/migrations/20260708_inventory_foundation.sql</code></p>
+<p class="numbered"><code>supabase-schema.sql</code> に同じスキーマを反映する。完了</p>
+<p class="numbered"><code>scripts/rebuild-inventory-balances.sh</code> を追加する。完了</p>
+<p class="numbered"><code>api/routes/inventory.js</code> に <code>/balances</code> と <code>/transactions</code> を追加する。完了</p>
+<p class="numbered"><code>api/routes/qr-units.js</code> を追加する。完了</p>
+<p class="numbered"><code>api/server.js</code> に <code>qr-units</code> ルートを追加する。完了</p>
+<p class="numbered"><code>tests/api/contract.test.js</code> に契約テストを追加する。完了</p>
+<p class="numbered"><code>docs/business-expansion-roadmap.md</code> に Phase 1 詳細文書への参照を追加する。完了</p>
+<p class="numbered">ローカル Docker でマイグレーション、再計算、API テストを実行する。</p>
+<div class="gap"></div>
+<h2>リスクと注意点</h2>
+<div class="gap"></div>
+<p>| リスク | 対策 |</p>
+<p>|--------|------|</p>
+<p>| <code>lot_inventory.quantity</code> と <code>inventory_balances.quantity</code> がずれる | Phase 1 では再計算スクリプトを正とし、差異チェックを追加する |</p>
+<p>| 出荷検品の既存挙動を壊す | 既存テーブルを破壊せず、追加テーブル方式にする |</p>
+<p>| <code>inventory</code> と新在庫 API の名前が衝突する | 既存 <code>/api/inventory</code> は維持し、まず <code>/api/inventory/balances</code> を追加する |</p>
+<p>| Supabase 反映漏れ | <code>postgres/migrations</code> と <code>supabase-schema.sql</code> の両方を更新する |</p>
+<p>| 非ローカル DB への誤投入 | データ再構築スクリプトは既定でローカル Docker 対象にする |</p>
+<div class="gap"></div>
+<h2>Phase 1 完了条件</h2>
+<div class="gap"></div>
+<p class="bullet">DB に <code>locations</code>、<code>inventory_transactions</code>、<code>inventory_balances</code>、<code>operation_events</code> が存在する。</p>
+<p class="bullet">既存 <code>lot_inventory</code> から初期在庫を作成できる。</p>
+<p class="bullet">在庫バランスを API で取得できる。</p>
+<p class="bullet">在庫変動履歴を API で取得できる。</p>
+<p class="bullet">QR コードから品目、ロット、数量、保管場所を取得できる。</p>
+<p class="bullet">既存の出荷検品 API と現場レビュー用スクリプトが引き続き成功する。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/04-purchase-receiving-phase2-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 2 発注・入庫 MVP 実装計画</h1>
+<div class="gap"></div>
+<p>作成日: 2026-07-08</p>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>推奨実装順の 2 番目として、発注から入庫予定、QR 入庫検品、在庫反映までの最小業務フローを実装する。</p>
+<div class="gap"></div>
+<h2>今回の対象</h2>
+<div class="gap"></div>
+<p class="bullet">仕入先マスタ</p>
+<p class="bullet">発注ヘッダ、発注明細</p>
+<p class="bullet">発注から入庫予定生成</p>
+<p class="bullet">入庫予定明細</p>
+<p class="bullet">QR 入庫検品</p>
+<p class="bullet">ロット在庫への反映</p>
+<p class="bullet">QR 管理単位への反映</p>
+<p class="bullet"><code>inventory_transactions</code> / <code>inventory_balances</code> への反映</p>
+<p class="bullet"><code>operation_events</code> への記録</p>
+<div class="gap"></div>
+<h2>追加 API</h2>
+<div class="gap"></div>
+<pre><code>GET  /api/suppliers
+POST /api/suppliers
+
+GET  /api/purchase-orders
+GET  /api/purchase-orders/:id
+POST /api/purchase-orders
+POST /api/purchase-orders/:id/create-receiving-order
+
+GET   /api/receiving-orders
+GET   /api/receiving-orders/:id
+POST  /api/receiving-orders/:id/scan
+PATCH /api/receiving-orders/:id/complete
+</code></pre>
+<div class="gap"></div>
+<h2>POC 方針</h2>
+<div class="gap"></div>
+<p class="bullet">入庫時にロット番号を指定する。</p>
+<p class="bullet">QR コードは任意。指定された場合は <code>qr_units</code> に登録する。</p>
+<p class="bullet">合格数量だけを利用可能在庫へ反映する。</p>
+<p class="bullet">不合格数量は入庫結果には残すが、Phase 2 MVP では不良在庫バランスにはまだ反映しない。</p>
+<p class="bullet">発注、入庫予定、入庫検品はすべて <code>operation_events</code> に記録する。</p>
+<div class="gap"></div>
+<h2>後続タスク</h2>
+<div class="gap"></div>
+<p class="numbered">発注・入庫の画面を追加する。</p>
+<p class="numbered">入庫レビュー用デモデータと API 通し実行スクリプトを追加する。</p>
+<p class="numbered">不合格、保留在庫のステータス別バランス反映を追加する。</p>
+<p class="numbered">納品書 OCR 照合へ接続する。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/05-sales-order-shipping-phase3-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 3: 受注・出荷指示生成 設計</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>受注を起点に、既存の出荷検品アプリで扱える出荷指示を生成する。POC では受注登録、受注明細登録、出荷指示生成までを対象とし、在庫引当の自動最適化は次フェーズで扱う。</p>
+<div class="gap"></div>
+<h2>業務範囲</h2>
+<div class="gap"></div>
+<p class="bullet">受注ヘッダを登録する。</p>
+<p class="bullet">受注は 1 から N 件の品目明細を持つ。</p>
+<p class="bullet">受注から出荷指示を生成する。</p>
+<p class="bullet">出荷指示は既存の <code>shipping_instructions</code> をヘッダとして利用する。</p>
+<p class="bullet">複数品目は既存の <code>shipping_instruction_lines</code> に展開する。</p>
+<p class="bullet">出荷指示生成後は、既存の PPS、ロット引当、QR 検品、出荷完了フローへ接続する。</p>
+<div class="gap"></div>
+<h2>データ設計</h2>
+<div class="gap"></div>
+<h3>追加テーブル</h3>
+<div class="gap"></div>
+<p class="bullet"><code>sales_orders</code></p>
+<p>  - 受注番号、顧客名、受注日、希望出荷日、出荷元、納品先、優先度、ステータスを保持する。</p>
+<p class="bullet"><code>sales_order_lines</code></p>
+<p>  - 受注明細として品目、受注数量、出荷済み数量、ステータスを保持する。</p>
+<div class="gap"></div>
+<h3>既存テーブルへの追加</h3>
+<div class="gap"></div>
+<p class="bullet"><code>shipping_instructions.sales_order_id</code></p>
+<p>  - 出荷指示がどの受注から生成されたかを保持する。</p>
+<p class="bullet"><code>shipping_instruction_lines.sales_order_line_id</code></p>
+<p>  - 出荷指示明細がどの受注明細から生成されたかを保持する。</p>
+<div class="gap"></div>
+<h2>API 設計</h2>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/sales-orders</code></p>
+<p>  - 受注一覧を返す。</p>
+<p class="bullet"><code>GET /api/sales-orders/:id</code></p>
+<p>  - 受注ヘッダ、受注明細、生成済み出荷指示を返す。</p>
+<p class="bullet"><code>POST /api/sales-orders</code></p>
+<p>  - 受注と受注明細を登録する。</p>
+<p class="bullet"><code>POST /api/sales-orders/:id/create-shipping-instruction</code></p>
+<p>  - 受注から出荷指示を生成する。</p>
+<div class="gap"></div>
+<h2>既存互換方針</h2>
+<div class="gap"></div>
+<p>既存の画面と API は <code>shipping_instructions.product_id</code> と <code>quantity</code> を参照する箇所が残っている。そのため、受注から出荷指示を生成するときは以下の互換値を入れる。</p>
+<div class="gap"></div>
+<p class="bullet"><code>product_id</code>: 先頭明細の品目 ID</p>
+<p class="bullet"><code>quantity</code>: 全明細の合計数量</p>
+<div class="gap"></div>
+<p>正規の複数品目情報は <code>shipping_instruction_lines</code> を正とする。</p>
+<div class="gap"></div>
+<h2>次フェーズへの接続</h2>
+<div class="gap"></div>
+<p>次の実装では、生成された出荷指示明細に対して、在庫・ロット・QR 共通基盤から候補ロットを提示し、ロット引当を行う。これにより、受注から出荷完了までの流れがつながる。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/06-inventory-count-phase4-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 4: 棚卸 設計</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>在庫・ロット・QR 共通基盤を使い、理論在庫と現物数量の差異を記録し、承認後に在庫へ反映する。POC では API と DB を先に整備し、画面は次ステップで追加する。</p>
+<div class="gap"></div>
+<h2>対象業務</h2>
+<div class="gap"></div>
+<p class="bullet">棚卸セッションを開始する。</p>
+<p class="bullet">開始時点の <code>inventory_balances</code> を棚卸明細へスナップショットする。</p>
+<p class="bullet">QR コードまたは品目・ロット・保管場所単位で実数を記録する。</p>
+<p class="bullet">理論数量と実数の差異を算出する。</p>
+<p class="bullet">棚卸完了後、承認操作で差異を在庫調整として反映する。</p>
+<p class="bullet">操作は <code>operation_events</code> と <code>inventory_transactions</code> に残す。</p>
+<div class="gap"></div>
+<h2>データ設計</h2>
+<div class="gap"></div>
+<p class="bullet"><code>inventory_count_sessions</code></p>
+<p>  - 棚卸番号、名称、対象保管場所、状態、開始・完了・承認日時を保持する。</p>
+<p class="bullet"><code>inventory_count_lines</code></p>
+<p>  - 品目、ロット、QR、保管場所、理論数量、実数、差異を保持する。</p>
+<p class="bullet"><code>inventory_adjustments</code></p>
+<p>  - 承認済み差異調整と、対応する <code>inventory_transactions</code> を保持する。</p>
+<div class="gap"></div>
+<h2>API 設計</h2>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/inventory-counts</code></p>
+<p>  - 棚卸一覧を返す。</p>
+<p class="bullet"><code>GET /api/inventory-counts/:id</code></p>
+<p>  - 棚卸ヘッダと明細を返す。</p>
+<p class="bullet"><code>POST /api/inventory-counts</code></p>
+<p>  - 棚卸を開始し、理論在庫を明細へスナップショットする。</p>
+<p class="bullet"><code>POST /api/inventory-counts/:id/scan</code></p>
+<p>  - QR または品目・ロット単位で実数を記録する。</p>
+<p class="bullet"><code>PATCH /api/inventory-counts/:id/complete</code></p>
+<p>  - 棚卸入力を完了状態にする。</p>
+<p class="bullet"><code>PATCH /api/inventory-counts/:id/approve</code></p>
+<p>  - 差異を <code>inventory_transactions</code> と <code>inventory_balances</code> へ反映する。</p>
+<div class="gap"></div>
+<h2>ステータス</h2>
+<div class="gap"></div>
+<p class="bullet"><code>draft</code>: 作成直後</p>
+<p class="bullet"><code>in_progress</code>: 棚卸中</p>
+<p class="bullet"><code>counted</code>: 入力完了</p>
+<p class="bullet"><code>approved</code>: 差異承認済み</p>
+<div class="gap"></div>
+<h2>POC 方針</h2>
+<div class="gap"></div>
+<p class="bullet">不明 QR は 404 とし、未登録 QR の新規作成は行わない。</p>
+<p class="bullet">実数入力はスキャンごとに最新値へ上書きする。</p>
+<p class="bullet">承認後の修正は別セッションで扱う。</p>
+<p class="bullet">ロット・QR の数量は差異分だけ増減し、0 未満にはしない。</p>
+<div class="gap"></div>
+<h2>次ステップ</h2>
+<div class="gap"></div>
+<p>画面側では、棚卸一覧、棚卸開始、QR スキャン入力、差異一覧、承認ボタンを追加する。現場利用では差異理由分類と承認者入力を必須にする。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/07-ocr-import-phase5-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 5: OCR 取込 設計</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>既存の OCR 抽出機能を、受注・発注・入庫業務へ接続する。POC では OCR エンジンの精度向上よりも、読み取ったテキストを業務候補として保存し、人が確認して登録できる流れを優先する。</p>
+<div class="gap"></div>
+<h2>対象範囲</h2>
+<div class="gap"></div>
+<p class="bullet">注文書 OCR から受注候補を作成する。</p>
+<p class="bullet">納品書 OCR から発注・入庫照合候補を作成する。</p>
+<p class="bullet">OCR 原文、正規化テキスト、抽出ヘッダ、明細、照合候補を保存する。</p>
+<p class="bullet">受注候補から <code>sales_orders</code> と <code>sales_order_lines</code> を作成する。</p>
+<div class="gap"></div>
+<h2>追加テーブル</h2>
+<div class="gap"></div>
+<p class="bullet"><code>ocr_documents</code></p>
+<p>  - OCR 文書ヘッダ。文書番号、文書種別、原文、正規化テキスト、抽出結果、変換先を保持する。</p>
+<p class="bullet"><code>ocr_document_lines</code></p>
+<p>  - OCR 明細。品目コード、品名、数量、単価、照合済み品目を保持する。</p>
+<p class="bullet"><code>ocr_business_matches</code></p>
+<p>  - 業務照合候補。納品書明細と発注明細などの候補を保持する。</p>
+<div class="gap"></div>
+<h2>API</h2>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/ocr-imports</code></p>
+<p>  - OCR 取込文書一覧を返す。</p>
+<p class="bullet"><code>GET /api/ocr-imports/:id</code></p>
+<p>  - OCR 文書、明細、照合候補を返す。</p>
+<p class="bullet"><code>POST /api/ocr-imports</code></p>
+<p>  - OCR テキストを登録し、ヘッダと明細を抽出する。</p>
+<p class="bullet"><code>POST /api/ocr-imports/:id/create-sales-order</code></p>
+<p>  - 注文書 OCR から受注を作成する。</p>
+<div class="gap"></div>
+<h2>文字抽出ルール</h2>
+<div class="gap"></div>
+<p>POC では以下のようなテキストを想定する。</p>
+<div class="gap"></div>
+<pre><code>注文番号: OCR-SO-001
+顧客名: POC 顧客
+希望出荷日: 2026-07-20
+PROD001 製品A 2
+PROD002 製品B 1
+</code></pre>
+<div class="gap"></div>
+<p>明細は <code>品目コード 品名 数量 [単価]</code> の順で抽出する。</p>
+<div class="gap"></div>
+<h2>納品書照合</h2>
+<div class="gap"></div>
+<p>納品書 OCR の明細は、品目コードが既存 <code>products.product_code</code> と一致する場合に、未入庫の <code>purchase_order_lines</code> と照合候補を作成する。</p>
+<div class="gap"></div>
+<p>照合候補は自動確定しない。実運用では人が確認して入庫予定または入庫実績へ反映する。</p>
+<div class="gap"></div>
+<h2>制約</h2>
+<div class="gap"></div>
+<p class="bullet">OCR 精度そのものは既存 OCR API に依存する。</p>
+<p class="bullet">GCP Document AI 連携は後回しのまま維持する。</p>
+<p class="bullet">明細抽出は POC ルールベースであり、注文書フォーマットが増えたらテンプレート化する。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/08-manufacturing-orders-phase6-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 6: 製造指図・工程実績 設計</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>生産計画と既存在庫・QR 基盤を接続し、製造指図、工程実績、部品消費、完成品入庫を記録できるようにする。</p>
+<div class="gap"></div>
+<h2>対象範囲</h2>
+<div class="gap"></div>
+<p class="bullet">工程マスタを管理する。</p>
+<p class="bullet">製造指図を発行する。</p>
+<p class="bullet">製造指図に標準工程を展開する。</p>
+<p class="bullet">工程開始・完了を記録する。</p>
+<p class="bullet">部品 QR またはロットを消費し、在庫履歴へ反映する。</p>
+<p class="bullet">完成品ロットと QR を作成し、完成品在庫として入庫する。</p>
+<p class="bullet">操作は <code>operation_events</code> と <code>inventory_transactions</code> に残す。</p>
+<div class="gap"></div>
+<h2>追加テーブル</h2>
+<div class="gap"></div>
+<p class="bullet"><code>manufacturing_processes</code></p>
+<p>  - 工程マスタ。</p>
+<p class="bullet"><code>manufacturing_orders</code></p>
+<p>  - 製造指図ヘッダ。</p>
+<p class="bullet"><code>manufacturing_order_operations</code></p>
+<p>  - 指図別工程。</p>
+<p class="bullet"><code>manufacturing_material_consumptions</code></p>
+<p>  - 部品消費実績。</p>
+<p class="bullet"><code>manufacturing_receipts</code></p>
+<p>  - 完成品入庫実績。</p>
+<div class="gap"></div>
+<h2>API</h2>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/manufacturing-orders</code></p>
+<p>  - 製造指図一覧を返す。</p>
+<p class="bullet"><code>GET /api/manufacturing-orders/:id</code></p>
+<p>  - 指図、工程、部品消費、完成入庫を返す。</p>
+<p class="bullet"><code>POST /api/manufacturing-orders</code></p>
+<p>  - 製造指図を発行し、標準工程を展開する。</p>
+<p class="bullet"><code>PATCH /api/manufacturing-orders/:id/operations/:operationId/start</code></p>
+<p>  - 工程を開始する。</p>
+<p class="bullet"><code>PATCH /api/manufacturing-orders/:id/operations/:operationId/complete</code></p>
+<p>  - 工程を完了する。</p>
+<p class="bullet"><code>POST /api/manufacturing-orders/:id/consume-material</code></p>
+<p>  - 部品ロットまたは QR を消費し、在庫を減算する。</p>
+<p class="bullet"><code>POST /api/manufacturing-orders/:id/receive-finished-good</code></p>
+<p>  - 完成品ロットと QR を作成し、在庫を増加する。</p>
+<div class="gap"></div>
+<h2>POC 方針</h2>
+<div class="gap"></div>
+<p class="bullet"><code>product_components</code> を簡易 BOM として扱う。</p>
+<p class="bullet">実際の部品品目マスタ連携は後続で強化する。</p>
+<p class="bullet">部品消費は QR があれば QR を正、なければ品目・ロットを正とする。</p>
+<p class="bullet">完成品入庫は <code>lot_inventory</code>、<code>qr_units</code>、<code>inventory_transactions</code>、<code>inventory_balances</code> へ反映する。</p>
+<p class="bullet">指図完了は完成品入庫時に自動更新する。</p>
+<div class="gap"></div>
+<h2>次ステップ</h2>
+<div class="gap"></div>
+<p>次フェーズのトレーサビリティで、製造指図、部品ロット、完成品ロット、出荷先を横断検索できるようにする。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/09-traceability-phase7-plan.md</h1>
+<div class="gap"></div>
+<h1>Phase 7: トレーサビリティ 設計</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>受注、出荷、発注、入庫、製造、在庫、QR、ロットを横断して追跡できるようにする。POC では既存テーブルに新規キーを追加せず、各業務で記録済みの番号、ロット番号、QRコード、<code>operation_events</code>、<code>inventory_transactions</code> を束ねる API を提供する。</p>
+<div class="gap"></div>
+<h2>追跡起点</h2>
+<div class="gap"></div>
+<p class="bullet">ロット番号</p>
+<p class="bullet">QR コード</p>
+<p class="bullet">業務番号</p>
+<p>  - 受注番号</p>
+<p>  - 出荷指示番号</p>
+<p>  - 発注番号</p>
+<p>  - 入庫予定番号</p>
+<p>  - 製造指図番号</p>
+<p>  - OCR 文書番号</p>
+<div class="gap"></div>
+<h2>API</h2>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/traceability/lot/:lotNumber</code></p>
+<p>  - ロットに関係する在庫履歴、入庫、製造消費、製造入庫、出荷ロット引当、業務イベントを返す。</p>
+<p class="bullet"><code>GET /api/traceability/qr/:qrCode</code></p>
+<p>  - QR 単位の履歴と、その QR が属するロットの履歴を返す。</p>
+<p class="bullet"><code>GET /api/traceability/document/:documentNo</code></p>
+<p>  - 業務番号から関連する受注、出荷指示、発注、入庫予定、製造指図、OCR 文書、業務イベントを返す。</p>
+<p class="bullet"><code>GET /api/traceability/search?q=...</code></p>
+<p>  - ロット、QR、受注、出荷指示、発注、製造指図を横断検索する。</p>
+<div class="gap"></div>
+<h2>データ参照方針</h2>
+<div class="gap"></div>
+<p class="bullet">在庫増減は <code>inventory_transactions</code> を正とする。</p>
+<p class="bullet">業務操作は <code>operation_events</code> を正とする。</p>
+<p class="bullet">QR 個体は <code>qr_units</code> を正とする。</p>
+<p class="bullet">ロット在庫は <code>lot_inventory</code> を既存互換の現在値として扱う。</p>
+<p class="bullet">出荷との接続は <code>shipping_lot_allocations</code> を優先する。</p>
+<p class="bullet">製造との接続は <code>manufacturing_material_consumptions</code> と <code>manufacturing_receipts</code> を使う。</p>
+<div class="gap"></div>
+<h2>POC の制約</h2>
+<div class="gap"></div>
+<p class="bullet">既存出荷検品の一部履歴はロット番号文字列で接続する。</p>
+<p class="bullet">完全な親子ロットツリーはまだ作らない。</p>
+<p class="bullet">製造で使用した部品ロットと完成品ロットの明示的な親子関係テーブルは次の改善候補とする。</p>
+<div class="gap"></div>
+<h2>次ステップ</h2>
+<div class="gap"></div>
+<p>次に強化する場合は、<code>lot_genealogy</code> のような専用テーブルを追加し、製造消費ロットと完成品ロットの関係を保存する。これにより、完成品ロットから部品ロットへ、部品ロットから出荷先へ、より厳密に正逆展開できる。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/10-grafana-cloud-minimal-monitoring.md</h1>
+<div class="gap"></div>
+<h1>Grafana Cloud 最小監視 設計</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>出荷検品 POC の業務状態を Grafana Cloud で確認できるようにする。初期段階では Prometheus 連携やアプリ内メトリクス SDK ではなく、Grafana Cloud の Infinity datasource から既存 API を JSON として参照する。</p>
+<div class="gap"></div>
+<h2>監視対象</h2>
+<div class="gap"></div>
+<p class="bullet">API / DB 疎通</p>
+<p class="bullet">受注残数量</p>
+<p class="bullet">発注残数量</p>
+<p class="bullet">出荷待ち件数</p>
+<p class="bullet">入庫待ち件数</p>
+<p class="bullet">棚卸差異数量</p>
+<p class="bullet">未確認アラート件数</p>
+<p class="bullet">業務イベント日次件数</p>
+<div class="gap"></div>
+<h2>追加 API</h2>
+<div class="gap"></div>
+<p>Grafana Cloud からは次の API を参照する。</p>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/monitoring/grafana-cloud/kpis</code></p>
+<p>  - KPI 一覧を配列で返す。</p>
+<p class="bullet"><code>GET /api/monitoring/grafana-cloud/backlog</code></p>
+<p>  - 受注、発注、出荷指示、入庫予定の残を返す。</p>
+<p class="bullet"><code>GET /api/monitoring/grafana-cloud/events-daily</code></p>
+<p>  - <code>operation_events</code> の日次集計を返す。</p>
+<p class="bullet"><code>GET /api/monitoring/grafana-cloud/inventory-count-variance</code></p>
+<p>  - 棚卸差異を棚卸セッション単位で返す。</p>
+<div class="gap"></div>
+<h2>Grafana Cloud 取り込み方針</h2>
+<div class="gap"></div>
+<p>Grafana Cloud では Infinity datasource を使う。</p>
+<div class="gap"></div>
+<p class="bullet">datasource UID: <code>grafanacloud-infinity</code></p>
+<p class="bullet">datasource type: <code>yesoreyeram-infinity-datasource</code></p>
+<p class="bullet">API URL の <code>__API_BASE_URL__</code> を公開 URL に置換する。</p>
+<div class="gap"></div>
+<p>公開 URL 例:</p>
+<div class="gap"></div>
+<pre><code>https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<h2>ダッシュボード定義</h2>
+<div class="gap"></div>
+<p>Grafana 側リポジトリに次の JSON を配置する。</p>
+<div class="gap"></div>
+<pre><code>C:\Users\tsuts\OneDrive\ドキュメント\Grafana\dashboards\shipping-inspection-minimal-monitoring.json
+</code></pre>
+<div class="gap"></div>
+<p>インポート前に <code>__API_BASE_URL__</code> を Azure Container Apps の公開 URL へ置換する。</p>
+<div class="gap"></div>
+<h2>POC の制約</h2>
+<div class="gap"></div>
+<p class="bullet">API 監視は JSON polling であり、Prometheus メトリクスではない。</p>
+<p class="bullet">認証必須環境では Grafana Cloud から API を読むための認証方式が別途必要。</p>
+<p class="bullet">本番運用では Application Insights、Azure Monitor、Grafana Cloud Prometheus 連携を併用する。</p>
+<div class="gap"></div>
+<h2>次ステップ</h2>
+<div class="gap"></div>
+<p class="numbered">Azure 公開 URL で追加 API が 200 を返すことを確認する。</p>
+<p class="numbered">Dashboard JSON の <code>__API_BASE_URL__</code> を公開 URL に置換する。</p>
+<p class="numbered">Grafana Cloud に Infinity datasource を設定する。</p>
+<p class="numbered">JSON をインポートする。</p>
+<p class="numbered">しきい値と通知ルールを業務基準に合わせる。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/11-m365-delegated-auth.md</h1>
+<div class="gap"></div>
+<h1>Microsoft 365 Delegated Authentication</h1>
+<div class="gap"></div>
+<p>The shipping inspection app can optionally require Microsoft 365 sign-in by using MSAL in the browser and Microsoft Graph delegated tokens.</p>
+<div class="gap"></div>
+<p>This implementation was adapted from <code>meeting-room-tool</code>:</p>
+<div class="gap"></div>
+<p class="bullet">Browser acquires a Microsoft Graph delegated access token with MSAL.js.</p>
+<p class="bullet">The shared frontend script attaches <code>Authorization: Bearer &lt;token&gt;</code> to same-origin application API calls.</p>
+<p class="bullet">The API validates the token by calling Microsoft Graph <code>/me</code>.</p>
+<p class="bullet">Tokens are not stored on the server. A short in-memory validation cache stores only a SHA-256 token hash and normalized user profile for 60 seconds.</p>
+<div class="gap"></div>
+<h2>Azure App Registration</h2>
+<div class="gap"></div>
+<p>Create or reuse a Microsoft Entra app registration.</p>
+<div class="gap"></div>
+<p>Authentication:</p>
+<div class="gap"></div>
+<p class="bullet">Platform: Single-page application</p>
+<p class="bullet">Redirect URI for local Docker: <code>http://localhost:8080</code></p>
+<p class="bullet">Redirect URI for Azure Container Apps: the current web URL, for example:</p>
+<p>  <code>https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io</code></p>
+<p class="bullet">Supported account types:</p>
+<p>  - <code>AzureADMyOrg</code> when only users in the app tenant are allowed.</p>
+<p>  - <code>AzureADMultipleOrgs</code> for the current POC, because users sign in from a different Microsoft 365 tenant.</p>
+<div class="gap"></div>
+<p>API permissions:</p>
+<div class="gap"></div>
+<p class="bullet">Microsoft Graph delegated permission: <code>User.Read</code></p>
+<div class="gap"></div>
+<p>Grant admin consent if your tenant policy requires it.</p>
+<div class="gap"></div>
+<h2>Terraform Settings</h2>
+<div class="gap"></div>
+<p>Set these values in <code>infra/terraform/terraform.tfvars</code> when enabling the feature:</p>
+<div class="gap"></div>
+<pre><code>m365_auth_enabled         = true
+m365_auth_required        = true
+m365_auth_tenant_id       = "&lt;tenant-id-or-organizations&gt;"
+m365_auth_client_id       = "&lt;client-id&gt;"
+m365_auth_scopes          = "User.Read"
+m365_auth_allowed_domains = "example.com"
+</code></pre>
+<div class="gap"></div>
+<p><code>m365_auth_allowed_domains</code> is optional. Leave it empty to allow any user accepted by the Entra app registration.</p>
+<div class="gap"></div>
+<p>For the public Azure POC, write APIs are protected separately from full M365 sign-in:</p>
+<div class="gap"></div>
+<pre><code>write_auth_mode = "enforce"
+admin_api_token = "&lt;strong-random-token&gt;"
+</code></pre>
+<div class="gap"></div>
+<p>With <code>write_auth_mode = "enforce"</code>, all <code>POST</code> / <code>PUT</code> / <code>PATCH</code> / <code>DELETE</code> requests require either a valid M365 bearer token or <code>x-admin-token</code>. Read-only <code>GET</code> endpoints remain available unless <code>m365_auth_required = true</code> is also enabled.</p>
+<div class="gap"></div>
+<h2>Current Azure POC</h2>
+<div class="gap"></div>
+<p>The Azure Container Apps POC currently uses this Entra app registration:</p>
+<div class="gap"></div>
+<pre><code>Display name: shipping-inspection-poc
+App home tenant ID: 25840d14-a711-4414-a32f-ff288351dd0a
+Application (client) ID: 06bf7a06-fff0-40d1-a405-cb5c15c54221
+Sign-in audience: AzureADMultipleOrgs
+MSAL authority: https://login.microsoftonline.com/organizations
+Redirect URIs:
+- https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+- http://localhost:8080
+Microsoft Graph delegated permission: User.Read
+</code></pre>
+<div class="gap"></div>
+<p>The public POC is configured with:</p>
+<div class="gap"></div>
+<pre><code>m365_auth_enabled  = true
+m365_auth_required = true
+m365_auth_tenant_id = "organizations"
+write_auth_mode    = "enforce"
+</code></pre>
+<div class="gap"></div>
+<p>In this mode, unauthenticated application API calls return <code>401</code>. Browser pages load normally, then <code>web/js/m365-auth.js</code> prompts for Microsoft 365 sign-in and retries same-origin API calls with <code>Authorization: Bearer &lt;Graph access token&gt;</code>.</p>
+<div class="gap"></div>
+<p>Apply Terraform after changing the values:</p>
+<div class="gap"></div>
+<pre><code>cd infra/terraform
+terraform plan
+terraform apply
+</code></pre>
+<div class="gap"></div>
+<p>Then rebuild and deploy images as usual.</p>
+<div class="gap"></div>
+<h2>Local Docker</h2>
+<div class="gap"></div>
+<p>Local Docker keeps M365 authentication disabled by default:</p>
+<div class="gap"></div>
+<pre><code>M365_AUTH_ENABLED: "false"
+M365_AUTH_REQUIRED: "false"
+</code></pre>
+<div class="gap"></div>
+<p>To test locally, edit <code>docker-compose.yml</code>:</p>
+<div class="gap"></div>
+<pre><code>M365_AUTH_ENABLED: "true"
+M365_AUTH_REQUIRED: "true"
+M365_AUTH_TENANT_ID: "&lt;tenant-id&gt;"
+M365_AUTH_CLIENT_ID: "&lt;client-id&gt;"
+M365_AUTH_SCOPES: "User.Read"
+</code></pre>
+<div class="gap"></div>
+<p>Then restart:</p>
+<div class="gap"></div>
+<pre><code>docker compose down
+docker compose up -d --build
+</code></pre>
+<div class="gap"></div>
+<h2>API Endpoints</h2>
+<div class="gap"></div>
+<p class="bullet"><code>GET /api/auth/m365/config</code>: frontend MSAL configuration</p>
+<p class="bullet"><code>GET /api/auth/m365/me</code>: validates the provided Graph delegated token and returns the signed-in user</p>
+<div class="gap"></div>
+<p>When <code>M365_AUTH_REQUIRED=true</code>, all application API routes except <code>/health</code> and <code>/auth/m365/*</code> require a valid Microsoft Graph delegated token.</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/12-azure-container-apps.md</h1>
+<div class="gap"></div>
+<h1>Azure Container Apps Deployment Notes</h1>
+<div class="gap"></div>
+<h2>Target architecture</h2>
+<div class="gap"></div>
+<p class="bullet"><code>web</code>: public Azure Container App running nginx and static files.</p>
+<p class="bullet"><code>api</code>: internal Azure Container App running Node.js/Express.</p>
+<p class="bullet"><code>web</code> proxies <code>/api/*</code> and legacy root API paths to <code>api</code> using <code>API_UPSTREAM</code>.</p>
+<p class="bullet">Container images are built from <code>web/Dockerfile</code> and <code>api/Dockerfile</code>.</p>
+<p class="bullet">Supabase is external and configured through Container Apps secrets.</p>
+<div class="gap"></div>
+<h2>Initial settings</h2>
+<div class="gap"></div>
+<p class="bullet">Azure region: <code>japaneast</code></p>
+<p class="bullet">Use case: POC</p>
+<p class="bullet">Grafana/Prometheus: deferred</p>
+<p class="bullet">GCP Document AI: deferred</p>
+<p class="bullet">API min replicas: 1</p>
+<p class="bullet">Web min replicas: 1</p>
+<div class="gap"></div>
+<h2>Required Azure parameters</h2>
+<div class="gap"></div>
+<p><code>infra/main.bicep</code> requires these secure parameters at deployment time:</p>
+<div class="gap"></div>
+<pre><code>supabaseDbHost
+supabaseDbName
+supabaseDbUser
+supabaseDbPassword
+</code></pre>
+<div class="gap"></div>
+<p>Optional later:</p>
+<div class="gap"></div>
+<pre><code>enableAwsTextract=true
+awsAccessKeyId
+awsSecretAccessKey
+enableGcpDocumentAi=true
+gcpProjectId
+documentAiProcessorId
+</code></pre>
+<div class="gap"></div>
+<h2>Deployment choices</h2>
+<div class="gap"></div>
+<p><code>azure.yaml</code> is prepared for Azure Developer CLI. <code>azd</code> was not installed in the scanned WSL environment, so install it before using <code>azd up</code>.</p>
+<div class="gap"></div>
+<p>Alternative manual deployment can use Azure CLI:</p>
+<div class="gap"></div>
+<pre><code>az group create -n rg-shipping-inspection-poc -l japaneast
+az deployment group create \
+  -g rg-shipping-inspection-poc \
+  -f infra/main.bicep \
+  -p environmentName=shipping-inspection-poc \
+  -p location=japaneast \
+  -p supabaseDbHost='&lt;host&gt;' \
+  -p supabaseDbName='postgres' \
+  -p supabaseDbUser='postgres' \
+  -p supabaseDbPassword='&lt;password&gt;'
+</code></pre>
+<div class="gap"></div>
+<p>After the first infrastructure deployment, build/push images and update the Container Apps with the real ACR images.</p>
+<div class="gap"></div>
+<h2>Validation</h2>
+<div class="gap"></div>
+<p>Minimum checks:</p>
+<div class="gap"></div>
+<pre><code>curl https://&lt;web-url&gt;/health
+curl https://&lt;web-url&gt;/api/health
+curl https://&lt;web-url&gt;/api/db-test
+curl https://&lt;web-url&gt;/api/products
+</code></pre>
+<div class="gap"></div>
+<h2>Current Deployment</h2>
+<div class="gap"></div>
+<p>Public web endpoint:</p>
+<div class="gap"></div>
+<pre><code>https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<p>Internal API FQDN:</p>
+<div class="gap"></div>
+<pre><code>shipping-inspection-poc-api.internal.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<p>The deployed app has been validated through <code>/health</code>, <code>/api/health</code>, <code>/api/db-test</code>, <code>/api/products</code>, <code>/api/shipping-instructions</code>, and <code>/api/inspectors</code>.</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/13-supabase-migration.md</h1>
+<div class="gap"></div>
+<h1>Supabase Migration Runbook</h1>
+<div class="gap"></div>
+<p>Target: Supabase PostgreSQL for the shipping inspection POC.</p>
+<div class="gap"></div>
+<h2>1. Create the Supabase project</h2>
+<div class="gap"></div>
+<p>This repo includes <code>scripts/create-supabase-project.sh</code>, which uses the Supabase Management API.</p>
+<div class="gap"></div>
+<p>Required environment variables:</p>
+<div class="gap"></div>
+<p class="bullet">Supabase personal access token</p>
+<p class="bullet">Supabase organization ID</p>
+<p class="bullet">Supabase database password</p>
+<p class="bullet">Supabase project name</p>
+<p class="bullet">Supabase region</p>
+<div class="gap"></div>
+<p>Do not upload actual values to NotebookLM.</p>
+<div class="gap"></div>
+<p>The script writes <code>supabase-project.json</code>. Wait until the project is active before applying schema.</p>
+<div class="gap"></div>
+<h2>2. Prepare schema SQL</h2>
+<div class="gap"></div>
+<pre><code>./scripts/prepare-supabase-schema.sh
+</code></pre>
+<div class="gap"></div>
+<p>This creates <code>supabase-schema.sql</code> by concatenating the existing SQL files and removing <code>GRANT ALL PRIVILEGES</code> statements that reference the old <code>production_user</code> role.</p>
+<div class="gap"></div>
+<h2>3. Apply schema</h2>
+<div class="gap"></div>
+<p>Use the direct Supabase PostgreSQL connection string from Project Settings &gt; Database.</p>
+<div class="gap"></div>
+<pre><code>psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase-schema.sql
+</code></pre>
+<div class="gap"></div>
+<p>For Supabase, typical DB settings for the API are:</p>
+<div class="gap"></div>
+<pre><code>DB_HOST=db.&lt;project-ref&gt;.supabase.co
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=&lt;project password&gt;
+DB_SSL=true
+DB_SSL_REJECT_UNAUTHORIZED=false
+</code></pre>
+<div class="gap"></div>
+<h2>4. Migrate existing data from RDS</h2>
+<div class="gap"></div>
+<p>If you need current RDS data:</p>
+<div class="gap"></div>
+<pre><code>pg_dump "$OLD_DATABASE_URL" --data-only --inserts --no-owner --no-privileges &gt; rds-data.sql
+psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f rds-data.sql
+</code></pre>
+<div class="gap"></div>
+<p>If schema drift exists between RDS and these repo migrations, dump schema separately and compare first:</p>
+<div class="gap"></div>
+<pre><code>pg_dump "$OLD_DATABASE_URL" --schema-only --no-owner --no-privileges &gt; rds-schema.sql
+</code></pre>
+<div class="gap"></div>
+<h2>5. Verification</h2>
+<div class="gap"></div>
+<p>After Container Apps deployment, verify:</p>
+<div class="gap"></div>
+<pre><code>curl https://&lt;web-url&gt;/api/db-test
+curl https://&lt;web-url&gt;/api/products
+</code></pre>
+<div class="gap"></div>
+<h2>Notes</h2>
+<div class="gap"></div>
+<p class="bullet">Keep Supabase Row Level Security disabled for these server-owned tables unless the frontend is rewritten to use Supabase directly.</p>
+<p class="bullet">Do not expose the Supabase service credentials in frontend JavaScript.</p>
+<p class="bullet">Database backup/restore endpoints in the API are suitable for POC only and should be protected before production use.</p>
+<h2>IPv4-only WSL/Docker note</h2>
+<div class="gap"></div>
+<p>If direct connection fails with Network unreachable and an IPv6 address, use Supabase Session Pooler.</p>
+<div class="gap"></div>
+<p>Set the database password and enable the pooler before running <code>scripts/apply-supabase-schema.sh</code>.</p>
+<div class="gap"></div>
+<p>If the inferred pooler host is different from your dashboard, copy the Session pooler connection string from Supabase Dashboard &gt; Connect and run:</p>
+<div class="gap"></div>
+<p>Use a Session Pooler connection string from Supabase Dashboard &gt; Connect, then run <code>scripts/apply-supabase-schema.sh</code>.</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<h2>Current Supabase Status</h2>
+<div class="gap"></div>
+<p>The Supabase project has been created and the application schema has been applied. The Azure API uses the Supabase Session Pooler, not the direct IPv6-only database endpoint.</p>
+<div class="gap"></div>
+<p>Validated through:</p>
+<div class="gap"></div>
+<pre><code>curl https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io/api/db-test
+curl https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io/api/products
+</code></pre>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/14-testing-ci.md</h1>
+<div class="gap"></div>
+<h1>テスト / CI 運用メモ</h1>
+<div class="gap"></div>
+<h2>目的</h2>
+<div class="gap"></div>
+<p>出荷検品アプリの主要な回帰を、ローカル Docker と GitHub Actions で早期に検出する。</p>
+<div class="gap"></div>
+<p>CI では次を確認する。</p>
+<div class="gap"></div>
+<p class="bullet">API JavaScript の構文チェック</p>
+<p class="bullet">API 単体テスト</p>
+<p class="bullet">API 依存関係の <code>npm audit</code></p>
+<p class="bullet">Docker Compose による Web / API / PostgreSQL 起動</p>
+<p class="bullet">画面・静的資産・主要 API のスモークテスト</p>
+<p class="bullet">API 契約テスト</p>
+<div class="gap"></div>
+<h2>ローカル実行</h2>
+<div class="gap"></div>
+<pre><code>npm --prefix api run check:syntax
+npm --prefix api test
+npm --prefix api run audit
+docker compose up -d --build
+BASE=http://localhost:8080 bash tests/smoke/smoke.sh
+BASE=http://localhost:8080 node --test tests/api/contract.test.js
+</code></pre>
+<div class="gap"></div>
+<h2>契約テストの注意</h2>
+<div class="gap"></div>
+<p><code>tests/api/contract.test.js</code> は、実行中のアプリに対して HTTP 経由で検証する。</p>
+<div class="gap"></div>
+<p>注意点:</p>
+<div class="gap"></div>
+<p class="bullet"><code>BASE</code> は原則 <code>http://localhost:8080</code> を指定する。</p>
+<p class="bullet">本番または Azure 公開 URL を <code>BASE</code> に指定しない。</p>
+<p class="bullet">帳票出力イベントの契約テストは、ローカル DB の監査ログに <code>report_printed</code> を 1 件追加する。</p>
+<p class="bullet">M365 認証必須環境では、更新系 API が <code>401</code> になることを確認して終了する。</p>
+<div class="gap"></div>
+<h2>レート制限</h2>
+<div class="gap"></div>
+<p>本番の既定値は <code>100 requests / 15 minutes</code>。</p>
+<div class="gap"></div>
+<p>ローカル Docker と CI では、スモークテストと契約テストを連続実行するため <code>RATE_LIMIT_MAX=1000</code> を設定している。</p>
+<div class="gap"></div>
+<p>本番で変更する場合は、Container Apps の API コンテナ環境変数で次を調整する。</p>
+<div class="gap"></div>
+<p class="bullet"><code>RATE_LIMIT_MAX</code></p>
+<p class="bullet"><code>RATE_LIMIT_WINDOW_MS</code></p>
+<div class="gap"></div>
+<h2>CI</h2>
+<div class="gap"></div>
+<p>GitHub Actions 定義:</p>
+<div class="gap"></div>
+<p class="bullet"><code>.github/workflows/ci.yml</code></p>
+<div class="gap"></div>
+<p>CI は <code>main</code> / <code>master</code> への push と pull request で実行する。</p>
+<div class="gap"></div>
+<p>Docker 起動直後のレースを避けるため、<code>/health</code> が成功するまで待ってからスモークテストを実行する。</p>
+<div class="gap"></div>
+<div class="gap"></div>
+<hr>
+<div class="gap"></div>
+<h1>Source: sources/15-endpoints.md</h1>
+<div class="gap"></div>
+<h1>Current Endpoints</h1>
+<div class="gap"></div>
+<p>Last updated: 2026-07-08</p>
+<div class="gap"></div>
+<h2>Public Web Endpoint</h2>
+<div class="gap"></div>
+<pre><code>https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<p>Open this URL in a browser to use the migrated application.</p>
+<div class="gap"></div>
+<h2>API Access Pattern</h2>
+<div class="gap"></div>
+<p>The API Container App is internal. External clients should call API routes through the public web app reverse proxy under <code>/api</code>.</p>
+<div class="gap"></div>
+<p>Internal API FQDN:</p>
+<div class="gap"></div>
+<pre><code>shipping-inspection-poc-api.internal.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+</code></pre>
+<div class="gap"></div>
+<h2>Public Checks</h2>
+<div class="gap"></div>
+<p>| Purpose | Endpoint | Expected |</p>
+<p>|---------|----------|----------|</p>
+<p>| Web page | <code>/index.html</code> | <code>200</code> |</p>
+<p>| Web health | <code>/health</code> | <code>healthy</code> |</p>
+<p>| M365 config | <code>/api/auth/m365/config</code> | <code>200</code> JSON |</p>
+<p>| Protected history API without token | <code>/api/shipping-instructions/1/history</code> | <code>401</code> |</p>
+<div class="gap"></div>
+<h2>Authenticated API Examples</h2>
+<div class="gap"></div>
+<p>After M365 login, the browser adds a Bearer token to same-origin API requests.</p>
+<div class="gap"></div>
+<p>Representative API paths:</p>
+<div class="gap"></div>
+<p>| Purpose | API path |</p>
+<p>|---------|----------|</p>
+<p>| Products | <code>/api/products</code> |</p>
+<p>| Shipping instructions | <code>/api/shipping-instructions</code> |</p>
+<p>| Shipping instruction lines | <code>/api/shipping-instructions/:id/lines</code> |</p>
+<p>| PPS status | <code>/api/shipping-instructions/:id/pps-status</code> |</p>
+<p>| Completion status | <code>/api/shipping-instructions/:id/completion-status</code> |</p>
+<p>| Shipping history | <code>/api/shipping-instructions/:id/history</code> |</p>
+<p>| Report event | <code>/api/shipping-instructions/:id/report-events</code> |</p>
+<p>| Inspectors | <code>/api/inspectors</code> |</p>
+<div class="gap"></div>
+<h2>Validation Commands</h2>
+<div class="gap"></div>
+<pre><code>WEB_URL="https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io"
+curl -i "$WEB_URL/index.html"
+curl -i "$WEB_URL/health"
+curl -i "$WEB_URL/api/auth/m365/config"
+curl -i "$WEB_URL/api/shipping-instructions/1/history"
+</code></pre>
+<div class="gap"></div>
+<p>Expected unauthenticated status:</p>
+<div class="gap"></div>
+<p class="bullet"><code>/index.html</code>: <code>200</code></p>
+<p class="bullet"><code>/health</code>: <code>200</code></p>
+<p class="bullet"><code>/api/auth/m365/config</code>: <code>200</code></p>
+<p class="bullet"><code>/api/shipping-instructions/1/history</code>: <code>401</code></p>
+<div class="gap"></div>
+</body></html>

@@ -1,0 +1,14 @@
+:root {
+    --page-accent: var(--color-status-hold);
+    --page-accent-dark: var(--color-text-muted);
+}
+
+.production-plans-spinner {
+    width: 3rem;
+    height: 3rem;
+}
+
+.production-plans-save-button {
+    background-color: var(--color-status-hold);
+    border-color: var(--color-status-hold);
+}

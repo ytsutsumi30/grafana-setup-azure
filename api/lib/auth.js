@@ -11,6 +11,14 @@
 const crypto = require('crypto');
 
 module.exports = function createAuth(logger) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const configuredWriteAuthMode = process.env.WRITE_AUTH_MODE;
+  const writeAuthMode = (configuredWriteAuthMode || (isProduction ? 'enforce' : 'off')).toLowerCase();
+  const adminApiToken = process.env.ADMIN_API_TOKEN || '';
+  if (!['off', 'warn', 'enforce'].includes(writeAuthMode)) {
+    throw new Error('WRITE_AUTH_MODE must be one of: off, warn, enforce');
+  }
+
   const m365AuthConfig = {
     enabled: process.env.M365_AUTH_ENABLED === 'true' &&
       Boolean(process.env.M365_AUTH_TENANT_ID) &&
@@ -111,11 +119,10 @@ module.exports = function createAuth(logger) {
         req.user = user;
         return next();
       }
-      const adminToken = process.env.ADMIN_API_TOKEN || '';
-      if (adminToken) {
+      if (adminApiToken) {
         const provided = req.get('x-admin-token') || '';
         const a = Buffer.from(provided);
-        const b = Buffer.from(adminToken);
+        const b = Buffer.from(adminApiToken);
         if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
           return next();
         }
@@ -139,11 +146,10 @@ module.exports = function createAuth(logger) {
       const user = await validateM365Token(getBearerToken(req));
       return user || null;
     }
-    const adminToken = process.env.ADMIN_API_TOKEN || '';
-    if (adminToken) {
+    if (adminApiToken) {
       const provided = req.get('x-admin-token') || '';
       const a = Buffer.from(provided);
-      const b = Buffer.from(adminToken);
+      const b = Buffer.from(adminApiToken);
       if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
         return { id: 'admin-token', displayName: 'Admin (token)' };
       }
@@ -151,10 +157,10 @@ module.exports = function createAuth(logger) {
     return null;
   }
 
-  // 更新系の段階認証。WRITE_AUTH_MODE=off|warn|enforce(既定 off)。
+  // 更新系の段階認証。production で未指定なら enforce、それ以外は off。
   async function writeAuth(req, res, next) {
     if (!WRITE_METHODS.has(req.method)) return next();
-    const mode = (process.env.WRITE_AUTH_MODE || 'off').toLowerCase();
+    const mode = writeAuthMode;
     if (mode === 'off') return next();
     if (WRITE_AUTH_EXEMPT.some((p) => req.path.startsWith(p))) return next();
     try {
@@ -201,6 +207,12 @@ module.exports = function createAuth(logger) {
     validateM365Token,
     requireAdmin,
     writeAuth,
-    requiredAuth
+    requiredAuth,
+    writeAuthMode,
+    validateProductionConfiguration() {
+      if (!isProduction || writeAuthMode !== 'enforce') return [];
+      if (m365AuthConfig.enabled || adminApiToken.length >= 32) return [];
+      return ['WRITE_AUTH_MODE=enforce requires configured M365 authentication or an ADMIN_API_TOKEN of at least 32 characters'];
+    }
   };
 };

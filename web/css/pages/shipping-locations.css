@@ -1,0 +1,5 @@
+:root { --page-accent: var(--color-status-ok); --page-accent-dark: var(--color-status-progress); }
+.shipping-locations-spinner {
+  width: 3rem;
+  height: 3rem;
+}

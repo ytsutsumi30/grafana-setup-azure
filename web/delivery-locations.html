@@ -9,15 +9,13 @@
     <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
     <link href="css/tokens.css" rel="stylesheet">
     <link href="css/components.css" rel="stylesheet">
-    <style>
-        :root { --page-accent: #17a2b8; --page-accent-dark: #138496; }
-    </style>
-    <script src="js/m365-auth.js"></script>
+    <link href="css/pages/delivery-locations.css?v=2026071001" rel="stylesheet">
+    <script src="js/m365-auth.js?v=202607070030"></script>
 </head>
 <body data-page="delivery-locations">
     <!-- ローディングオーバーレイ -->
     <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+        <div class="spinner-border text-light delivery-locations-spinner" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
     </div>
@@ -44,10 +42,10 @@
         <!-- アクションボタン -->
         <div class="row mb-4">
             <div class="col">
-                <button class="btn btn-info btn-lg" data-bs-toggle="modal" data-bs-target="#locationModal" onclick="openCreateModal()">
+                <button class="btn btn-info btn-lg" id="createDeliveryLocationButton" type="button">
                     <i class="fas fa-plus-circle me-2"></i>新規拠点登録
                 </button>
-                <button class="btn btn-outline-secondary btn-lg ms-2" onclick="loadLocations()">
+                <button class="btn btn-outline-secondary btn-lg ms-2" id="refreshDeliveryLocationsButton" type="button">
                     <i class="fas fa-sync-alt me-2"></i>更新
                 </button>
             </div>
@@ -146,7 +144,7 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times me-2"></i>キャンセル
                     </button>
-                    <button type="button" class="btn btn-info" onclick="saveLocation()">
+                    <button type="button" class="btn btn-info" id="saveDeliveryLocationButton">
                         <i class="fas fa-save me-2"></i>保存
                     </button>
                 </div>
@@ -158,254 +156,7 @@
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="js/layout.js"></script>
 
-    <script>
-        const API_BASE_URL = '/api';
-        let currentEditingId = null;
-
-        // ページ読み込み時に拠点一覧を取得
-        document.addEventListener('DOMContentLoaded', () => {
-            loadLocations();
-        });
-
-        // ローディング表示制御
-        function showLoading() {
-            document.getElementById('loadingOverlay').classList.add('active');
-        }
-
-        function hideLoading() {
-            document.getElementById('loadingOverlay').classList.remove('active');
-        }
-
-        // 拠点一覧取得
-        async function loadLocations() {
-            showLoading();
-            try {
-                const response = await fetch(`${API_BASE_URL}/delivery-locations`);
-                if (!response.ok) throw new Error('拠点一覧の取得に失敗しました');
-
-                const locations = await response.json();
-                renderLocationsTable(locations);
-            } catch (error) {
-                console.error('Error loading locations:', error);
-                showError('拠点一覧の取得に失敗しました');
-                document.getElementById('locationsTableBody').innerHTML = `
-                    <tr>
-                        <td colspan="7" class="text-center text-danger py-5">
-                            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
-                            <p>${error.message}</p>
-                        </td>
-                    </tr>
-                `;
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // テーブル描画
-        function renderLocationsTable(locations) {
-            const tbody = document.getElementById('locationsTableBody');
-
-            if (locations.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" class="text-center text-muted py-5">
-                            <i class="fas fa-inbox fa-3x mb-3"></i>
-                            <p>拠点が登録されていません</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = locations.map(location => `
-                <tr>
-                    <td><strong>${escapeHtml(location.location_code)}</strong></td>
-                    <td>${escapeHtml(location.location_name)}</td>
-                    <td>${location.address ? escapeHtml(location.address) : '<span class="text-muted">-</span>'}</td>
-                    <td>${location.phone ? escapeHtml(location.phone) : '<span class="text-muted">-</span>'}</td>
-                    <td>${location.contact_person ? escapeHtml(location.contact_person) : '<span class="text-muted">-</span>'}</td>
-                    <td><span class="badge bg-info">${escapeHtml(location.delivery_method || '宅配便')}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="openEditModal(${location.id})" title="編集">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteLocation(${location.id}, '${escapeHtml(location.location_code)}')" title="削除">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // 新規登録モーダルを開く
-        function openCreateModal() {
-            currentEditingId = null;
-            document.getElementById('modalTitle').textContent = '新規拠点登録';
-            document.getElementById('locationForm').reset();
-            document.getElementById('locationForm').classList.remove('was-validated');
-            document.getElementById('locationId').value = '';
-            document.getElementById('deliveryMethod').value = '宅配便';
-        }
-
-        // 編集モーダルを開く
-        async function openEditModal(locationId) {
-            showLoading();
-            try {
-                const response = await fetch(`${API_BASE_URL}/delivery-locations/${locationId}`);
-                if (!response.ok) throw new Error('拠点情報の取得に失敗しました');
-
-                const location = await response.json();
-
-                currentEditingId = locationId;
-                document.getElementById('modalTitle').textContent = '拠点編集';
-                document.getElementById('locationId').value = location.id;
-                document.getElementById('locationCode').value = location.location_code;
-                document.getElementById('locationName').value = location.location_name;
-                document.getElementById('address').value = location.address || '';
-                document.getElementById('phone').value = location.phone || '';
-                document.getElementById('contactPerson').value = location.contact_person || '';
-                document.getElementById('deliveryMethod').value = location.delivery_method || '宅配便';
-
-                document.getElementById('locationForm').classList.remove('was-validated');
-
-                const modal = new bootstrap.Modal(document.getElementById('locationModal'));
-                modal.show();
-            } catch (error) {
-                console.error('Error loading location:', error);
-                showError('拠点情報の取得に失敗しました');
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // 拠点保存（新規登録・更新）
-        async function saveLocation() {
-            const form = document.getElementById('locationForm');
-
-            if (!form.checkValidity()) {
-                form.classList.add('was-validated');
-                return;
-            }
-
-            const locationData = {
-                location_code: document.getElementById('locationCode').value.trim(),
-                location_name: document.getElementById('locationName').value.trim(),
-                address: document.getElementById('address').value.trim() || null,
-                phone: document.getElementById('phone').value.trim() || null,
-                contact_person: document.getElementById('contactPerson').value.trim() || null,
-                delivery_method: document.getElementById('deliveryMethod').value
-            };
-
-            showLoading();
-            try {
-                const locationId = document.getElementById('locationId').value;
-                const url = locationId ? `${API_BASE_URL}/delivery-locations/${locationId}` : `${API_BASE_URL}/delivery-locations`;
-                const method = locationId ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(locationData)
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || '保存に失敗しました');
-                }
-
-                const savedLocation = await response.json();
-
-                showSuccess(locationId ? '拠点情報を更新しました' : '拠点を登録しました');
-
-                // モーダルを閉じる
-                const modal = bootstrap.Modal.getInstance(document.getElementById('locationModal'));
-                modal.hide();
-
-                // 一覧を再読み込み
-                await loadLocations();
-            } catch (error) {
-                console.error('Error saving location:', error);
-                showError(error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // 拠点削除
-        async function deleteLocation(locationId, locationCode) {
-            if (!confirm(`拠点「${locationCode}」を削除してもよろしいですか？\n\n※出荷指示で使用されている場合は削除できません。`)) {
-                return;
-            }
-
-            showLoading();
-            try {
-                const response = await fetch(`${API_BASE_URL}/delivery-locations/${locationId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || '削除に失敗しました');
-                }
-
-                showSuccess('拠点を削除しました');
-                await loadLocations();
-            } catch (error) {
-                console.error('Error deleting location:', error);
-                showError(error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // 成功メッセージ表示
-        function showSuccess(message) {
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
-            alert.style.zIndex = '10000';
-            alert.innerHTML = `
-                <i class="fas fa-check-circle me-2"></i>${escapeHtml(message)}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            document.body.appendChild(alert);
-
-            setTimeout(() => {
-                alert.remove();
-            }, 3000);
-        }
-
-        // エラーメッセージ表示
-        function showError(message) {
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
-            alert.style.zIndex = '10000';
-            alert.innerHTML = `
-                <i class="fas fa-exclamation-circle me-2"></i>${escapeHtml(message)}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            document.body.appendChild(alert);
-
-            setTimeout(() => {
-                alert.remove();
-            }, 5000);
-        }
-
-        // HTMLエスケープ
-        function escapeHtml(text) {
-            if (text === null || text === undefined) return '';
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return String(text).replace(/[&<>"']/g, m => map[m]);
-        }
-    </script>
+    <script src="js/pages/delivery-locations.js?v=2026071001"></script>
 </body>
 </html>
-
 

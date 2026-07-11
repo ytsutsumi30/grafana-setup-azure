@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>在庫・ロット・QR基盤 - 出荷検品システム</title>
+  <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+  <link href="css/tokens.css" rel="stylesheet">
+  <link href="css/components.css" rel="stylesheet">
+  <link href="css/pages/inventory-foundation.css" rel="stylesheet">
+  <script src="js/m365-auth.js?v=202607070030"></script>
+</head>
+<body data-page="inventory-foundation" data-layout="auto">
+  <main class="container-fluid px-3 pb-4">
+    <section class="app-card card">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-4">
+            <label for="inventoryLotFilter" class="form-label">ロット番号</label>
+            <input id="inventoryLotFilter" class="form-control form-control-lg" type="search" placeholder="例: LOT / RCV / FG">
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="inventoryLocationFilter" class="form-label">ロケーション</label>
+            <input id="inventoryLocationFilter" class="form-control form-control-lg" type="search" placeholder="例: A-1-01">
+          </div>
+          <div class="col-8 col-md-4 col-lg-3">
+            <label for="inventoryStatusFilter" class="form-label">状態</label>
+            <select id="inventoryStatusFilter" class="form-select form-select-lg">
+              <option value="">すべて</option>
+              <option value="available">利用可能</option>
+              <option value="reserved">引当済</option>
+              <option value="hold">保留</option>
+              <option value="damaged">不良</option>
+            </select>
+          </div>
+          <div class="col-4 col-md-2 col-lg-2 d-grid">
+            <button id="inventoryReloadButton" class="btn btn-primary btn-lg" type="button">
+              <i class="fas fa-rotate me-1"></i>更新
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row g-2 mb-3" id="inventoryKpis"></section>
+
+    <div class="row g-3">
+      <section class="col-12 col-xxl-8">
+        <div class="app-card card">
+          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <h2 class="h6 mb-0"><i class="fas fa-boxes-stacked me-1"></i>在庫残高</h2>
+            <span id="inventoryBalanceCount" class="badge badge-pending">0件</span>
+          </div>
+          <div class="table-responsive inventory-table">
+            <table class="table table-hover table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>品目</th>
+                  <th>ロット</th>
+                  <th>QR</th>
+                  <th>場所</th>
+                  <th>状態</th>
+                  <th class="text-end">数量</th>
+                  <th>更新日時</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryBalanceBody">
+                <tr><td colspan="7" class="text-center text-muted py-4">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="col-12 col-xxl-4">
+        <div class="app-card card">
+          <div class="card-header bg-white">
+            <h2 class="h6 mb-0"><i class="fas fa-qrcode me-1"></i>QR単位照会</h2>
+          </div>
+          <div class="card-body">
+            <label for="qrLookupInput" class="form-label">QRコード</label>
+            <div class="input-group input-group-lg">
+              <input id="qrLookupInput" class="form-control" type="search" placeholder="例: QR-FG">
+              <button id="qrLookupButton" class="btn btn-outline-primary" type="button">
+                <i class="fas fa-magnifying-glass"></i>
+              </button>
+            </div>
+            <div id="qrLookupResult" class="mt-3 text-muted small">QRコードを入力してください</div>
+          </div>
+        </div>
+
+        <div class="app-card card">
+          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <h2 class="h6 mb-0"><i class="fas fa-right-left me-1"></i>直近の在庫移動</h2>
+            <span id="inventoryTransactionCount" class="badge badge-pending">0件</span>
+          </div>
+          <div id="inventoryTransactionList" class="list-group list-group-flush">
+            <div class="text-muted small p-3">読み込み中...</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pages/inventory-foundation.js"></script>
+</body>
+</html>

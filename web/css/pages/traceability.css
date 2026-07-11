@@ -1,0 +1,63 @@
+.trace-result-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.trace-kpi {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  min-height: 72px;
+}
+
+.trace-timeline {
+  border-left: 3px solid var(--color-primary);
+  margin-left: 0.75rem;
+  padding-left: 1rem;
+}
+
+.trace-event {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.trace-event::before {
+  content: "";
+  position: absolute;
+  left: calc(-1rem - 7px);
+  top: 1rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+}
+
+.trace-table {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+#traceClearButton {
+  min-width: var(--touch-target-min);
+}
+
+body[data-page="traceability"] .nav-tabs .nav-link {
+  min-height: var(--touch-target-min);
+}
+
+@media (max-width: 575.98px) {
+  .trace-timeline {
+    margin-left: 0.35rem;
+    padding-left: 0.85rem;
+  }
+
+  .trace-event {
+    padding: 0.7rem 0.8rem;
+  }
+}

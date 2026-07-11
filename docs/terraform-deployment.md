@@ -62,7 +62,6 @@ This script builds images in ACR, configures managed identity registry access, a
 WEB_URL="https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io"
 curl "$WEB_URL/health"
 curl "$WEB_URL/api/health"
-curl "$WEB_URL/api/db-test"
 curl "$WEB_URL/api/products"
 ```
 
@@ -72,7 +71,7 @@ curl "$WEB_URL/api/products"
 - GCP Document AI remains deferred. See `docs/gcp-document-ai-deferred-plan.md`.
 ## Supabase pooler correction
 
-If /api/db-test returns 	enant/user ... not found, copy the **Session pooler** connection string from Supabase Dashboard > Connect and run:
+If the administrator-authenticated `/api/db-test` returns `tenant/user ... not found`, copy the **Session pooler** connection string from Supabase Dashboard > Connect and run:
 
 `ash
 cd ~/grafana-setup-azure

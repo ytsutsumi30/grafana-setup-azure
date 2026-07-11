@@ -19,7 +19,6 @@ docker compose up -d --build
 ```bash
 curl http://localhost:8080/health
 curl http://localhost:8080/api/health
-curl http://localhost:8080/api/db-test
 curl http://localhost:8080/api/products
 curl http://localhost:8080/api/shipping-instructions
 curl http://localhost:8080/api/inspectors
@@ -41,5 +40,6 @@ docker compose down -v
 
 - Local Docker uses the `postgres` service, not Supabase.
 - Microsoft 365 authentication is disabled by default. See `docs/m365-delegated-auth.md` to enable it.
+- `/api/db-test` is disabled without administrator authentication. To use it locally, set `ADMIN_API_TOKEN` and call it with `x-admin-token`.
 - The local database credentials are POC-only values defined in `docker-compose.yml`.
 - Azure Terraform state, `terraform.tfvars`, and Supabase project metadata are not required for local Docker execution.

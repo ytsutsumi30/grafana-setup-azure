@@ -1,0 +1,4 @@
+:root {
+  --page-accent: var(--color-status-ng);
+  --page-accent-dark: var(--color-status-ng);
+}

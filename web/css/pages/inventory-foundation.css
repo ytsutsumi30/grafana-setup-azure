@@ -1,0 +1,31 @@
+.inventory-kpi {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  min-height: 76px;
+}
+
+.inventory-table {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  overflow: auto;
+}
+
+.inventory-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.inventory-transaction-item {
+  border-left: 4px solid var(--color-primary);
+}
+
+#qrLookupButton {
+  min-width: var(--touch-target-min);
+}
+
+@media (max-width: 575.98px) {
+  .inventory-table table {
+    min-width: 760px;
+  }
+}

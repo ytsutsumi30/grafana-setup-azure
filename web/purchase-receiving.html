@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>発注・入庫 - 出荷検品システム</title>
+  <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+  <link href="css/tokens.css" rel="stylesheet">
+  <link href="css/components.css" rel="stylesheet">
+  <link href="css/pages/purchase-receiving.css" rel="stylesheet">
+  <script src="js/m365-auth.js?v=202607070030"></script>
+</head>
+<body data-page="purchase-receiving" data-layout="auto">
+  <main class="container-fluid px-3 pb-4">
+    <section class="app-card card">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-4">
+            <label for="poSupplier" class="form-label">仕入先</label>
+            <select id="poSupplier" class="form-select form-select-lg"></select>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="poNumber" class="form-label">発注番号</label>
+            <input id="poNumber" class="form-control form-control-lg" type="text">
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label for="poExpectedDate" class="form-label">入庫予定日</label>
+            <input id="poExpectedDate" class="form-control form-control-lg" type="date">
+          </div>
+          <div class="col-12 col-lg-2 d-grid">
+            <button id="reloadButton" class="btn btn-outline-primary btn-lg" type="button">
+              <i class="fas fa-rotate me-1"></i>更新
+            </button>
+          </div>
+        </div>
+        <div class="row g-2 align-items-end mt-1">
+          <div class="col-12 col-lg-5">
+            <label for="poProduct" class="form-label">品目</label>
+            <select id="poProduct" class="form-select form-select-lg"></select>
+          </div>
+          <div class="col-8 col-lg-3">
+            <label for="poQuantity" class="form-label">数量</label>
+            <input id="poQuantity" class="form-control form-control-lg" type="number" min="1" step="1" value="1">
+          </div>
+          <div class="col-4 col-lg-2 d-grid">
+            <button id="createPoButton" class="btn btn-primary btn-lg" type="button">
+              <i class="fas fa-file-circle-plus me-1"></i>発注
+            </button>
+          </div>
+          <div class="col-12 col-lg-2 d-grid">
+            <a class="btn btn-outline-secondary btn-lg" href="inventory-foundation.html">
+              <i class="fas fa-warehouse me-1"></i>在庫基盤
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row g-2 mb-3" id="receivingKpis"></section>
+
+    <div class="row g-3">
+      <section class="col-12 col-xl-4">
+        <div class="app-card card">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0"><i class="fas fa-file-invoice me-1"></i>発注</h2>
+            <span id="poCount" class="badge badge-pending">0件</span>
+          </div>
+          <div id="purchaseOrderList" class="list-group list-group-flush">
+            <div class="text-muted small p-3">読み込み中...</div>
+          </div>
+        </div>
+
+        <div class="app-card card">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0"><i class="fas fa-truck-ramp-box me-1"></i>入庫予定</h2>
+            <span id="receivingCount" class="badge badge-pending">0件</span>
+          </div>
+          <div id="receivingOrderList" class="list-group list-group-flush">
+            <div class="text-muted small p-3">読み込み中...</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="col-12 col-xl-8">
+        <div id="receivingEmpty" class="app-card card">
+          <div class="card-body text-center py-5 text-muted">
+            <i class="fas fa-clipboard-list fa-2x mb-3"></i>
+            <div>入庫予定を選択すると、明細、入庫スキャン、入庫実績を表示します。</div>
+          </div>
+        </div>
+
+        <div id="receivingDetail" class="d-none">
+          <section class="app-card card">
+            <div class="card-body">
+              <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                <div>
+                  <h2 id="receivingTitle" class="h5 mb-1"></h2>
+                  <div id="receivingMeta" class="text-muted small"></div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <span id="receivingStatus" class="status-badge badge-pending">未選択</span>
+                  <button id="completeReceivingButton" class="btn btn-success" type="button">
+                    <i class="fas fa-circle-check me-1"></i>入庫完了
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="row g-3">
+            <section class="col-12 col-lg-7">
+              <div class="app-card card">
+                <div class="card-header bg-white">
+                  <h3 class="h6 mb-0"><i class="fas fa-list-check me-1"></i>入庫明細</h3>
+                </div>
+                <div id="receivingLines" class="list-group list-group-flush"></div>
+              </div>
+            </section>
+
+            <section class="col-12 col-lg-5">
+              <div class="app-card card">
+                <div class="card-header bg-white">
+                  <h3 class="h6 mb-0"><i class="fas fa-qrcode me-1"></i>入庫スキャン入力</h3>
+                </div>
+                <div class="card-body">
+                  <label for="scanLine" class="form-label">明細</label>
+                  <select id="scanLine" class="form-select form-select-lg mb-2"></select>
+                  <label for="scanQr" class="form-label">QRコード</label>
+                  <input id="scanQr" class="form-control form-control-lg mb-2" type="text" placeholder="任意。QR単位管理する場合に入力">
+                  <label for="scanLot" class="form-label">ロット番号</label>
+                  <input id="scanLot" class="form-control form-control-lg mb-2" type="text" placeholder="必須">
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label for="scanQuantity" class="form-label">入庫数量</label>
+                      <input id="scanQuantity" class="form-control form-control-lg" type="number" min="1" step="1" value="1">
+                    </div>
+                    <div class="col-6">
+                      <label for="scanLocation" class="form-label">場所</label>
+                      <input id="scanLocation" class="form-control form-control-lg" type="text" value="RECEIVING">
+                    </div>
+                  </div>
+                  <label for="scanStatus" class="form-label mt-2">検査結果</label>
+                  <select id="scanStatus" class="form-select form-select-lg">
+                    <option value="accepted">合格</option>
+                    <option value="on_hold">保留</option>
+                    <option value="rejected">不合格</option>
+                  </select>
+                  <label for="scanComment" class="form-label mt-2">コメント</label>
+                  <input id="scanComment" class="form-control form-control-lg" type="text" placeholder="任意">
+                  <div class="d-grid mt-3">
+                    <button id="scanButton" class="btn btn-primary btn-field" type="button">
+                      <i class="fas fa-box-open me-1"></i>入庫登録
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="app-card card">
+            <div class="card-header bg-white">
+              <h3 class="h6 mb-0"><i class="fas fa-clock-rotate-left me-1"></i>入庫実績</h3>
+            </div>
+            <div id="receivingResults" class="table-responsive receiving-table"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pages/purchase-receiving.js"></script>
+</body>
+</html>

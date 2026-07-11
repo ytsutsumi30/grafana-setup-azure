@@ -44,7 +44,9 @@ DB_NAME=postgres
 DB_USER=postgres
 DB_PASSWORD=<project password>
 DB_SSL=true
-DB_SSL_REJECT_UNAUTHORIZED=false
+# Omit this setting to verify the server certificate (recommended).
+# Set false only when a private/self-signed CA has been explicitly approved.
+DB_SSL_REJECT_UNAUTHORIZED=true
 ```
 
 ## 4. Migrate existing data from RDS
@@ -67,7 +69,6 @@ pg_dump "$OLD_DATABASE_URL" --schema-only --no-owner --no-privileges > rds-schem
 After Container Apps deployment, verify:
 
 ```bash
-curl https://<web-url>/api/db-test
 curl https://<web-url>/api/products
 ```
 
@@ -75,7 +76,7 @@ curl https://<web-url>/api/products
 
 - Keep Supabase Row Level Security disabled for these server-owned tables unless the frontend is rewritten to use Supabase directly.
 - Do not expose the Supabase service credentials in frontend JavaScript.
-- Database backup/restore endpoints in the API are suitable for POC only and should be protected before production use.
+- Database backup/restore and `/api/db-test` endpoints require administrator authentication. Keep their credentials outside browser code.
 ## IPv4-only WSL/Docker note
 
 If direct connection fails with Network unreachable and an IPv6 address, use Supabase Session Pooler.
@@ -98,9 +99,8 @@ export SUPABASE_DB_URL='postgresql://postgres.<project-ref>:<password>@aws-0-ap-
 
 The Supabase project has been created and the application schema has been applied. The Azure API uses the Supabase Session Pooler, not the direct IPv6-only database endpoint.
 
-Validated through:
+Validated through (the database diagnostic uses administrator authentication):
 
 ```bash
-curl https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io/api/db-test
 curl https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io/api/products
 ```

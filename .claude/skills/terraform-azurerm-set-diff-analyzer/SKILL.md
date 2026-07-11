@@ -1,48 +1,32 @@
 ---
 name: terraform-azurerm-set-diff-analyzer
-description: Analyze Terraform plan JSON output for AzureRM Provider to distinguish between false-positive diffs (order-only changes in Set-type attributes) and actual resource changes. Use when reviewing terraform plan output for Azure resources like Application Gateway, Load Balancer, Firewall, Front Door, NSG, and other resources with Set-type attributes that cause spurious diffs due to internal ordering changes.
+description: AzureRM Providerの terraform plan 出力をJSON解析し、Set型属性の順序変化による偽陽性diffと実変更を区別するとき。「planの差分が多すぎる」「Application Gateway/Load Balancer/NSG/Front Door/Firewallで全要素changedになる」「CI/CDでplanレビューを自動化したい」等。Azure以外のproviderの一般的なplanレビューには使わない。
 license: MIT
 ---
 
 # Terraform AzureRM Set Diff Analyzer
 
-A skill to identify "false-positive diffs" in Terraform plans caused by AzureRM Provider's Set-type attributes and distinguish them from actual changes.
+背景: TerraformのSet型は位置比較のため、要素の追加/削除で全要素が「変更」に見える。AzureRMのSet型多用リソースで顕著。
 
-## When to Use
-
-- `terraform plan` shows many changes, but you only added/removed a single element
-- Application Gateway, Load Balancer, NSG, etc. show "all elements changed"
-- You want to automatically filter false-positive diffs in CI/CD
-
-## Background
-
-Terraform's Set type compares by position rather than by key, so when adding or removing elements, all elements appear as "changed". This is a general Terraform issue, but it's particularly noticeable with AzureRM resources that heavily use Set-type attributes like Application Gateway, Load Balancer, and NSG.
-
-These "false-positive diffs" don't actually affect the resources, but they make reviewing terraform plan output difficult.
-
-## Prerequisites
-
-- Python 3.8+
-
-If Python is unavailable, install via your package manager (e.g., `apt install python3`, `brew install python3`) or from [python.org](https://www.python.org/downloads/).
-
-## Basic Usage
+## DO(やること)
 
 ```bash
-# 1. Generate plan JSON output
 terraform plan -out=plan.tfplan
 terraform show -json plan.tfplan > plan.json
-
-# 2. Analyze
-python scripts/analyze_plan.py plan.json
+python scripts/analyze_plan.py plan.json   # python3でも可・標準ライブラリのみ(3.8+)
 ```
 
-## Troubleshooting
+- 対応リソース・属性は `references/azurerm_set_attributes.md` を確認する。
+- 全オプション・出力形式・exit code・CI/CD組込例は `scripts/README.md`。
 
-- **`python: command not found`**: Use `python3` instead, or install Python
-- **`ModuleNotFoundError`**: Script uses only standard library; ensure Python 3.8+
+## DON'T(やらないこと)
 
-## Detailed Documentation
+- JSON planなしの目視判定(人手でのSet属性diff読解は誤りやすい)。
+- 偽陽性と実変更の混在報告(必ず区別して提示)。
+- 解析スクリプトへの依存ライブラリ追加(標準ライブラリ維持)。
 
-- [scripts/README.md](scripts/README.md) - All options, output formats, exit codes, CI/CD examples
-- [references/azurerm_set_attributes.md](references/azurerm_set_attributes.md) - Supported resources and attributes
+## OUTPUT FORMAT(出力の型)
+
+- 判定表: リソース → 偽陽性(順序のみ) / 実変更(内容) の区分と根拠
+- 実変更のみの要約(applyの判断材料)
+- CI利用時は exit code の意味(scripts/README.md 準拠)を併記

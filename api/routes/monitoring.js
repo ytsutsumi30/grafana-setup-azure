@@ -474,6 +474,148 @@ router.get('/dashboard-summary', async (req, res) => {
     }
 });
 
+// --- Grafana Cloud 最小監視(JSON API / Infinity datasource向け) ---
+
+router.get('/grafana-cloud/kpis', async (req, res) => {
+    try {
+        const [
+            health,
+            salesBacklog,
+            purchaseBacklog,
+            shippingPending,
+            receivingPending,
+            inventoryVariance,
+            unacknowledgedAlerts
+        ] = await Promise.all([
+            pool.query('SELECT NOW() AS db_time'),
+            pool.query(`
+                SELECT COALESCE(SUM(ordered_quantity - shipped_quantity), 0)::int AS quantity
+                FROM sales_order_lines
+                WHERE status <> 'cancelled'
+            `),
+            pool.query(`
+                SELECT COALESCE(SUM(ordered_quantity - received_quantity), 0)::int AS quantity
+                FROM purchase_order_lines
+                WHERE status <> 'cancelled'
+            `),
+            pool.query(`
+                SELECT COUNT(*)::int AS count
+                FROM shipping_instructions
+                WHERE status IN ('pending','processing','picking','picked','packing','packed')
+            `),
+            pool.query(`
+                SELECT COUNT(*)::int AS count
+                FROM receiving_orders
+                WHERE status IN ('pending','in_progress','partial')
+            `),
+            pool.query(`
+                SELECT COALESCE(SUM(ABS(variance_quantity)), 0)::int AS quantity,
+                       COUNT(*) FILTER (WHERE COALESCE(variance_quantity, 0) <> 0)::int AS lines
+                FROM inventory_count_lines
+            `),
+            pool.query(`
+                SELECT COUNT(*)::int AS count
+                FROM monitoring_alerts
+                WHERE NOT is_acknowledged
+                  AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+            `)
+        ]);
+
+        res.json([
+            { metric: 'api_db_health', value: 1, unit: 'status', status: 'ok', observed_at: health.rows[0].db_time },
+            { metric: 'sales_order_backlog_quantity', value: Number(salesBacklog.rows[0].quantity || 0), unit: 'qty', status: 'info' },
+            { metric: 'purchase_order_backlog_quantity', value: Number(purchaseBacklog.rows[0].quantity || 0), unit: 'qty', status: 'info' },
+            { metric: 'shipping_pending_count', value: Number(shippingPending.rows[0].count || 0), unit: 'count', status: Number(shippingPending.rows[0].count || 0) > 20 ? 'warning' : 'ok' },
+            { metric: 'receiving_pending_count', value: Number(receivingPending.rows[0].count || 0), unit: 'count', status: Number(receivingPending.rows[0].count || 0) > 20 ? 'warning' : 'ok' },
+            { metric: 'inventory_count_variance_quantity_abs', value: Number(inventoryVariance.rows[0].quantity || 0), unit: 'qty', status: Number(inventoryVariance.rows[0].quantity || 0) > 0 ? 'warning' : 'ok' },
+            { metric: 'inventory_count_variance_lines', value: Number(inventoryVariance.rows[0].lines || 0), unit: 'count', status: Number(inventoryVariance.rows[0].lines || 0) > 0 ? 'warning' : 'ok' },
+            { metric: 'unacknowledged_alert_count', value: Number(unacknowledgedAlerts.rows[0].count || 0), unit: 'count', status: Number(unacknowledgedAlerts.rows[0].count || 0) > 0 ? 'warning' : 'ok' }
+        ]);
+    } catch (error) {
+        logger.error('Error fetching Grafana Cloud KPIs:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/grafana-cloud/backlog', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 'sales_orders' AS domain,
+                   COUNT(DISTINCT so.id)::int AS open_count,
+                   COALESCE(SUM(sol.ordered_quantity - sol.shipped_quantity), 0)::int AS open_quantity
+            FROM sales_orders so
+            LEFT JOIN sales_order_lines sol ON sol.sales_order_id = so.id
+            WHERE so.status NOT IN ('cancelled','closed')
+            UNION ALL
+            SELECT 'purchase_orders',
+                   COUNT(DISTINCT po.id)::int,
+                   COALESCE(SUM(pol.ordered_quantity - pol.received_quantity), 0)::int
+            FROM purchase_orders po
+            LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id
+            WHERE po.status NOT IN ('cancelled','received','closed')
+            UNION ALL
+            SELECT 'shipping_instructions',
+                   COUNT(*)::int,
+                   COALESCE(SUM(quantity), 0)::int
+            FROM shipping_instructions
+            WHERE status IN ('pending','processing','picking','picked','packing','packed')
+            UNION ALL
+            SELECT 'receiving_orders',
+                   COUNT(*)::int,
+                   0::int
+            FROM receiving_orders
+            WHERE status IN ('pending','in_progress','partial')
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching Grafana Cloud backlog:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/grafana-cloud/events-daily', async (req, res) => {
+    try {
+        const { days = 14 } = req.query;
+        const result = await pool.query(`
+            SELECT DATE(occurred_at)::text AS event_date,
+                   event_domain,
+                   event_type,
+                   COUNT(*)::int AS event_count
+            FROM operation_events
+            WHERE occurred_at >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
+            GROUP BY DATE(occurred_at), event_domain, event_type
+            ORDER BY event_date, event_domain, event_type
+        `, [parseInt(days)]);
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching Grafana Cloud daily events:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/grafana-cloud/inventory-count-variance', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT s.count_no,
+                   s.count_name,
+                   s.status,
+                   COUNT(l.id) FILTER (WHERE COALESCE(l.variance_quantity, 0) <> 0)::int AS variance_lines,
+                   COALESCE(SUM(l.variance_quantity), 0)::int AS variance_quantity,
+                   COALESCE(SUM(ABS(l.variance_quantity)), 0)::int AS variance_quantity_abs,
+                   MAX(COALESCE(l.counted_at, s.updated_at)) AS last_counted_at
+            FROM inventory_count_sessions s
+            LEFT JOIN inventory_count_lines l ON l.inventory_count_session_id = s.id
+            GROUP BY s.id
+            ORDER BY last_counted_at DESC NULLS LAST, s.id DESC
+            LIMIT 50
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching Grafana Cloud inventory count variance:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // サンプルデータ生成エンドポイント
 router.post('/generate-sample-data', requireAdmin, async (req, res) => {
     const client = await pool.connect();

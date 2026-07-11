@@ -2,23 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const winston = require('winston');
-const { Pool } = require('pg');
-const Joi = require('joi');
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
-const crypto = require('crypto');
 require('dotenv').config();
-
-const execPromise = util.promisify(exec);
 
 // OCRルートのインポート
 const ocrRoutes = require('./routes/ocr');
 const ocrEnhanceRoutes = require('./routes/ocr-enhance');
 const ocrAiRoutes = require('./routes/ocr-ai');
-const ocrFeedbackRoutes = require('./routes/ocr-feedback');
+const createOcrFeedbackRoutes = require('./routes/ocr-feedback');
+const ocrImportsRoutes = require('./routes/ocr-imports');
 const reportsRoutes = require('./routes/reports');
 const qcToolsRoutes = require('./routes/qc-tools');
 const monitoringRoutes = require('./routes/monitoring');
@@ -30,6 +21,14 @@ const inventoryRoutes = require('./routes/inventory');
 const inspectorsRoutes = require('./routes/inspectors');
 const newQcRoutes = require('./routes/new-qc');
 const lotInventoryRoutes = require('./routes/lot-inventory');
+const qrUnitsRoutes = require('./routes/qr-units');
+const inventoryCountsRoutes = require('./routes/inventory-counts');
+const suppliersRoutes = require('./routes/suppliers');
+const purchaseOrdersRoutes = require('./routes/purchase-orders');
+const receivingOrdersRoutes = require('./routes/receiving-orders');
+const salesOrdersRoutes = require('./routes/sales-orders');
+const manufacturingOrdersRoutes = require('./routes/manufacturing-orders');
+const traceabilityRoutes = require('./routes/traceability');
 const pickingInstructionsRoutes = require('./routes/picking-instructions');
 const packingRecordsRoutes = require('./routes/packing-records');
 const logsRoutes = require('./routes/logs');
@@ -55,9 +54,10 @@ const auth = require('./lib/auth')(logger);
 const cookieParser = require('cookie-parser');
 const oidc = require('./lib/oidc')(logger);
 const { m365AuthConfig, getBearerToken, validateM365Token, requireAdmin } = auth;
-
-// システム設定(共有・可変)
-const systemConfig = require('./lib/config');
+const configurationErrors = auth.validateProductionConfiguration();
+if (configurationErrors.length) {
+    throw new Error(`Invalid production security configuration: ${configurationErrors.join('; ')}`);
+}
 
 // プロキシ信頼設定（nginxリバースプロキシ対応）
 app.set('trust proxy', 1);
@@ -76,8 +76,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // レート制限（プロキシ対応）
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15分
-    max: 100, // リクエスト数制限
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000), // 15分
+    max: Number(process.env.RATE_LIMIT_MAX || 100), // リクエスト数制限
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     // プロキシ環境での正確なIP取得
@@ -99,7 +99,7 @@ app.use((req, res, next) => {
 });
 
 // 更新系(POST/PUT/PATCH/DELETE)の段階認証(lib/auth の writeAuth)
-// WRITE_AUTH_MODE=off|warn|enforce で制御(既定 off)。
+// WRITE_AUTH_MODE=off|warn|enforce で制御(本番の未指定値は enforce)。
 app.use(auth.writeAuth);
 
 // ヘルスチェック
@@ -149,7 +149,9 @@ app.use(oidc.wall);
 
 // === OCR API（AWS Textract） ===
 app.use('/api/ocr-ai', ocrAiRoutes);
-app.use('/api/ocr-feedback', ocrFeedbackRoutes);
+app.use('/api/ocr-feedback', createOcrFeedbackRoutes({ requireAdmin }));
+app.use('/ocr-imports', ocrImportsRoutes);
+app.use('/api/ocr-imports', ocrImportsRoutes);
 app.use('/ocr', ocrRoutes);
 app.use('/api/ocr', ocrEnhanceRoutes);
 app.use('/reports', reportsRoutes);
@@ -174,6 +176,22 @@ app.use('/new-qc', newQcRoutes);
 app.use('/api/new-qc', newQcRoutes);
 app.use('/lot-inventory', lotInventoryRoutes);
 app.use('/api/lot-inventory', lotInventoryRoutes);
+app.use('/qr-units', qrUnitsRoutes);
+app.use('/api/qr-units', qrUnitsRoutes);
+app.use('/inventory-counts', inventoryCountsRoutes);
+app.use('/api/inventory-counts', inventoryCountsRoutes);
+app.use('/suppliers', suppliersRoutes);
+app.use('/api/suppliers', suppliersRoutes);
+app.use('/purchase-orders', purchaseOrdersRoutes);
+app.use('/api/purchase-orders', purchaseOrdersRoutes);
+app.use('/receiving-orders', receivingOrdersRoutes);
+app.use('/api/receiving-orders', receivingOrdersRoutes);
+app.use('/sales-orders', salesOrdersRoutes);
+app.use('/api/sales-orders', salesOrdersRoutes);
+app.use('/manufacturing-orders', manufacturingOrdersRoutes);
+app.use('/api/manufacturing-orders', manufacturingOrdersRoutes);
+app.use('/traceability', traceabilityRoutes);
+app.use('/api/traceability', traceabilityRoutes);
 app.use('/picking-instructions', pickingInstructionsRoutes);
 app.use('/api/picking-instructions', pickingInstructionsRoutes);
 app.use('/packing-records', packingRecordsRoutes);
@@ -194,11 +212,8 @@ app.use('/shipping-instruction-lines', shippingLotsRoutes);
 app.use('/api/shipping-instruction-lines', shippingLotsRoutes);
 app.use('/database', databaseRoutes(requireAdmin));
 app.use('/api/database', databaseRoutes(requireAdmin));
-app.use('/api/ocr-ai', ocrAiRoutes);
-app.use('/api/ocr-feedback', ocrFeedbackRoutes);
-
-// データベース接続テスト
-app.get('/db-test', async (req, res) => {
+// データベース接続テストは管理者限定。公開エンドポイントから接続状態を露出しない。
+app.get('/db-test', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT NOW()');
         res.json({
@@ -211,18 +226,6 @@ app.get('/db-test', async (req, res) => {
     }
 });
 
-// === 製品関連API ===
-
-// バリデーションスキーマ
-const productSchema = Joi.object({
-    product_code: Joi.string().max(50).required(),
-    product_name: Joi.string().max(255).required(),
-    description: Joi.string().allow('', null),
-    unit_price: Joi.number().min(0).allow(null),
-    category: Joi.string().max(100).allow('', null)
-});
-
-// 製品一覧取得
 app.use((err, req, res, next) => {
     logger.error('Unhandled error:', err);
     res.status(500).json({ error: 'Internal server error' });

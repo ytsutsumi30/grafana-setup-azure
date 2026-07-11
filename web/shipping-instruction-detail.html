@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>出荷指示詳細 - 出荷検品システム</title>
+  <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+  <link href="css/tokens.css" rel="stylesheet">
+  <link href="css/components.css" rel="stylesheet">
+  <link href="css/pages/shipping-instruction-detail.css?v=2026071001" rel="stylesheet">
+  <script src="js/m365-auth.js?v=202607070030"></script>
+</head>
+<body data-page="shipping-instruction-detail" data-layout="auto">
+  <main class="container-fluid px-3 pb-4">
+    <section id="detailLoading" class="app-card card">
+      <div class="card-body text-center py-5 text-muted">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="mt-3">出荷指示詳細を読み込んでいます...</div>
+      </div>
+    </section>
+
+    <section id="detailError" class="app-card card d-none">
+      <div class="card-body text-center py-5 text-danger">
+        <i class="fas fa-triangle-exclamation fa-2x mb-3"></i>
+        <div id="detailErrorMessage">出荷指示詳細を読み込めませんでした。</div>
+        <a class="btn btn-outline-secondary mt-3" href="shipping-instructions.html">
+          <i class="fas fa-arrow-left me-1"></i>一覧へ戻る
+        </a>
+      </div>
+    </section>
+
+    <div id="detailContent" class="d-none">
+      <section class="app-card card detail-hero">
+        <div class="card-body">
+          <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
+            <div>
+              <div class="text-muted small">出荷指示</div>
+              <h2 class="h4 mb-1" id="instructionTitle">-</h2>
+              <div class="detail-meta" id="instructionMeta">-</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              <span id="instructionStatus" class="status-badge"></span>
+              <a id="quantityLink" class="btn btn-primary btn-sm" href="#">
+                <i class="fas fa-boxes-stacked me-1"></i>出荷数入力
+              </a>
+              <a id="ppsLink" class="btn btn-success btn-sm" href="#">
+                <i class="fas fa-boxes-packing me-1"></i>PPS
+              </a>
+              <a id="historyLink" class="btn btn-outline-secondary btn-sm" href="#">
+                <i class="fas fa-clock-rotate-left me-1"></i>履歴
+              </a>
+            </div>
+          </div>
+          <div class="row g-2 mt-3" id="detailKpis"></div>
+        </div>
+      </section>
+
+      <section id="blockerCard" class="app-card card d-none">
+        <div class="card-body">
+          <h3 class="h6 mb-2"><i class="fas fa-circle-exclamation me-1"></i>出荷完了ブロッカー</h3>
+          <div id="blockerList"></div>
+        </div>
+      </section>
+
+      <section id="nextActionCard" class="app-card card detail-next-action">
+        <div class="card-body">
+          <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
+            <div>
+              <div class="text-muted small">次に必要な作業</div>
+              <h3 id="nextActionTitle" class="h5 mb-1">-</h3>
+              <div id="nextActionDescription" class="detail-meta">-</div>
+            </div>
+            <div id="nextActionButtons" class="d-flex gap-2 flex-wrap justify-content-end"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="row g-3">
+        <section class="col-12 col-xl-8">
+          <div class="app-card card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h3 class="h6 mb-0"><i class="fas fa-layer-group me-1"></i>品目・ロット・QR進捗</h3>
+              <button id="refreshButton" class="btn btn-outline-secondary btn-sm" type="button" title="更新">
+                <i class="fas fa-rotate"></i>
+              </button>
+            </div>
+            <div class="card-body">
+              <div id="lineCards" class="row g-2"></div>
+            </div>
+          </div>
+
+          <div class="app-card card">
+            <div class="card-header bg-white">
+              <h3 class="h6 mb-0"><i class="fas fa-qrcode me-1"></i>QR/スキャン履歴</h3>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>日時</th>
+                      <th>結果</th>
+                      <th>品目</th>
+                      <th>ロット / QR</th>
+                      <th class="text-end">数量</th>
+                      <th>理由・メッセージ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="scanRows"></tbody>
+                </table>
+              </div>
+              <div id="scanCards" class="detail-scan-cards"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="col-12 col-xl-4">
+          <section class="app-card card">
+            <div class="card-header bg-white">
+              <h3 class="h6 mb-0"><i class="fas fa-route me-1"></i>作業状態</h3>
+            </div>
+            <div class="card-body">
+              <div id="workflowSteps" class="detail-timeline"></div>
+            </div>
+          </section>
+
+          <section class="app-card card">
+            <div class="card-header bg-white">
+              <h3 class="h6 mb-0"><i class="fas fa-file-lines me-1"></i>帳票</h3>
+            </div>
+            <div class="list-group list-group-flush">
+              <a id="inspectionReportLink" class="list-group-item list-group-item-action" href="#">
+                <i class="fas fa-clipboard-check me-1"></i>出荷検品結果票
+              </a>
+              <a id="lotReportLink" class="list-group-item list-group-item-action" href="#">
+                <i class="fas fa-table-list me-1"></i>ロット別出荷実績票
+              </a>
+            </div>
+          </section>
+
+          <section class="app-card card">
+            <div class="card-header bg-white">
+              <h3 class="h6 mb-0"><i class="fas fa-shield-halved me-1"></i>監査ログ</h3>
+            </div>
+            <div id="auditList" class="list-group list-group-flush"></div>
+          </section>
+        </aside>
+      </div>
+
+      <section id="detailActionBar" class="detail-action-bar" aria-live="polite"></section>
+    </div>
+  </main>
+
+  <div class="modal fade" id="detailCorrectionModal" tabindex="-1" aria-labelledby="detailCorrectionTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h2 class="modal-title h5" id="detailCorrectionTitle">
+            <i class="fas fa-pen-to-square me-2"></i>出荷完了後修正
+          </h2>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="閉じる"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning small py-2">
+            出荷完了後のロット・数量修正は監査ログに記録されます。理由とコメントを必ず入力してください。
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="detailCorrectionAllocation">修正対象ロット</label>
+            <select id="detailCorrectionAllocation" class="form-select"></select>
+          </div>
+          <div class="row g-2">
+            <div class="col-12 col-sm-6">
+              <label class="form-label" for="detailCorrectionLotNumber">修正後ロット番号</label>
+              <input type="text" id="detailCorrectionLotNumber" class="form-control" autocomplete="off">
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label" for="detailCorrectionQuantity">修正後数量</label>
+              <input type="number" id="detailCorrectionQuantity" class="form-control" min="1" inputmode="numeric">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label" for="detailCorrectionReason">修正理由</label>
+            <select id="detailCorrectionReason" class="form-select">
+              <option value="lot_entry_error">ロット入力誤り</option>
+              <option value="quantity_entry_error">数量入力誤り</option>
+              <option value="customer_request">顧客依頼</option>
+              <option value="inventory_adjustment">在庫調整</option>
+              <option value="other">その他</option>
+            </select>
+          </div>
+          <div class="mt-3">
+            <label class="form-label" for="detailCorrectionComment">コメント</label>
+            <textarea id="detailCorrectionComment" class="form-control" rows="3" placeholder="修正理由の詳細を入力"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="detailCorrectionSubmit" class="btn btn-success detail-primary-action w-100" type="button">
+            <i class="fas fa-check me-1"></i>理由付きで修正
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pages/shipping-instruction-detail.js?v=2026071002"></script>
+</body>
+</html>

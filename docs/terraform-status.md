@@ -1,45 +1,89 @@
 # Terraform Status
 
-Terraform is now the primary deployment path.
+Last updated: 2026-07-08
 
-## Current Terraform stack
+Terraform is the primary infrastructure deployment path for the Azure Container Apps + Supabase POC.
 
-Path: infra/terraform
+## Current Terraform Stack
 
-Validated with:
+Path:
 
-`ash
+```text
+infra/terraform
+```
+
+Validation commands:
+
+```bash
 cd ~/grafana-setup-azure/infra/terraform
 terraform fmt -recursive
 terraform init -backend=false
 terraform validate
-`
+```
 
-Result: valid.
+## Important Distinction
 
-## Important distinction
+The original repository also contains `terraform/`, but that stack targets AWS EC2/RDS/Route53 and GCP Document AI.
 
-The original source repository contains `terraform/`, but that stack targets AWS EC2/RDS/Route53 and GCP Document AI. It is not used for the Azure Container Apps + Supabase migration.
+For the Azure Container Apps + Supabase migration, use only:
 
-The new Azure stack is under infra/terraform and creates:
+```text
+infra/terraform
+```
+
+## Azure Resources
+
+The Azure Terraform stack creates and manages:
 
 - Azure Resource Group
 - Log Analytics Workspace
 - Application Insights
 - Azure Container Registry
 - Azure Container Apps Environment
-- Internal pi Container App
-- External web Container App
+- Internal API Container App
+- External Web Container App
 - Managed Identity based ACR pull role assignments
 
-## Deployment flow
+## Current Deployment
 
-1. Apply Terraform infrastructure with placeholder images.
-2. Run scripts/deploy-images-terraform.sh to build images in ACR and update Container Apps.
-
-
-## Current Endpoint
+Public web endpoint:
 
 ```text
 https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io
+```
+
+Current image tag:
+
+```text
+api-rate-limit-ci-20260707235426
+```
+
+Current revisions:
+
+| App | Revision | Status |
+|-----|----------|--------|
+| `shipping-inspection-poc-api` | `shipping-inspection-poc-api--0000022` | `Running` |
+| `shipping-inspection-poc-web` | `shipping-inspection-poc-web--0000024` | `Running` |
+
+## Deployment Flow
+
+1. Apply infrastructure changes with Terraform.
+2. Build and publish images through Azure Container Registry.
+3. Update Container Apps to the new image tag.
+
+Commands:
+
+```bash
+cd ~/grafana-setup-azure/infra/terraform
+terraform plan
+terraform apply
+
+cd ~/grafana-setup-azure
+./scripts/deploy-images-terraform.sh
+```
+
+For traceable image tags:
+
+```bash
+IMAGE_TAG=<purpose>-$(date +%Y%m%d%H%M%S) ./scripts/deploy-images-terraform.sh
 ```

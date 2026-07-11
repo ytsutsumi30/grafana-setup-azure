@@ -17,3 +17,9 @@ m365_auth_tenant_id       = "REPLACE_WITH_ENTRA_TENANT_ID"
 m365_auth_client_id       = "REPLACE_WITH_ENTRA_CLIENT_ID"
 m365_auth_scopes          = "User.Read"
 m365_auth_allowed_domains = ""
+
+# Public POC default: protect all POST/PUT/PATCH/DELETE APIs.
+# off = no write auth, warn = log only, enforce = require M365 token or x-admin-token.
+write_auth_mode = "enforce"
+# Use 32+ random characters in the real tfvars file. This placeholder intentionally fails validation.
+admin_api_token = "REPLACE_WITH_STRONG_RANDOM_ADMIN_TOKEN"

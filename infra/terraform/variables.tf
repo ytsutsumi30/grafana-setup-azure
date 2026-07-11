@@ -130,6 +130,24 @@ variable "m365_auth_allowed_domains" {
   default     = ""
 }
 
+variable "write_auth_mode" {
+  description = "Authentication mode for write APIs: off, warn, or enforce. Public Azure POC should use enforce."
+  type        = string
+  default     = "enforce"
+
+  validation {
+    condition     = contains(["off", "warn", "enforce"], lower(var.write_auth_mode))
+    error_message = "write_auth_mode must be one of: off, warn, enforce."
+  }
+}
+
+variable "admin_api_token" {
+  description = "Optional admin token for protected maintenance APIs and write APIs when M365 auth is disabled. Sent by trusted clients as x-admin-token."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "tags" {
   description = "Common tags."
   type        = map(string)

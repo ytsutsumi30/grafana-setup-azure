@@ -53,8 +53,56 @@
         .log-item { font-size: .85rem; border-bottom: 1px solid #f0f0f0; padding: .3rem 0; }
         .log-item.err { color: var(--color-status-ng); }
         .log-item.ok  { color: var(--color-status-ok); }
+        .log-item.warn { color: #b58100; }
+        .scan-feedback {
+            animation: scanFlash .45s ease-out;
+        }
+        .scan-feedback.ok { box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--color-status-ok), transparent 82%); }
+        .scan-feedback.warn { box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--color-status-pending), transparent 78%); }
+        .scan-feedback.err { box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--color-status-ng), transparent 84%); }
+        @keyframes scanFlash {
+            from { filter: brightness(1.05); }
+            to { filter: brightness(1); }
+        }
+        .allocation-row {
+            display: grid; grid-template-columns: 1fr auto; gap: .5rem;
+            border: 1px solid #e9ecef; border-radius: .35rem;
+            padding: .4rem .5rem; margin-bottom: .35rem; background: #fff;
+        }
+        .allocation-row.done { border-color: var(--color-status-ok); background: #f0fff4; }
+        .allocation-row .meta { font-size: .78rem; color: #6c757d; }
+        .line-progress-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: .75rem;
+            min-height: 100%;
+        }
+        .line-progress-card.ready { border-color: var(--color-status-ok); }
+        .line-progress-card.blocked { border-color: #f59f00; background: #fff9db; }
+        .allocation-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            min-height: 32px;
+            border: 1px solid #dbe4ff;
+            border-radius: 999px;
+            background: #edf2ff;
+            color: #1c3d8f;
+            padding: .2rem .55rem;
+            margin: .12rem;
+            font-size: .78rem;
+            font-weight: 600;
+        }
+        .allocation-chip.done { border-color: #b2f2bb; background: #ebfbee; color: #087f5b; }
+        .allocation-chip.warn { border-color: #ffe066; background: #fff9db; color: #8a5a00; }
+        .scan-target-button {
+            min-height: 48px;
+            text-align: left;
+            white-space: normal;
+        }
     </style>
-    <script src="js/m365-auth.js"></script>
+    <script src="js/m365-auth.js?v=202607070030"></script>
 </head>
 <body data-page="pps">
 
@@ -106,6 +154,18 @@
                 </div>
                 <div class="text-muted small" id="infProduct"></div>
                 <div class="text-muted small" id="infCustomer"></div>
+            </div>
+        </div>
+
+        <div class="card mb-2" id="allocationOverviewCard">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <strong><i class="fas fa-list-check me-1"></i>品目・ロット別進捗</strong>
+                    <a class="btn btn-outline-primary btn-sm" id="quantityEntryLink" href="#">
+                        <i class="fas fa-boxes-stacked me-1"></i>出荷数入力
+                    </a>
+                </div>
+                <div id="allocationOverview"></div>
             </div>
         </div>
 
@@ -196,6 +256,27 @@
                         <button class="btn btn-primary" onclick="submitScan()">スキャン</button>
                     </div>
                 </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label small mb-1" for="scanNgReason">NG 理由分類</label>
+                        <select id="scanNgReason" class="form-select form-select-sm">
+                            <option value="">自動判定</option>
+                            <option value="unallocated_lot">未引当ロット</option>
+                            <option value="wrong_product">別品目</option>
+                            <option value="quantity_exceeded">数量超過</option>
+                            <option value="duplicate_scan">重複スキャン</option>
+                            <option value="lot_not_found">ロット不明</option>
+                            <option value="stock_shortage">在庫不足</option>
+                            <option value="label_unreadable">ラベル不鮮明</option>
+                            <option value="damaged_package">梱包材損傷</option>
+                            <option value="other">その他</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <label class="form-label small mb-1" for="scanNgComment">NG コメント</label>
+                        <input type="text" id="scanNgComment" class="form-control form-control-sm" maxlength="500" placeholder="NG/警告時のみ任意入力">
+                    </div>
+                </div>
                 <div class="mb-2">
                     <div class="d-flex justify-content-between">
                         <span class="small text-muted">ピッキング進捗</span>
@@ -205,6 +286,11 @@
                         <div id="scanProgressBar" class="progress-bar" style="width:0%"></div>
                     </div>
                 </div>
+                <div id="allocationProgress" class="mb-2"></div>
+                <div id="scanTargets" class="row g-2 mb-2"></div>
+                <button class="btn btn-outline-warning w-100 mb-2 d-none" id="undoScanBtn" type="button" onclick="undoLastScan()">
+                    <i class="fas fa-rotate-left me-1"></i>直前スキャンを取り消す
+                </button>
                 <div id="scanLog" style="max-height:160px;overflow-y:auto"></div>
             </div>
             <div class="modal-footer">
@@ -270,6 +356,53 @@
     </div>
 </div>
 
+<!-- モーダル: 出荷完了後修正 -->
+<div class="modal fade" id="postCompletionCorrectionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-pen-to-square me-2"></i>出荷完了後修正</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">修正対象ロット</label>
+                    <select id="correctionAllocation" class="form-select"></select>
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">修正後ロット番号</label>
+                        <input type="text" id="correctionLotNumber" class="form-control" autocomplete="off">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">修正後数量</label>
+                        <input type="number" id="correctionQuantity" class="form-control" min="1">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label">修正理由</label>
+                    <select id="correctionReason" class="form-select">
+                        <option value="lot_entry_error">ロット入力誤り</option>
+                        <option value="quantity_entry_error">数量入力誤り</option>
+                        <option value="customer_request">顧客依頼</option>
+                        <option value="inventory_adjustment">在庫調整</option>
+                        <option value="other">その他</option>
+                    </select>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label">コメント</label>
+                    <textarea id="correctionComment" class="form-control" rows="3" placeholder="修正理由の詳細を入力"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success w-100" onclick="submitPostCompletionCorrection()">
+                    <i class="fas fa-check me-1"></i>理由付きで修正
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="js/layout.js"></script>
 <script>
@@ -277,18 +410,22 @@ const API = '';  // same origin
 
 let state = {
     si: null,           // shipping_instruction
+    lines: [],          // shipping_instruction_lines
     picking: null,      // picking_instruction
     packing: null,      // packing_record
     qrInspection: null,
+    completion: null,
     availableLots: [],
+    allocations: [],
     pickingId: null,    // current picking_instruction id
-    packingId: null
+    packingId: null,
+    lastScanRecord: null
 };
 
 // ===== 出荷指示一覧 =====
 async function loadSIList() {
     const q = document.getElementById('siSearch').value.trim();
-    const res = await fetch(`${API}/shipping-instructions?status=pending,picking,packing,inspecting&instruction_id=${encodeURIComponent(q)}`);
+    const res = await fetch(`${API}/shipping-instructions?status=pending,picking,packing,inspecting,shipped&instruction_id=${encodeURIComponent(q)}`);
     const list = await res.json();
     const el = document.getElementById('siList');
     if (list.length === 0) { el.innerHTML = '<div class="text-muted small py-2">該当する出荷指示がありません</div>'; return; }
@@ -310,17 +447,20 @@ async function selectSI(id) {
     if (!res.ok) { alert('データ取得エラー'); return; }
     const data = await res.json();
     state.si           = data.shipping;
+    state.lines        = data.lines || [];
     state.picking      = data.picking;
     state.packing      = data.packing;
     state.qrInspection = data.qr_inspection;
+    state.completion   = data.completion;
     state.availableLots= data.available_lots || [];
+    state.allocations   = data.allocations || [];
     renderFlow();
     document.getElementById('ppsFlow').classList.remove('d-none');
     document.getElementById('selectCard').classList.add('d-none');
 }
 
 function resetFlow() {
-    state = { si:null, picking:null, packing:null, qrInspection:null, availableLots:[], pickingId:null, packingId:null };
+    state = { si:null, lines:[], picking:null, packing:null, qrInspection:null, completion:null, availableLots:[], allocations:[], pickingId:null, packingId:null, lastScanRecord:null };
     document.getElementById('ppsFlow').classList.add('d-none');
     document.getElementById('selectCard').classList.remove('d-none');
     document.getElementById('siList').innerHTML = '';
@@ -333,8 +473,10 @@ function renderFlow() {
     // ヘッダー
     document.getElementById('infInstructionId').textContent = si.instruction_id;
     document.getElementById('infStatus').innerHTML = `<span class="status-pill status-${si.status}">${statusLabel(si.status)}</span>`;
-    document.getElementById('infProduct').textContent = `${si.product_code}  ${si.product_name}  × ${si.quantity}`;
+    document.getElementById('infProduct').innerHTML = renderLineSummary();
     document.getElementById('infCustomer').textContent = `顧客: ${si.customer_name || '-'}  出荷日: ${si.shipping_date || '-'}`;
+    document.getElementById('quantityEntryLink').href = `shipping-quantity.html?id=${encodeURIComponent(si.id)}`;
+    renderAllocationOverview();
 
     renderPickStep();
     renderPackStep();
@@ -349,10 +491,26 @@ function renderPickStep() {
     const badge = document.getElementById('pickStatus');
 
     if (!p) {
+        const readiness = getQuantityReadiness();
+        if (!readiness.ready) {
+            card.className = 'card step-card mb-2 step-warning';
+            badge.className = 'ms-auto status-pill status-pending';
+            badge.textContent = '数量未確定';
+            content.innerHTML = `
+                <div class="alert alert-warning py-2 mb-2 small">
+                    PPS 開始前に、すべての品目でロットと出荷数を確定してください。
+                    <div class="mt-1">${escapeHtml(readiness.summary)}</div>
+                </div>
+                <a class="btn btn-primary btn-sm" href="shipping-quantity.html?id=${encodeURIComponent(state.si.id)}">
+                    <i class="fas fa-boxes-stacked me-1"></i>出荷数入力へ
+                </a>`;
+            return;
+        }
         card.className = 'card step-card mb-2 step-active';
         badge.className = 'ms-auto status-pill status-pending';
         badge.textContent = '未開始';
         content.innerHTML = `
+            <div class="small text-muted mb-2">確定済みロット引当を照合の正として QR 検品を開始します。</div>
             <button class="btn btn-primary btn-sm" onclick="openPickStart()">
                 <i class="fas fa-play me-1"></i>ピッキング指示を作成
             </button>`;
@@ -360,16 +518,21 @@ function renderPickStep() {
     }
 
     const pct = p.total_quantity > 0 ? Math.round(p.picked_quantity / p.total_quantity * 100) : 0;
-    if (p.status === 'completed') {
+    if (p.status === 'completed' || isShipmentClosed()) {
         card.className = 'card step-card mb-2 step-done';
         badge.className = 'ms-auto status-pill status-delivered';
         badge.textContent = '完了';
-        // ピッキングされたロット番号一覧
-        const lots = (p.records || []).filter(r => r && r.status === 'picked').map(r => r.lot_number);
+        const lots = (p.records || []).filter(r => r && r.status === 'picked').map(r => `${r.product_code || ''} ${r.lot_number}`.trim());
         const unique = [...new Set(lots)];
+        const picked = getTotalPickedQuantity();
+        const required = getTotalRequiredQuantity();
+        const closedNote = isShipmentClosed()
+            ? '<div class="small text-muted mt-1">出荷完了済みのため、通常の直前取消はできません。修正は「完了後修正」から理由付きで記録します。</div>'
+            : '';
         content.innerHTML = `
-            <div class="small text-muted mb-1">担当: ${p.picker_name || '-'}　ピッキング: ${p.picked_quantity}/${p.total_quantity}</div>
-            <div>${unique.map(l => `<span class="lot-tag">${l}</span>`).join('')}</div>`;
+            <div class="small text-muted mb-1">担当: ${p.picker_name || '-'}　QR OK: ${picked}/${required || p.total_quantity}</div>
+            <div>${unique.map(l => `<span class="lot-tag">${escapeHtml(l)}</span>`).join('')}</div>
+            ${closedNote}`;
     } else {
         card.className = 'card step-card mb-2 step-active';
         badge.className = 'ms-auto status-pill status-picking';
@@ -383,7 +546,7 @@ function renderPickStep() {
                 <span>${p.picked_quantity} / ${p.total_quantity}</span><span>${pct}%</span>
             </div>
             <button class="btn btn-primary btn-sm" onclick="openPickScan(${p.id})">
-                <i class="fas fa-qrcode me-1"></i>QR スキャン
+                <i class="fas fa-qrcode me-1"></i>QR 検品
             </button>`;
     }
 }
@@ -435,6 +598,7 @@ function renderPackStep() {
 
 function renderShipStep() {
     const siStatus = state.si.status;
+    const completion = state.completion || {};
     const card = document.getElementById('stepShip');
     const content = document.getElementById('shipContent');
     const badge = document.getElementById('shipStatus');
@@ -452,26 +616,66 @@ function renderShipStep() {
     badge.textContent = statusLabel(siStatus);
 
     if (siStatus === 'inspecting') {
+        const blockers = completion.blockers || [];
+        const warnings = completion.warnings || [];
+        const summary = renderCompletionSummary(completion);
+        const blockerHtml = blockers.length
+            ? `<div class="alert alert-warning py-2 mb-2 small">${blockers.map(b => `<div>${escapeHtml(b.message)}</div>`).join('')}</div>`
+            : '';
+        const warningHtml = warnings.length
+            ? `<div class="alert alert-info py-2 mb-2 small">${warnings.map(w => `<div>${escapeHtml(w.message)}</div>`).join('')}</div>`
+            : '';
+        const disabled = completion.can_complete ? '' : 'disabled';
         content.innerHTML = `
-            <a href="qr-inspection.html?id=${state.si.id}" class="btn btn-success btn-sm">
-                <i class="fas fa-qrcode me-1"></i>QR 検品へ
-            </a>`;
+            ${summary}
+            ${blockerHtml}
+            ${warningHtml}
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-success btn-sm" ${disabled} onclick="completeShipment()">
+                    <i class="fas fa-truck me-1"></i>出荷完了
+                </button>
+                <button class="btn btn-outline-primary btn-sm" onclick="openPickScan(${state.picking ? state.picking.id : 'null'})" ${state.picking ? '' : 'disabled'}>
+                    <i class="fas fa-qrcode me-1"></i>QR 検品履歴
+                </button>
+                <a href="shipping-history.html?id=${state.si.id}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-clock-rotate-left me-1"></i>履歴
+                </a>
+            </div>`;
     } else if (siStatus === 'shipped' || siStatus === 'delivered') {
-        content.innerHTML = `<div class="text-muted small">出荷済み (${statusLabel(siStatus)})</div>`;
+        content.innerHTML = `
+            ${renderCompletionSummary(completion)}
+            <div class="text-muted small mb-2">出荷済み (${statusLabel(siStatus)})</div>
+            <button class="btn btn-outline-success btn-sm" onclick="openPostCompletionCorrection()">
+                <i class="fas fa-pen-to-square me-1"></i>完了後修正
+            </button>`;
     }
 }
 
 // ===== ピッキング開始モーダル =====
 function openPickStart() {
+    const readiness = getQuantityReadiness();
+    if (!readiness.ready) {
+        notify('PPS 開始前に全品目のロットと出荷数を確定してください。', 'warning');
+        location.href = `shipping-quantity.html?id=${encodeURIComponent(state.si.id)}`;
+        return;
+    }
+    const allocations = getActiveAllocations();
     const lots = state.availableLots;
-    document.getElementById('lotList').innerHTML = lots.length
-        ? lots.map(l => `<span class="lot-tag">${l.lot_number} (${l.quantity}個 @ ${l.location||'-'})</span>`).join('')
+    document.getElementById('lotList').innerHTML = allocations.length
+        ? allocations.map(a => `<span class="lot-tag">${escapeHtml(a.product_code)} ${escapeHtml(a.lot_number)} (${Number(a.shipped_quantity || 0)}個 @ ${escapeHtml(a.location || '-')})</span>`).join('')
+        : lots.length
+        ? lots.map(l => `<span class="lot-tag">${escapeHtml(l.product_code || '')} ${escapeHtml(l.lot_number)} (${Number(l.quantity || 0)}個 @ ${escapeHtml(l.location||'-')})</span>`).join('')
         : '<span class="text-muted small">利用可能ロットなし</span>';
     document.getElementById('pickerName').value = '';
     new bootstrap.Modal(document.getElementById('pickStartModal')).show();
 }
 
 async function startPicking() {
+    const readiness = getQuantityReadiness();
+    if (!readiness.ready) {
+        notify('未確定の品目があります。先に出荷数入力を完了してください。', 'warning');
+        return;
+    }
     const name = document.getElementById('pickerName').value.trim();
     const res = await fetch(`${API}/picking-instructions`, {
         method: 'POST',
@@ -486,10 +690,30 @@ async function startPicking() {
 
 // ===== QR スキャンモーダル =====
 function openPickScan(piId) {
+    if (!piId) {
+        notify('QR 検品対象の PPS 指示がありません。', 'warning');
+        return;
+    }
     state.pickingId = piId;
     document.getElementById('scanInput').value = '';
     document.getElementById('scanQty').value = 1;
+    document.getElementById('scanNgReason').value = '';
+    document.getElementById('scanNgComment').value = '';
     document.getElementById('scanLog').innerHTML = '';
+    state.lastScanRecord = null;
+    const scanLocked = isShipmentClosed() || (state.picking && state.picking.status === 'completed');
+    document.getElementById('scanInput').disabled = scanLocked;
+    document.getElementById('scanQty').disabled = scanLocked;
+    document.getElementById('scanNgReason').disabled = scanLocked;
+    document.getElementById('scanNgComment').disabled = scanLocked;
+    const submitBtn = document.querySelector('#pickScanModal button[onclick="submitScan()"]');
+    if (submitBtn) {
+        submitBtn.disabled = scanLocked;
+        submitBtn.innerHTML = scanLocked
+            ? '<i class="fas fa-lock me-2"></i>完了済み'
+            : '<i class="fas fa-check me-2"></i>スキャン確定';
+    }
+    renderUndoScan();
     updateScanProgress();
     new bootstrap.Modal(document.getElementById('pickScanModal')).show();
     setTimeout(() => document.getElementById('scanInput').focus(), 300);
@@ -499,7 +723,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('scanInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') submitScan();
     });
-    loadSIList();
+    const id = new URLSearchParams(location.search).get('id');
+    if (id) {
+        selectSI(id);
+    } else {
+        loadSIList();
+    }
 });
 
 function updateScanProgress() {
@@ -508,34 +737,152 @@ function updateScanProgress() {
     const pct = p.total_quantity > 0 ? Math.round(p.picked_quantity / p.total_quantity * 100) : 0;
     document.getElementById('scanProgress').textContent = `${p.picked_quantity} / ${p.total_quantity}`;
     document.getElementById('scanProgressBar').style.width = `${pct}%`;
+    document.getElementById('allocationProgress').innerHTML = renderAllocationProgress();
+    renderScanTargets();
+    const completeBtn = document.getElementById('completPickBtn');
+    if (completeBtn) {
+        completeBtn.disabled = p.total_quantity > 0 && Number(p.picked_quantity || 0) < Number(p.total_quantity || 0);
+    }
 }
 
 async function submitScan() {
+    if (isShipmentClosed() || (state.picking && state.picking.status === 'completed')) {
+        notify('完了済みの PPS には通常スキャンを追加できません。完了後修正を使用してください。', 'warning');
+        return;
+    }
     const lot = document.getElementById('scanInput').value.trim();
     const qty = parseInt(document.getElementById('scanQty').value) || 1;
+    const ngReason = document.getElementById('scanNgReason').value;
+    const ngComment = document.getElementById('scanNgComment').value.trim();
     if (!lot) return;
 
     const res = await fetch(`${API}/picking-instructions/${state.pickingId}/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lot_number: lot, picked_quantity: qty })
+        body: JSON.stringify({
+            lot_number: lot,
+            picked_quantity: qty,
+            ng_reason_code: ngReason || null,
+            ng_comment: ngComment || null
+        })
     });
     const data = await res.json();
 
     const logEl = document.getElementById('scanLog');
-    const cls = data.success ? 'ok' : 'err';
-    const icon = data.success ? '✓' : '✗';
-    logEl.innerHTML = `<div class="log-item ${cls}">${icon} ${lot}  ×${qty}  ${data.message}</div>` + logEl.innerHTML;
+    const isWarn = ['duplicate_scan', 'quantity_exceeded'].includes(data.code);
+    const cls = data.success ? 'ok' : (isWarn ? 'warn' : 'err');
+    const icon = data.success ? 'OK' : (isWarn ? '警告' : 'NG');
+    scanFeedback(cls);
+    logEl.innerHTML = `<div class="log-item ${cls}">${icon} ${escapeHtml(lot)}  ×${qty}  ${escapeHtml(data.message || '')}</div>` + logEl.innerHTML;
+    notify(data.message || (data.success ? 'QR 検品を記録しました。' : 'QR 検品を記録しました。'), data.success ? 'ok' : (isWarn ? 'info' : 'ng'));
 
     if (data.success) {
         if (state.picking) {
             state.picking.picked_quantity = data.picked_quantity;
         }
+        await refreshState({ keepScanModal: true });
         updateScanProgress();
         document.getElementById('scanInput').value = '';
         document.getElementById('scanQty').value = 1;
+        document.getElementById('scanNgReason').value = '';
+        document.getElementById('scanNgComment').value = '';
+        state.lastScanRecord = data.record || null;
+        renderUndoScan();
+    } else if (data.remaining_quantity !== undefined && data.remaining_quantity !== null) {
+        document.getElementById('scanQty').value = Math.max(1, Number(data.remaining_quantity || 1));
     }
     document.getElementById('scanInput').focus();
+}
+
+async function undoLastScan() {
+    if (isShipmentClosed() || (state.picking && state.picking.status === 'completed')) {
+        notify('完了済みの PPS は直前取消できません。完了後修正を使用してください。', 'warning');
+        return;
+    }
+    if (!state.pickingId || !state.lastScanRecord || !state.lastScanRecord.id) {
+        notify('取り消しできる直前スキャンがありません。', 'warning');
+        return;
+    }
+    if (!confirm('直前の OK スキャンを取り消しますか？')) return;
+    const recordId = state.lastScanRecord.id;
+    const res = await fetch(`${API}/picking-instructions/${state.pickingId}/records/${recordId}`, {
+        method: 'DELETE'
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        notify(data.error || '直前スキャンを取り消せませんでした。', 'ng');
+        return;
+    }
+    scanFeedback('warn');
+    notify('直前スキャンを取り消しました。', 'info');
+    state.lastScanRecord = null;
+    renderUndoScan();
+    if (state.picking) {
+        state.picking.picked_quantity = data.picked_quantity;
+    }
+    await refreshState({ keepScanModal: true });
+    updateScanProgress();
+    document.getElementById('scanLog').innerHTML =
+        `<div class="log-item warn">取消 ${escapeHtml(data.cancelled_record?.lot_number || '')} ×${Number(data.cancelled_record?.picked_quantity || 0)}</div>` +
+        document.getElementById('scanLog').innerHTML;
+}
+
+function renderUndoScan() {
+    var btn = document.getElementById('undoScanBtn');
+    if (!btn) return;
+    const canUndo = !isShipmentClosed()
+        && !(state.picking && state.picking.status === 'completed')
+        && state.lastScanRecord
+        && state.lastScanRecord.id;
+    if (canUndo) {
+        btn.classList.remove('d-none');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-rotate-left me-1"></i>直前スキャンを取り消す';
+    } else {
+        btn.classList.add('d-none');
+        btn.disabled = true;
+    }
+}
+
+function scanFeedback(kind) {
+    var modalBody = document.querySelector('#pickScanModal .modal-content');
+    if (modalBody) {
+        modalBody.classList.remove('scan-feedback', 'ok', 'warn', 'err');
+        void modalBody.offsetWidth;
+        modalBody.classList.add('scan-feedback', kind);
+        setTimeout(function () { modalBody.classList.remove('scan-feedback', kind); }, 520);
+    }
+    if (navigator.vibrate) {
+        navigator.vibrate(kind === 'ok' ? [80] : kind === 'warn' ? [80, 50, 80] : [120, 80, 120]);
+    }
+    playScanTone(kind);
+}
+
+function playScanTone(kind) {
+    try {
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        var ctx = new AudioContext();
+        var now = ctx.currentTime;
+        var tones = kind === 'ok'
+            ? [{ f: 880, t: 0, d: 0.08 }]
+            : kind === 'warn'
+            ? [{ f: 660, t: 0, d: 0.08 }, { f: 660, t: 0.12, d: 0.08 }]
+            : [{ f: 220, t: 0, d: 0.1 }, { f: 180, t: 0.14, d: 0.12 }];
+        tones.forEach(function (tone) {
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.frequency.value = tone.f;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.0001, now + tone.t);
+            gain.gain.exponentialRampToValueAtTime(0.08, now + tone.t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + tone.t + tone.d);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + tone.t);
+            osc.stop(now + tone.t + tone.d + 0.02);
+        });
+        setTimeout(function () { ctx.close().catch(function () {}); }, 420);
+    } catch (e) {}
 }
 
 async function completePicking() {
@@ -546,6 +893,11 @@ async function completePicking() {
     await refreshState();
 }
 
+window.submitScan = submitScan;
+window.undoLastScan = undoLastScan;
+window.scanFeedback = scanFeedback;
+window.completePicking = completePicking;
+
 // ===== 梱包モーダル =====
 function openPack() {
     const p = state.picking;
@@ -554,7 +906,7 @@ function openPack() {
         ? [...new Set(p.records.filter(r=>r&&r.status==='picked').map(r=>r.lot_number))].join(', ')
         : '';
     document.getElementById('packLotNumbers').value = lots;
-    document.getElementById('packedQty').value = state.si.quantity;
+    document.getElementById('packedQty').value = state.picking ? state.picking.total_quantity : state.si.quantity;
     document.getElementById('packerName').value = '';
     document.getElementById('boxCount').value = 1;
     document.getElementById('totalWeight').value = '';
@@ -596,19 +948,312 @@ async function refreshState() {
     const res = await fetch(`${API}/shipping-instructions/${state.si.id}/pps-status`);
     const data = await res.json();
     state.si           = data.shipping;
+    state.lines        = data.lines || [];
     state.picking      = data.picking;
     state.packing      = data.packing;
     state.qrInspection = data.qr_inspection;
+    state.completion   = data.completion;
     state.availableLots= data.available_lots || [];
+    state.allocations   = data.allocations || [];
     renderFlow();
+    if (arguments[0] && arguments[0].keepScanModal) {
+        updateScanProgress();
+    }
 }
 
 function statusLabel(s) {
     return { pending:'未着手', picking:'ピッキング中', packing:'梱包中',
              inspecting:'検品中', shipped:'出荷済', delivered:'配達済', processing:'処理中' }[s] || s;
 }
+
+async function completeShipment() {
+    const completion = state.completion || {};
+    if (!completion.can_complete) {
+        notify('出荷完了条件を満たしていません。未検品数量または未完了作業を確認してください。', 'warning');
+        return;
+    }
+    if (!confirm('確定済みロット引当の全数量を出荷完了にしますか？')) return;
+    const res = await fetch(`${API}/shipping-instructions/${state.si.id}/complete-shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: 'PPS 画面から出荷完了' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        notify(data.error || '出荷完了に失敗しました。', 'danger');
+        return;
+    }
+    notify('出荷完了を記録しました。', 'success');
+    await refreshState();
+}
+
+function openPostCompletionCorrection() {
+    const allocations = getActiveAllocations();
+    if (!allocations.length) {
+        notify('完了後修正できるロット引当がありません。', 'warning');
+        return;
+    }
+    const select = document.getElementById('correctionAllocation');
+    select.innerHTML = allocations.map((a) => `
+        <option value="${a.id}" data-lot="${escapeHtml(a.lot_number)}" data-qty="${Number(a.shipped_quantity || 0)}">
+            ${escapeHtml(a.product_code || '')} ${escapeHtml(a.product_name || '')} / ${escapeHtml(a.lot_number)} / ${Number(a.shipped_quantity || 0)}個
+        </option>
+    `).join('');
+    select.onchange = syncCorrectionFields;
+    syncCorrectionFields();
+    document.getElementById('correctionReason').value = 'lot_entry_error';
+    document.getElementById('correctionComment').value = '';
+    new bootstrap.Modal(document.getElementById('postCompletionCorrectionModal')).show();
+}
+
+function syncCorrectionFields() {
+    const option = document.getElementById('correctionAllocation').selectedOptions[0];
+    document.getElementById('correctionLotNumber').value = option ? option.dataset.lot || '' : '';
+    document.getElementById('correctionQuantity').value = option ? option.dataset.qty || '' : '';
+}
+
+async function submitPostCompletionCorrection() {
+    const allocationId = Number(document.getElementById('correctionAllocation').value);
+    const lotNumber = document.getElementById('correctionLotNumber').value.trim();
+    const shippedQuantity = Number(document.getElementById('correctionQuantity').value);
+    const reasonCode = document.getElementById('correctionReason').value;
+    const comment = document.getElementById('correctionComment').value.trim();
+    if (!allocationId || !lotNumber || !shippedQuantity || shippedQuantity < 1) {
+        notify('修正対象、ロット番号、数量を確認してください。', 'warning');
+        return;
+    }
+    if (!comment) {
+        notify('完了後修正にはコメント入力が必要です。', 'warning');
+        return;
+    }
+    const res = await fetch(`${API}/shipping-instructions/${state.si.id}/post-completion-corrections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            allocation_id: allocationId,
+            lot_number: lotNumber,
+            shipped_quantity: shippedQuantity,
+            reason_code: reasonCode,
+            comment
+        })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        notify(data.error || '完了後修正に失敗しました。', 'danger');
+        return;
+    }
+    bootstrap.Modal.getInstance(document.getElementById('postCompletionCorrectionModal')).hide();
+    notify('完了後修正を監査ログへ記録しました。', 'success');
+    await refreshState();
+}
+
+function renderLineSummary() {
+    if (!state.lines || !state.lines.length) {
+        return `${state.si.product_code || ''}  ${state.si.product_name || ''}  × ${state.si.quantity || 0}`;
+    }
+    const total = state.lines.reduce((sum, l) => sum + Number(l.quantity || 0), 0);
+    const allocated = state.lines.reduce((sum, l) => sum + Number(l.allocated_quantity || l.shipped_quantity || 0), 0);
+    const picked = getTotalPickedQuantity();
+    const progressLabel = isShipmentClosed() ? 'QR OK' : 'QR検品';
+    const items = state.lines.map(l => {
+        const linePicked = getLinePickedQuantity(l);
+        const lineAlloc = l.allocations && l.allocations.length
+            ? l.allocations.map(a => `${a.lot_number}:${getAllocationPickedQuantity(a)}/${a.shipped_quantity || 0}`).join(' / ')
+            : 'ロット未引当';
+        return `<span class="lot-tag">${escapeHtml(l.product_code || '')} ${escapeHtml(l.product_name || '')} 引当 ${Number(l.allocated_quantity || l.shipped_quantity || 0)}/${Number(l.quantity || 0)} ${progressLabel} ${linePicked} (${escapeHtml(lineAlloc)})</span>`;
+    }).join('');
+    return `<div>${state.lines.length}品目 / 引当 ${allocated}/${total} / ${progressLabel} ${picked}/${allocated || total}</div><div class="mt-1">${items}</div>`;
+}
+
+function renderAllocationOverview() {
+    const box = document.getElementById('allocationOverview');
+    if (!box) return;
+    if (!state.lines || !state.lines.length) {
+        box.innerHTML = '<div class="text-muted small">品目明細がありません。</div>';
+        return;
+    }
+    box.innerHTML = `
+        <div class="row g-2">
+            ${state.lines.map(line => {
+                const required = Number(line.quantity || 0);
+                const allocated = Number(line.allocated_quantity || line.shipped_quantity || 0);
+                const picked = getLinePickedQuantity(line);
+                const ready = required > 0 && allocated >= required;
+                const pickPct = allocated > 0 ? Math.min(100, Math.round(picked / allocated * 100)) : 0;
+                const allocPct = required > 0 ? Math.min(100, Math.round(allocated / required * 100)) : 0;
+                const chips = (line.allocations || []).length
+                    ? line.allocations.map(a => {
+                        const aPicked = getAllocationPickedQuantity(a);
+                        const aRequired = Number(a.shipped_quantity || 0);
+                        const cls = aRequired > 0 && aPicked >= aRequired ? 'done' : (aPicked > 0 ? 'warn' : '');
+                        return `<span class="allocation-chip ${cls}">${escapeHtml(a.lot_number)} ${aPicked}/${aRequired}</span>`;
+                    }).join('')
+                    : '<span class="text-muted small">ロット未引当</span>';
+                return `
+                    <div class="col-md-6 col-xl-4">
+                        <div class="line-progress-card ${ready ? 'ready' : 'blocked'}">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div>
+                                    <div class="fw-semibold">${escapeHtml(line.product_code || '')}</div>
+                                    <div class="small text-muted">${escapeHtml(line.product_name || '')}</div>
+                                </div>
+                                <span class="status-pill ${ready ? 'status-delivered' : 'status-pending'}">${ready ? '数量確定' : '未確定'}</span>
+                            </div>
+                            <div class="small text-muted mt-2">ロット引当 ${allocated}/${required}</div>
+                            <div class="progress mt-1" style="height:7px"><div class="progress-bar" style="width:${allocPct}%"></div></div>
+                            <div class="small text-muted mt-2">QR 検品 ${picked}/${allocated || required}</div>
+                            <div class="progress mt-1" style="height:7px"><div class="progress-bar bg-success" style="width:${pickPct}%"></div></div>
+                            <div class="mt-2">${chips}</div>
+                        </div>
+                    </div>`;
+            }).join('')}
+        </div>`;
+}
+
+function isShipmentClosed() {
+    return ['shipped', 'delivered'].includes(state.si && state.si.status);
+}
+
+function getTotalRequiredQuantity() {
+    if (!state.lines || !state.lines.length) {
+        return Number(state.picking?.total_quantity || state.si?.quantity || 0);
+    }
+    return state.lines.reduce((sum, line) => sum + Number(line.allocated_quantity || line.shipped_quantity || line.quantity || 0), 0);
+}
+
+function getTotalPickedQuantity() {
+    if (state.lines && state.lines.length) {
+        return state.lines.reduce((sum, line) => sum + getLinePickedQuantity(line), 0);
+    }
+    return Number(state.picking?.picked_quantity || 0);
+}
+
+function getLinePickedQuantity(line) {
+    if (line.allocations && line.allocations.length) {
+        return line.allocations.reduce((sum, allocation) => sum + getAllocationPickedQuantity(allocation), 0);
+    }
+    return Number(line.picked_quantity || 0);
+}
+
+function getAllocationPickedQuantity(allocation) {
+    const fromApi = Number(allocation.picked_quantity || 0);
+    if (fromApi > 0) return fromApi;
+    const records = state.picking?.records || [];
+    return records
+        .filter((record) =>
+            record
+            && record.status === 'picked'
+            && String(record.lot_number || '') === String(allocation.lot_number || '')
+            && (!allocation.product_id || !record.product_id || Number(record.product_id) === Number(allocation.product_id))
+        )
+        .reduce((sum, record) => sum + Number(record.picked_quantity || 0), 0);
+}
+
+function getQuantityReadiness() {
+    const lines = state.lines || [];
+    if (!lines.length) {
+        return { ready: false, summary: '品目明細がありません。' };
+    }
+    const incomplete = lines.filter((line) => {
+        const required = Number(line.quantity || 0);
+        const allocated = Number(line.allocated_quantity || line.shipped_quantity || 0);
+        return required <= 0 || allocated < required;
+    });
+    const total = lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+    const allocated = lines.reduce((sum, line) => sum + Number(line.allocated_quantity || line.shipped_quantity || 0), 0);
+    return {
+        ready: incomplete.length === 0,
+        summary: `品目 ${lines.length - incomplete.length}/${lines.length} 件、ロット引当 ${allocated}/${total}`,
+        incomplete
+    };
+}
+
+function getActiveAllocations() {
+    const fromLines = (state.lines || []).flatMap(line => line.allocations || []);
+    return fromLines.length ? fromLines : (state.allocations || []);
+}
+
+function renderScanTargets() {
+    const box = document.getElementById('scanTargets');
+    if (!box) return;
+    const allocations = getActiveAllocations();
+    if (!allocations.length) {
+        box.innerHTML = '';
+        return;
+    }
+    box.innerHTML = allocations.map(a => {
+        const picked = Number(a.picked_quantity || 0);
+        const required = Number(a.shipped_quantity || 0);
+        const remaining = Math.max(0, required - picked);
+        return `
+            <div class="col-sm-6">
+                <button type="button" class="btn btn-outline-primary w-100 scan-target-button" data-scan-lot="${escapeHtml(a.lot_number)}" ${remaining <= 0 ? 'disabled' : ''}>
+                    <div class="fw-semibold">${escapeHtml(a.product_code || '')} ${escapeHtml(a.product_name || '')}</div>
+                    <div class="small">ロット ${escapeHtml(a.lot_number)} / 残 ${remaining}</div>
+                </button>
+            </div>`;
+    }).join('');
+    box.querySelectorAll('[data-scan-lot]').forEach((button) => {
+        button.addEventListener('click', () => {
+            document.getElementById('scanInput').value = button.getAttribute('data-scan-lot') || '';
+            document.getElementById('scanQty').value = 1;
+            document.getElementById('scanQty').focus();
+        });
+    });
+}
+
+function renderAllocationProgress() {
+    const allocations = getActiveAllocations();
+    if (!allocations.length) {
+        return '<div class="text-muted small">既存単一品目データ互換モード: 製品ロットをスキャンしてください。</div>';
+    }
+    return allocations.map(a => {
+        const picked = Number(a.picked_quantity || 0);
+        const required = Number(a.shipped_quantity || 0);
+        const done = required > 0 && picked >= required;
+        return `
+            <div class="allocation-row ${done ? 'done' : ''}">
+                <div>
+                    <div class="fw-semibold">${escapeHtml(a.product_code || '')} ${escapeHtml(a.product_name || '')}</div>
+                    <div class="meta">ロット ${escapeHtml(a.lot_number)} / ${escapeHtml(a.location || '-')}</div>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold">${picked}/${required}</div>
+                    <div class="meta">残 ${Math.max(0, required - picked)}</div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function renderCompletionSummary(completion) {
+    const required = Number(completion.total_required_quantity || 0);
+    const picked = Number(completion.total_picked_quantity || 0);
+    const pct = required > 0 ? Math.min(100, Math.round(picked / required * 100)) : 0;
+    return `
+        <div class="mb-2">
+            <div class="d-flex justify-content-between small text-muted">
+                <span>出荷完了判定</span>
+                <span>${picked}/${required}</span>
+            </div>
+            <div class="progress mt-1" style="height:8px">
+                <div class="progress-bar bg-success" style="width:${pct}%"></div>
+            </div>
+        </div>`;
+}
+
+function notify(message, type) {
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+    } else {
+        alert(message);
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
 </script>
 </body>
 </html>
-
-

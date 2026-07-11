@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出荷検品アプリ 拡張計画ポータル</title>
+<style>
+:root {
+  --c-bg: #f5f7fa;
+  --c-card: #ffffff;
+  --c-text: #1f2937;
+  --c-muted: #6b7280;
+  --c-line: #e5e7eb;
+  --c-inv: #0d6efd;   /* 在庫・棚卸 */
+  --c-ord: #198754;   /* 受発注・製造 */
+  --c-gra: #f46800;   /* Grafana */
+  --c-ui:  #6f42c1;   /* UI改善 */
+  --c-done: #198754;
+  --c-warn: #ffc107;
+  --c-ng: #dc3545;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--c-bg); color: var(--c-text);
+  font-family: 'Segoe UI','Hiragino Sans','Meiryo',sans-serif;
+  font-size: 15px; line-height: 1.7;
+}
+header.site {
+  background: linear-gradient(135deg,#0d6efd,#4dabf7);
+  color:#fff; padding: 28px 24px 20px;
+}
+header.site h1 { margin: 0 0 4px; font-size: 1.5rem; }
+header.site p { margin: 0; opacity: .85; font-size: .9rem; }
+nav.tabs {
+  display: flex; gap: 4px; padding: 0 16px; background: #fff;
+  border-bottom: 2px solid var(--c-line); position: sticky; top: 0; z-index: 100;
+  overflow-x: auto;
+}
+nav.tabs button {
+  border: none; background: none; padding: 14px 18px; cursor: pointer;
+  font-size: .95rem; font-weight: 600; color: var(--c-muted);
+  border-bottom: 3px solid transparent; white-space: nowrap;
+}
+nav.tabs button.active { color: var(--tab-color, var(--c-inv)); border-bottom-color: var(--tab-color, var(--c-inv)); }
+nav.tabs button:hover { background: #f3f4f6; }
+main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+section.tab { display: none; }
+section.tab.active { display: block; animation: fade .2s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none; } }
+.card {
+  background: var(--c-card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px 24px; margin-bottom: 20px; border-top: 4px solid var(--accent, var(--c-inv));
+}
+.card h2 { margin: 0 0 8px; font-size: 1.15rem; }
+.card h3 { margin: 18px 0 8px; font-size: 1rem; color: var(--accent, var(--c-inv)); }
+.grid { display: grid; gap: 16px; }
+.grid.c2 { grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); }
+.grid.c3 { grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: .75rem; font-weight: 700; vertical-align: middle;
+}
+.badge.done { background: #d1e7dd; color: #0a3622; }
+.badge.plan { background: #cfe2ff; color: #084298; }
+.badge.warn { background: #fff3cd; color: #856404; }
+.badge.ng   { background: #f8d7da; color: #842029; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 8px 0; }
+th, td { border: 1px solid var(--c-line); padding: 7px 10px; text-align: left; vertical-align: top; }
+th { background: #f3f4f6; }
+tr:nth-child(even) td { background: #fafbfc; }
+code, .mono {
+  font-family: Consolas,'Courier New',monospace; font-size: .85em;
+  background: #f3f4f6; border-radius: 4px; padding: 1px 6px;
+}
+pre {
+  background: #111827; color: #e5e7eb; border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; font-size: .82rem; line-height: 1.55;
+}
+pre code { background: none; color: inherit; padding: 0; }
+details { border: 1px solid var(--c-line); border-radius: 8px; margin: 8px 0; background: #fff; }
+details summary {
+  cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none;
+}
+details summary::before { content: "▸ "; color: var(--accent, var(--c-inv)); }
+details[open] summary::before { content: "▾ "; }
+details .body { padding: 0 16px 14px; }
+/* フェーズタイムライン */
+.timeline { list-style: none; margin: 8px 0 0; padding: 0 0 0 6px; position: relative; }
+.timeline::before {
+  content: ""; position: absolute; left: 13px; top: 6px; bottom: 6px;
+  width: 3px; background: var(--accent, var(--c-inv)); opacity: .25; border-radius: 2px;
+}
+.timeline li { position: relative; padding: 4px 0 14px 34px; }
+.timeline li::before {
+  content: ""; position: absolute; left: 6px; top: 10px; width: 14px; height: 14px;
+  border-radius: 50%; background: #fff; border: 3px solid var(--accent, var(--c-inv));
+}
+.timeline b { display: block; }
+.timeline small { color: var(--c-muted); }
+/* チェックリスト */
+.check { list-style: none; padding: 0; margin: 8px 0; }
+.check li { padding: 4px 0; }
+.check input { margin-right: 8px; transform: scale(1.15); accent-color: var(--accent, var(--c-inv)); }
+.note {
+  border-left: 4px solid var(--c-warn); background: #fffbea;
+  border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: .9rem;
+}
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.flow span {
+  background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px;
+  padding: 4px 10px; font-size: .82rem; font-weight: 600;
+}
+.flow i { color: var(--c-muted); font-style: normal; }
+.src { font-size: .8rem; color: var(--c-muted); margin-top: 4px; }
+svg text { font-family: inherit; }
+footer { text-align: center; color: var(--c-muted); font-size: .8rem; padding: 24px; }
+@media (prefers-color-scheme: dark) {
+  :root { --c-bg:#111827; --c-card:#1f2937; --c-text:#e5e7eb; --c-muted:#9ca3af; --c-line:#374151; }
+  nav.tabs { background:#1f2937; }
+  nav.tabs button:hover { background:#374151; }
+  th { background:#374151; }
+  tr:nth-child(even) td { background:#273244; }
+  code, .mono { background:#374151; }
+  details { background: var(--c-card); }
+  .flow span { background:#312e81; border-color:#4338ca; }
+  .note { background:#3a3320; }
+}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <h1>出荷検品アプリ 拡張計画ポータル</h1>
+  <p>入庫・在庫・棚卸 / 受発注・製造指図 / Grafana 埋め込み / UI 改善 / スキル導入 — 5 計画書の統合ビュー(2026-07-05 時点)</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="overview" data-color="#0d6efd" class="active">概要</button>
+  <button data-tab="inv" data-color="#0d6efd">在庫・棚卸</button>
+  <button data-tab="ord" data-color="#198754">受発注・製造</button>
+  <button data-tab="gra" data-color="#f46800">Grafana 埋め込み</button>
+  <button data-tab="ui" data-color="#6f42c1">UI 改善</button>
+  <button data-tab="skl" data-color="#0d9488">スキル導入</button>
+</nav>
+
+<main>
+
+<!-- ============ 概要 ============ -->
+<section class="tab active" id="tab-overview" style="--accent:#0d6efd">
+  <div class="card">
+    <h2>全体像</h2>
+    <p>Azure Container Apps + Supabase で稼働中の出荷検品アプリ(POC)を、製造業向け汎用システムへ拡張する4つの計画の統合ビューです。各タブに詳細、元となる Markdown は <code>docs/*.md</code> に保持しています。</p>
+    <svg viewBox="0 0 1000 420" role="img" aria-label="システム全体図">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/>
+        </marker>
+      </defs>
+      <!-- クライアント -->
+      <rect x="20" y="150" width="150" height="90" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+      <text x="95" y="185" text-anchor="middle" font-size="14" font-weight="bold" fill="#312e81">現場端末</text>
+      <text x="95" y="208" text-anchor="middle" font-size="11" fill="#312e81">iPhone / タブレット</text>
+      <text x="95" y="224" text-anchor="middle" font-size="11" fill="#312e81">QR / OCR / PWA</text>
+      <!-- web -->
+      <rect x="250" y="60" width="170" height="300" rx="10" fill="#dbeafe" stroke="#0d6efd"/>
+      <text x="335" y="90" text-anchor="middle" font-size="14" font-weight="bold" fill="#084298">web (nginx)</text>
+      <text x="335" y="112" text-anchor="middle" font-size="11" fill="#084298">静的 UI + 逆プロキシ</text>
+      <rect x="270" y="130" width="130" height="40" rx="6" fill="#fff" stroke="#0d6efd"/>
+      <text x="335" y="155" text-anchor="middle" font-size="11">/api/* → API</text>
+      <rect x="270" y="185" width="130" height="40" rx="6" fill="#fff" stroke="#f46800"/>
+      <text x="335" y="210" text-anchor="middle" font-size="11">/grafana/* → Grafana</text>
+      <rect x="270" y="240" width="130" height="40" rx="6" fill="#fff" stroke="#6f42c1"/>
+      <text x="335" y="265" text-anchor="middle" font-size="11">現場/管理モード UI</text>
+      <!-- api -->
+      <rect x="500" y="60" width="180" height="130" rx="10" fill="#d1e7dd" stroke="#198754"/>
+      <text x="590" y="90" text-anchor="middle" font-size="14" font-weight="bold" fill="#0a3622">api (Node.js)</text>
+      <text x="590" y="112" text-anchor="middle" font-size="11" fill="#0a3622">検品 / 在庫 / 受発注</text>
+      <text x="590" y="130" text-anchor="middle" font-size="11" fill="#0a3622">製造指図 / OCR</text>
+      <text x="590" y="148" text-anchor="middle" font-size="11" fill="#0a3622">/metrics (計画)</text>
+      <!-- grafana -->
+      <rect x="500" y="230" width="180" height="110" rx="10" fill="#ffe8d9" stroke="#f46800"/>
+      <text x="590" y="260" text-anchor="middle" font-size="14" font-weight="bold" fill="#9a3412">OSS Grafana</text>
+      <text x="590" y="282" text-anchor="middle" font-size="11" fill="#9a3412">internal ingress</text>
+      <text x="590" y="300" text-anchor="middle" font-size="11" fill="#9a3412">匿名 Viewer / d-solo</text>
+      <!-- supabase -->
+      <rect x="780" y="120" width="190" height="170" rx="10" fill="#fef9c3" stroke="#ca8a04"/>
+      <text x="875" y="150" text-anchor="middle" font-size="14" font-weight="bold" fill="#713f12">Supabase PostgreSQL</text>
+      <text x="875" y="175" text-anchor="middle" font-size="11" fill="#713f12">アプリ DB (業務データ)</text>
+      <text x="875" y="193" text-anchor="middle" font-size="11" fill="#713f12">Grafana 設定 DB</text>
+      <text x="875" y="211" text-anchor="middle" font-size="11" fill="#713f12">読み取り専用ロール</text>
+      <text x="875" y="238" text-anchor="middle" font-size="10" fill="#713f12">inventory_transactions</text>
+      <text x="875" y="254" text-anchor="middle" font-size="10" fill="#713f12">operation_events ほか</text>
+      <!-- cloud -->
+      <rect x="780" y="330" width="190" height="60" rx="10" fill="#f3e8ff" stroke="#9333ea"/>
+      <text x="875" y="355" text-anchor="middle" font-size="12" font-weight="bold" fill="#581c87">Grafana Cloud</text>
+      <text x="875" y="373" text-anchor="middle" font-size="10" fill="#581c87">運用監視・アラート(管理者)</text>
+      <!-- arrows -->
+      <line x1="170" y1="195" x2="248" y2="195" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="400" y1="150" x2="498" y2="125" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="400" y1="205" x2="498" y2="280" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="680" y1="125" x2="778" y2="180" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="680" y1="285" x2="778" y2="230" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="680" y1="140" x2="778" y2="345" stroke="#9ca3af" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ar)"/>
+      <text x="745" y="255" font-size="10" fill="#6b7280">metrics</text>
+    </svg>
+  </div>
+
+  <div class="grid c2">
+    <div class="card" style="--accent:#0d6efd">
+      <h2>在庫・棚卸計画 <span class="badge plan">計画済</span></h2>
+      <p>入庫予定 → ロット/QR発行 → 入庫検品 → 在庫 → 棚卸 → 調整の一連フロー。3層管理(品目/ロット/QR)+追記型在庫履歴。</p>
+      <p class="src">元: manufacturing-inventory-plan.md ・ 追加テーブル 15 ・ Phase 1-7</p>
+    </div>
+    <div class="card" style="--accent:#198754">
+      <h2>受発注・製造指図計画 <span class="badge plan">計画済</span></h2>
+      <p>受注(OCR注文書取込)→出荷指示、発注→入庫予定、製造指図→QR工程打刻→部品消費。ロット正逆トレースを完成させる。</p>
+      <p class="src">元: manufacturing-order-plan.md ・ 追加テーブル 14 ・ Phase 1-8</p>
+    </div>
+    <div class="card" style="--accent:#f46800">
+      <h2>Grafana 埋め込み計画 <span class="badge plan">計画済</span></h2>
+      <p>OSS Grafana を ACA/Cloud Run + Supabase でステートレス稼働し、iframe(d-solo/kiosk)でアプリ画面に埋め込み。Cloud は埋め込み不可のため OSS 採用。</p>
+      <p class="src">元: grafana-embedding-plan.md ・ Phase 1-6</p>
+    </div>
+    <div class="card" style="--accent:#6f42c1">
+      <h2>UI 改善計画 <span class="badge plan">計画済</span></h2>
+      <p>47→15 ページへ整理、共通トークン/ナビ、現場・管理モード分離、スキャンフィードバック強化、PWA オフライン対応。</p>
+      <p class="src">元: ui-improvement-plan.md ・ Phase 1-5</p>
+    </div>
+    <div class="card" style="--accent:#0d9488">
+      <h2>スキル導入計画 <span class="badge plan">計画済</span></h2>
+      <p>公開 Agent Skills 89 件から 14 件を厳選し、prj3 専用スキル 4 件を自作。セキュリティ監査を全計画の前提として先行実施。</p>
+      <p class="src">元: skills-adoption-plan.md ・ Step 1-6</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>推奨着手順序</h2>
+    <ul class="timeline">
+      <li><b>1. UI 改善 Phase 1(ページ整理+共通基盤)</b><small>全改善の土台。以降の画面追加コストを下げる</small></li>
+      <li><b>2. 在庫・棚卸 Phase 2-5(DB→入庫→在庫→棚卸)</b><small>物流面を完成させる</small></li>
+      <li><b>3. Grafana 埋め込み Phase 1-4(ローカル→ACA)</b><small>在庫の業務メトリクスを現場に見せる</small></li>
+      <li><b>4. 受発注 Phase 2-4(受注→OCR→発注)</b><small>業務の入口を接続</small></li>
+      <li><b>5. 製造指図 Phase 5-6(工程打刻→トレサビ)</b><small>製造の中身とトレーサビリティ完成</small></li>
+    </ul>
+    <div class="note">依存関係: 受発注計画の入庫予定連携・製品ロット採番は在庫計画のテーブル(receiving_orders / lots)を前提とする。Grafana の業務メトリクスは operation_events(在庫計画 Phase 2)以降が対象。</div>
+  </div>
+</section>
+
+<!-- ============ 在庫・棚卸 ============ -->
+<section class="tab" id="tab-inv" style="--accent:#0d6efd">
+  <div class="card">
+    <h2>入庫・在庫・棚卸し計画</h2>
+    <p>製造現場で利用できる POC 向け在庫管理。在庫は <b>品目 → ロット → QR 管理単位</b> の3層で追跡し、現在庫(<code>inventory_balances</code>)と変動履歴(<code>inventory_transactions</code>、追記型)を分離する。</p>
+    <div class="flow">
+      <span>入庫予定</span><i>→</i><span>ロット作成</span><i>→</i><span>QRラベル発行</span><i>→</i><span>QR入庫検品</span><i>→</i><span>在庫反映</span><i>→</i><span>在庫照会</span><i>→</i><span>QR棚卸</span><i>→</i><span>差異確認</span><i>→</i><span>承認・調整</span><i>→</i><span>Grafana監視</span>
+    </div>
+    <h3>在庫ステータス遷移</h3>
+    <svg viewBox="0 0 900 130" role="img" aria-label="在庫ステータス遷移">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/></marker></defs>
+      <rect x="20" y="40" width="130" height="46" rx="8" fill="#cfe2ff" stroke="#0d6efd"/><text x="85" y="68" text-anchor="middle" font-size="13" font-weight="bold">inspection</text>
+      <rect x="230" y="40" width="130" height="46" rx="8" fill="#d1e7dd" stroke="#198754"/><text x="295" y="68" text-anchor="middle" font-size="13" font-weight="bold">available</text>
+      <rect x="440" y="40" width="130" height="46" rx="8" fill="#e2e3e5" stroke="#6c757d"/><text x="505" y="68" text-anchor="middle" font-size="13" font-weight="bold">allocated</text>
+      <rect x="230" y="0" width="130" height="32" rx="8" fill="#fff3cd" stroke="#ffc107"/><text x="295" y="21" text-anchor="middle" font-size="12" font-weight="bold">on_hold</text>
+      <rect x="230" y="96" width="130" height="32" rx="8" fill="#f8d7da" stroke="#dc3545"/><text x="295" y="117" text-anchor="middle" font-size="12" font-weight="bold">defective</text>
+      <rect x="650" y="40" width="130" height="46" rx="8" fill="#e0e7ff" stroke="#6366f1"/><text x="715" y="68" text-anchor="middle" font-size="13" font-weight="bold">shipped</text>
+      <line x1="150" y1="63" x2="228" y2="63" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar2)"/><text x="188" y="55" text-anchor="middle" font-size="10" fill="#6b7280">合格</text>
+      <line x1="150" y1="50" x2="228" y2="18" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#ar2)"/><text x="180" y="24" text-anchor="middle" font-size="10" fill="#6b7280">保留</text>
+      <line x1="150" y1="78" x2="228" y2="110" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#ar2)"/><text x="180" y="112" text-anchor="middle" font-size="10" fill="#6b7280">不合格</text>
+      <line x1="360" y1="63" x2="438" y2="63" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar2)"/><text x="398" y="55" text-anchor="middle" font-size="10" fill="#6b7280">引当</text>
+      <line x1="570" y1="63" x2="648" y2="63" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar2)"/><text x="608" y="55" text-anchor="middle" font-size="10" fill="#6b7280">出荷</text>
+    </svg>
+  </div>
+
+  <div class="grid c2">
+    <div class="card">
+      <h2>QR / ロット設計</h2>
+      <p>QR には短い ID のみ(例: <code>QR-LOT-20260705-001-0001</code>)。詳細は DB 側で管理し、長い JSON の埋め込みは避ける。</p>
+      <table>
+        <tr><th>QRステータス</th><th>意味</th></tr>
+        <tr><td class="mono">created / received / inspection</td><td>発行済み / 入庫済み / 検査中</td></tr>
+        <tr><td class="mono">available / allocated / moved</td><td>利用可能 / 引当済み / 移動済み</td></tr>
+        <tr><td class="mono">consumed / shipped</td><td>製造使用済み / 出荷済み</td></tr>
+        <tr><td class="mono">on_hold / defective / lost / adjusted</td><td>保留 / 不良 / 紛失 / 調整済み</td></tr>
+      </table>
+      <p>ロット品質: <span class="badge warn">pending_inspection</span> <span class="badge done">approved</span> <span class="badge ng">rejected</span> <span class="badge warn">on_hold</span> <span class="badge ng">expired</span></p>
+    </div>
+    <div class="card">
+      <h2>追加テーブル(15)</h2>
+      <table>
+        <tr><th>分類</th><th>テーブル</th></tr>
+        <tr><td>マスタ</td><td class="mono">items, locations</td></tr>
+        <tr><td>ロット/QR</td><td class="mono">lots, qr_units</td></tr>
+        <tr><td>在庫</td><td class="mono">inventory_balances, inventory_transactions, inventory_moves</td></tr>
+        <tr><td>入庫</td><td class="mono">receiving_orders, receiving_order_lines, receiving_results, receiving_inspections</td></tr>
+        <tr><td>棚卸</td><td class="mono">inventory_counts, inventory_count_lines, inventory_count_scans, inventory_adjustments</td></tr>
+        <tr><td>監視</td><td class="mono">operation_events</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>API・監視・フェーズ</h2>
+    <details><summary>API 設計案(抜粋)</summary><div class="body">
+<pre><code>POST /api/lots                     GET  /api/lots/:id/traceability
+POST /api/qr-units/print-batch     POST /api/qr-units/:qrCode/scan
+POST /api/receiving-orders         POST /api/receiving-inspections/:id/approve
+GET  /api/inventory/by-lot         POST /api/inventory-moves
+POST /api/inventory-counts         GET  /api/inventory-counts/:id/differences
+GET  /metrics                      GET  /api/monitoring/events</code></pre>
+    </div></details>
+    <details><summary>Grafana Cloud 監視(技術+業務メトリクス)</summary><div class="body">
+      <p>技術: <code>http_requests_total</code> <code>http_5xx_total</code> <code>db_connection_errors_total</code> など。業務: <code>qr_scans_total</code> <code>inventory_count_differences_total</code> <code>lot_expiring_soon_total</code> など。アラート例: 棚卸差異率 5% 超過、期限切れロット 1 件以上、不明 QR スキャン 10 件以上。</p>
+    </div></details>
+    <h3>実装フェーズ</h3>
+    <ul class="timeline">
+      <li><b>Phase 1 設計文書</b><small>業務フロー / スキーマ / API / 画面 / QR運用 / 監視設計</small></li>
+      <li><b>Phase 2 DB スキーマ追加</b><small>15 テーブル</small></li>
+      <li><b>Phase 3 入庫と QR 管理</b><small>入庫予定 API・ロット作成・QR 一括発行・入庫検品</small></li>
+      <li><b>Phase 4 在庫管理</b><small>各種在庫照会・保管場所移動・履歴</small></li>
+      <li><b>Phase 5 棚卸し</b><small>計画作成・QR 棚卸・差異計算・調整承認</small></li>
+      <li><b>Phase 6 Grafana Cloud 監視</b><small>/metrics・業務メトリクス・ダッシュボード・アラート</small></li>
+      <li><b>Phase 7 Azure/Supabase 反映</b><small>schema 適用・イメージ・デプロイ・M365 共存</small></li>
+    </ul>
+    <h3>POC 完成条件</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="inv-1">QR ラベルを発行し、スキャンで入庫検品できる</label></li>
+      <li><label><input type="checkbox" id="inv-2">品目 / ロット / 保管場所 / QR 単位で在庫を確認できる</label></li>
+      <li><label><input type="checkbox" id="inv-3">在庫変動が追記型履歴として記録される</label></li>
+      <li><label><input type="checkbox" id="inv-4">QR 棚卸で未スキャン・不明 QR を検出し差異を確認できる</label></li>
+      <li><label><input type="checkbox" id="inv-5">承認済み差異が在庫へ反映される</label></li>
+      <li><label><input type="checkbox" id="inv-6">Grafana Cloud でヘルスと業務メトリクス・アラートを確認できる</label></li>
+    </ul>
+    <details><summary>後回しにする項目</summary><div class="body"><p>ERP 連携、原価計算、棚番最適化、多拠点移動承認、WMS ピッキング最適化、製造実績連携、ラベルプリンタ専用連携</p></div></details>
+  </div>
+</section>
+
+<!-- ============ 受発注・製造 ============ -->
+<section class="tab" id="tab-ord" style="--accent:#198754">
+  <div class="card">
+    <h2>受発注・製造指図計画</h2>
+    <p>業務の起点(受注・発注)と製造工程の実績収集を追加し、既存の出荷検品・在庫計画と接続して 2 本の業務フローを閉じる。</p>
+    <h3>ドキュメント連鎖</h3>
+    <svg viewBox="0 0 960 240" role="img" aria-label="ドキュメント連鎖">
+      <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/></marker></defs>
+      <!-- 受注 -->
+      <rect x="20" y="20" width="150" height="44" rx="8" fill="#d1e7dd" stroke="#198754"/><text x="95" y="47" text-anchor="middle" font-size="12" font-weight="bold">受注 sales_orders</text>
+      <rect x="240" y="20" width="180" height="44" rx="8" fill="#eef2ff" stroke="#6366f1"/><text x="330" y="41" text-anchor="middle" font-size="12" font-weight="bold">出荷指示(既存)</text><text x="330" y="57" text-anchor="middle" font-size="10">shipping_instructions</text>
+      <rect x="490" y="20" width="170" height="44" rx="8" fill="#eef2ff" stroke="#6366f1"/><text x="575" y="41" text-anchor="middle" font-size="12" font-weight="bold">QR検品(既存)</text><text x="575" y="57" text-anchor="middle" font-size="10">qr_inspections</text>
+      <!-- 発注 -->
+      <rect x="20" y="100" width="150" height="44" rx="8" fill="#d1e7dd" stroke="#198754"/><text x="95" y="121" text-anchor="middle" font-size="12" font-weight="bold">発注</text><text x="95" y="137" text-anchor="middle" font-size="10">purchase_orders</text>
+      <rect x="240" y="100" width="180" height="44" rx="8" fill="#cfe2ff" stroke="#0d6efd"/><text x="330" y="121" text-anchor="middle" font-size="12" font-weight="bold">入庫予定(在庫計画)</text><text x="330" y="137" text-anchor="middle" font-size="10">receiving_orders</text>
+      <rect x="490" y="100" width="170" height="44" rx="8" fill="#cfe2ff" stroke="#0d6efd"/><text x="575" y="121" text-anchor="middle" font-size="12" font-weight="bold">入庫検品(在庫計画)</text><text x="575" y="137" text-anchor="middle" font-size="10">receiving_inspections</text>
+      <!-- 製造 -->
+      <rect x="20" y="180" width="150" height="44" rx="8" fill="#d1e7dd" stroke="#198754"/><text x="95" y="201" text-anchor="middle" font-size="12" font-weight="bold">製造指図</text><text x="95" y="217" text-anchor="middle" font-size="10">work_orders</text>
+      <rect x="240" y="180" width="180" height="44" rx="8" fill="#cfe2ff" stroke="#0d6efd"/><text x="330" y="201" text-anchor="middle" font-size="12" font-weight="bold">部品消費(在庫計画)</text><text x="330" y="217" text-anchor="middle" font-size="10">inventory_transactions</text>
+      <rect x="490" y="180" width="170" height="44" rx="8" fill="#cfe2ff" stroke="#0d6efd"/><text x="575" y="201" text-anchor="middle" font-size="12" font-weight="bold">製品ロット(在庫計画)</text><text x="575" y="217" text-anchor="middle" font-size="10">lots</text>
+      <rect x="730" y="100" width="210" height="124" rx="8" fill="#fef9c3" stroke="#ca8a04"/><text x="835" y="130" text-anchor="middle" font-size="12" font-weight="bold">トレーサビリティ</text><text x="835" y="152" text-anchor="middle" font-size="10">製品ロット → 部品ロット(逆)</text><text x="835" y="170" text-anchor="middle" font-size="10">部品ロット → 出荷先(正)</text><text x="835" y="188" text-anchor="middle" font-size="10">受注/発注/指図 横断検索</text>
+      <line x1="170" y1="42" x2="238" y2="42" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar3)"/>
+      <line x1="420" y1="42" x2="488" y2="42" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar3)"/>
+      <line x1="170" y1="122" x2="238" y2="122" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar3)"/>
+      <line x1="420" y1="122" x2="488" y2="122" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar3)"/>
+      <line x1="170" y1="202" x2="238" y2="202" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar3)"/>
+      <line x1="420" y1="202" x2="488" y2="202" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar3)"/>
+      <line x1="660" y1="42" x2="728" y2="120" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ar3)"/>
+      <line x1="660" y1="122" x2="728" y2="150" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ar3)"/>
+      <line x1="660" y1="202" x2="728" y2="190" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ar3)"/>
+    </svg>
+    <div class="note"><b>OCR は既存資産を横展開:</b> FAX/PDF 注文書 → OCR → 確認・修正画面(マスタ照合)→ 受注化。納品書も OCR → 発注明細と自動突合 → 差異表示。読み取り結果をそのまま登録しないことを原則とする(<code>ocr_documents</code> に原本+解析結果を保存)。</div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card" style="--accent:#198754">
+      <h2>追加テーブル(14)</h2>
+      <table>
+        <tr><th>分類</th><th>テーブル</th></tr>
+        <tr><td>マスタ</td><td class="mono">customers, suppliers, processes</td></tr>
+        <tr><td>受注</td><td class="mono">sales_orders, sales_order_lines</td></tr>
+        <tr><td>発注</td><td class="mono">purchase_orders, purchase_order_lines</td></tr>
+        <tr><td>OCR</td><td class="mono">ocr_documents, delivery_note_matches</td></tr>
+        <tr><td>製造</td><td class="mono">work_orders, work_order_operations, work_order_components, operation_results, material_consumptions</td></tr>
+      </table>
+    </div>
+    <div class="card" style="--accent:#198754">
+      <h2>ステータス設計</h2>
+      <table>
+        <tr><th>伝票</th><th>遷移</th></tr>
+        <tr><td>受注</td><td class="mono">draft → confirmed → allocated → partially_shipped → shipped</td></tr>
+        <tr><td>発注</td><td class="mono">draft → ordered → partially_received → received → closed</td></tr>
+        <tr><td>製造指図</td><td class="mono">planned → released → in_progress → completed → closed</td></tr>
+        <tr><td>工程実績</td><td class="mono">pending → started → completed (suspended)</td></tr>
+      </table>
+      <p>工程打刻・部品消費は既存 QR 検品 UI のスキャン操作を流用(<code>POST /api/operation-results/scan</code>、<code>POST /api/material-consumptions/scan</code>)。</p>
+    </div>
+  </div>
+
+  <div class="card" style="--accent:#198754">
+    <h2>フェーズと完成条件</h2>
+    <ul class="timeline">
+      <li><b>Phase 1 設計文書</b><small>業務フロー / スキーマ / API / 画面 / OCR 運用 / 状態遷移</small></li>
+      <li><b>Phase 2 マスタと受注管理</b><small>customers・suppliers・受注 CRUD・出荷指示生成</small></li>
+      <li><b>Phase 3 受注 OCR 取込</b><small>ocr_documents・確認/修正画面・受注化</small></li>
+      <li><b>Phase 4 発注・購買</b><small>発注残・入庫予定生成・納品書照合</small></li>
+      <li><b>Phase 5 製造指図・工程実績</b><small>BOM 展開・指図票 QR・打刻・部品消費・製品ロット</small></li>
+      <li><b>Phase 6 トレーサビリティ統合</b><small>正逆展開 API・横断検索・ツリー表示</small></li>
+      <li><b>Phase 7 Grafana Cloud 監視</b><small>受注残・照合差異・工程遅延メトリクス</small></li>
+      <li><b>Phase 8 Azure/Supabase 反映</b><small>schema・イメージ・デプロイ</small></li>
+    </ul>
+    <h3>POC 完成条件</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="ord-1">受注を手入力と OCR 取込の両方で登録できる(確認画面経由)</label></li>
+      <li><label><input type="checkbox" id="ord-2">受注残を照会し、受注から出荷指示を生成できる</label></li>
+      <li><label><input type="checkbox" id="ord-3">発注 → 入庫予定生成、納品書 OCR 突合・差異検出ができる</label></li>
+      <li><label><input type="checkbox" id="ord-4">製造指図を発行し BOM から部品所要を展開できる</label></li>
+      <li><label><input type="checkbox" id="ord-5">工程開始・完了を QR 打刻で記録できる</label></li>
+      <li><label><input type="checkbox" id="ord-6">部品消費が在庫履歴に反映され、ロット正逆展開ができる</label></li>
+      <li><label><input type="checkbox" id="ord-7">Grafana Cloud で受注残・照合差異・工程遅延を確認できる</label></li>
+    </ul>
+    <details><summary>後回しにする項目</summary><div class="body"><p>検査成績書・NCR・CAPA、設備保全、帳票 PDF、簡易 MRP・自動引当、原価計算、EDI/ERP 連携、多段階承認、小日程スケジューラ</p></div></details>
+  </div>
+</section>
+
+<!-- ============ Grafana 埋め込み ============ -->
+<section class="tab" id="tab-gra" style="--accent:#f46800">
+  <div class="card">
+    <h2>OSS Grafana 埋め込み計画</h2>
+    <p>現場端末のアプリ画面内に、<b>ログイン不要でリアルタイム更新される Grafana グラフ</b>を iframe 表示する。Grafana Cloud は iframe 埋め込み不可(<code>allow_embedding</code> 変更不可・匿名アクセス不可)のため、<b>OSS 版セルフホストを採用</b>。Cloud は管理者向け運用監視・アラートに役割分担する。</p>
+    <table>
+      <tr><th>機能</th><th>Grafana Cloud</th><th>OSS セルフホスト</th></tr>
+      <tr><td>共有 URL (Public/Shared Dashboards)</td><td><span class="badge done">可</span></td><td><span class="badge done">可</span></td></tr>
+      <tr><td>iframe 埋め込み (allow_embedding)</td><td><span class="badge ng">不可</span></td><td><span class="badge done">可</span></td></tr>
+      <tr><td>匿名アクセス</td><td><span class="badge ng">不可</span></td><td><span class="badge done">可</span></td></tr>
+      <tr><td>パネル単体埋め込み (d-solo)</td><td><span class="badge ng">不可</span></td><td><span class="badge done">可</span></td></tr>
+    </table>
+    <h3>構成(ACA 主案 / Cloud Run 併記)</h3>
+    <div class="flow">
+      <span>Browser</span><i>→</i><span>web (nginx, 外部公開)</span><i>→</i><span>/grafana/* → grafana (internal)</span><i>→</i><span>Supabase (設定DB + データソース)</span>
+    </div>
+    <table>
+      <tr><th>観点</th><th>Azure Container Apps</th><th>Cloud Run</th></tr>
+      <tr><td>既存アプリとの同居</td><td>済み (web/api 稼働中)</td><td>新規展開が必要</td></tr>
+      <tr><td>内部サービス間通信</td><td>internal ingress で完結</td><td>ingress 制限 + 認証/VPC 設定</td></tr>
+      <tr><td>スケール</td><td>min replicas 1 推奨</td><td>min-instances 1 推奨 (コールドスタート回避)</td></tr>
+      <tr><td>位置づけ</td><td><span class="badge done">主案</span> 既存 Terraform に追加</td><td><span class="badge plan">代替</span> GCP 展開時</td></tr>
+    </table>
+  </div>
+
+  <div class="grid c2">
+    <div class="card" style="--accent:#f46800">
+      <h2>必須設定</h2>
+<pre><code>GF_SECURITY_ALLOW_EMBEDDING=true
+GF_AUTH_ANONYMOUS_ENABLED=true
+GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+GF_SERVER_ROOT_URL=https://&lt;app&gt;/grafana/
+GF_SERVER_SERVE_FROM_SUB_PATH=true
+# 設定DBを Supabase に外出し (ステートレス化)
+GF_DATABASE_TYPE=postgres
+GF_DATABASE_HOST=&lt;pooler&gt;:5432
+GF_DATABASE_SSL_MODE=require</code></pre>
+      <p>設定 DB を外出ししないと再起動でダッシュボードが消える。データソースは<b>読み取り専用ロール</b>でアプリ DB を参照。</p>
+    </div>
+    <div class="card" style="--accent:#f46800">
+      <h2>埋め込み方法</h2>
+<pre><code>&lt;!-- パネル単体 --&gt;
+&lt;iframe src="/grafana/d-solo/&lt;uid&gt;/&lt;slug&gt;
+  ?orgId=1&amp;panelId=2&amp;from=now-6h&amp;to=now
+  &amp;refresh=30s&amp;theme=light"&gt;&lt;/iframe&gt;
+
+&lt;!-- ダッシュボード全体 (キオスク) --&gt;
+&lt;iframe src="/grafana/d/&lt;uid&gt;/&lt;slug&gt;
+  ?kiosk&amp;refresh=30s"&gt;&lt;/iframe&gt;</code></pre>
+      <p><code>var-xxx</code> テンプレート変数で、アプリ側の選択中拠点・品目を引き渡して絞り込み表示できる。</p>
+    </div>
+  </div>
+
+  <div class="card" style="--accent:#f46800">
+    <h2>セキュリティ・フェーズ・完成条件</h2>
+    <details><summary>セキュリティ設計</summary><div class="body">
+      <p>匿名は Viewer 固定(編集・Explore 不可)。埋め込み用 Org/フォルダを分離。Grafana は internal ingress で直接公開しない(閲覧は必ず nginx 経由 → アプリの M365 認証・IP 制限がそのまま効く)。DB ユーザーは SELECT のみ。admin/admin を本番に持ち込まない。/grafana/ にレート制限。</p>
+    </div></details>
+    <h3>実装フェーズ</h3>
+    <ul class="timeline">
+      <li><b>Phase 1 ローカル検証</b><small>docker-compose に grafana 追加・nginx プロキシ・iframe 仮組み</small></li>
+      <li><b>Phase 2 ダッシュボード整備</b><small>shipping-floor / inventory を JSON + 投入スクリプトで管理</small></li>
+      <li><b>Phase 3 Supabase 対応</b><small>設定 DB 外出し・読み取り専用ユーザー・ステートレス確認</small></li>
+      <li><b>Phase 4 ACA 展開</b><small>Terraform 追加 (internal ingress)・secrets・本番確認</small></li>
+      <li><b>Phase 5 Cloud Run 展開(GCP 採用時のみ)</b><small>ingress 制限・サービス間認証・min-instances=1</small></li>
+      <li><b>Phase 6 運用整備</b><small>ダッシュボード CI 投入・稼働監視・キオスク常時表示ルール</small></li>
+    </ul>
+    <h3>POC 完成条件</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="gra-1">OSS Grafana がステートレスに稼働し、再デプロイ後もダッシュボードが保持される</label></li>
+      <li><label><input type="checkbox" id="gra-2">アプリ HTML に d-solo パネルが iframe 表示され、自動更新が動作する</label></li>
+      <li><label><input type="checkbox" id="gra-3">現場端末でログイン操作なしにグラフが閲覧できる</label></li>
+      <li><label><input type="checkbox" id="gra-4">外部から Grafana へ直接アクセスできない</label></li>
+      <li><label><input type="checkbox" id="gra-5">匿名ユーザーが編集・保存・Explore できない</label></li>
+    </ul>
+    <details><summary>後回しにする項目</summary><div class="body"><p>Enterprise 機能、JWT/プロキシ認証によるユーザー単位認可、Grafana Live、画像レンダラー、アラートの OSS 側移管、複数拠点/Org 展開</p></div></details>
+  </div>
+</section>
+
+<!-- ============ UI 改善 ============ -->
+<section class="tab" id="tab-ui" style="--accent:#6f42c1">
+  <div class="card">
+    <h2>デザイン・UI・機能改善計画</h2>
+    <p>現場端末での操作性と信頼性を高め、今後の機能拡張(在庫・受発注・Grafana 埋め込み)を低コストで載せられる UI 基盤を整える。</p>
+    <div class="grid c3">
+      <div>
+        <h3>現状の課題</h3>
+        <p style="font-size:.9rem">HTML 47 本中、本番は 15 前後(safari*、qr-inspection 系 7 種などが混在)。全ページがインライン style 個別実装。外部 CDN 依存。PWA 未完成(SW なし)。「戻る」連鎖のナビ。</p>
+      </div>
+      <div>
+        <h3>基本方針</h3>
+        <p style="font-size:.9rem">先にページ整理+共通レイアウト → 全画面へ一括適用できる状態を作る。現場モード / 管理モードの分離。CSS 変数トークンで統一。CDN ローカル化。PWA でオフライン耐性。</p>
+      </div>
+      <div>
+        <h3>モード分離</h3>
+        <p style="font-size:.9rem"><b>現場</b>: 大ボタンランチャー(検品/ピッキング/棚卸)、1 画面 1 タスク、PWA 起点。<b>管理</b>: サイドバー付き(指示・実績・マスタ・QC・モニタリング)。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card" style="--accent:#6f42c1">
+      <h2>ページ整理</h2>
+      <table>
+        <tr><th>区分</th><th>内容</th></tr>
+        <tr><td><span class="badge done">残す (約15)</span></td><td class="mono" style="font-size:.78rem">index / qr-inspection3(rename) / pps / ItemPicking / maintenance / 各マスタ / shipping-instructions / inventory / monitoring / qc-* / ocr / logs / system-config</td></tr>
+        <tr><td><span class="badge warn">_archive へ</span></td><td class="mono" style="font-size:.78rem">safari*(6) / qr-inspection 旧版(7) / index-org,original / mockup 系 / camera-test / QRPOC / android / aws-system-diagram / exhibition-flyer / *.backup-*</td></tr>
+      </table>
+      <p style="font-size:.9rem">nginx で <code>_archive/</code> を遮断し、Docker イメージから除外。</p>
+      <h3>デザイントークン</h3>
+<pre><code>:root {
+  --color-status-ok: #198754;
+  --color-status-ng: #dc3545;
+  --touch-target-min: 48px;
+  --touch-target-field: 64px;
+}
+[data-theme="dark"] { /* 上書き */ }</code></pre>
+    </div>
+    <div class="card" style="--accent:#6f42c1">
+      <h2>現場向け UX</h2>
+      <table>
+        <tr><th>改善</th><th>内容</th></tr>
+        <tr><td>スキャン結果</td><td>成功=緑+ビープ+バイブ1回 / 失敗=赤+低音2回+バイブ2回 / 重複=黄。画面を注視せず連続スキャン</td></tr>
+        <tr><td>タッチ</td><td>主要 48px以上、検品操作 64px以上。OK/NG/完了は下部 sticky バー(親指圏)</td></tr>
+        <tr><td>進捗</td><td>「3/12 スキャン済み」大型表示 + プログレスバー</td></tr>
+        <tr><td>リカバリ</td><td>直前スキャン Undo、検品差し戻し</td></tr>
+        <tr><td>作業者</td><td>検品者をセッション記憶(M365 認証時は自動設定)</td></tr>
+      </table>
+      <h3>オフライン (PWA 完成)</h3>
+      <p style="font-size:.9rem">SW でアプリシェルをキャッシュ、API GET は network-first。スキャン結果は IndexedDB キューへ保存し、復帰時に自動再送。送信済み/未送信をアイコン表示。オフラインバナー表示中も操作継続可能。</p>
+    </div>
+  </div>
+
+  <div class="card" style="--accent:#6f42c1">
+    <h2>フェーズと完成条件</h2>
+    <ul class="timeline">
+      <li><b>Phase 1 ページ整理と共通基盤</b><small>本番確定・_archive・tokens/components/layout・CDN ローカル化・タイトル修正</small></li>
+      <li><b>Phase 2 現場向け UI 改善</b><small>フィードバック・タッチターゲット・進捗・Undo・作業者記憶</small></li>
+      <li><b>Phase 3 PWA / オフライン</b><small>SW・IndexedDB キュー・iOS Safari 確認</small></li>
+      <li><b>Phase 4 ナビ再設計とダークテーマ</b><small>モード分離・サイドバー・data-theme(Grafana theme と連動)</small></li>
+      <li><b>Phase 5 機能追加</b><small>絞り込み/検索・優先度通知・監査表示・monitoring の Grafana 置換</small></li>
+    </ul>
+    <h3>POC 完成条件</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="ui-1">本番ページが確定し、実験ページが _archive に隔離されている</label></li>
+      <li><label><input type="checkbox" id="ui-2">全本番ページが共通トークン・共通ナビを使用している</label></li>
+      <li><label><input type="checkbox" id="ui-3">外部 CDN に依存せず全画面が表示される</label></li>
+      <li><label><input type="checkbox" id="ui-4">スキャン成功/失敗が色・音・バイブで判別できる</label></li>
+      <li><label><input type="checkbox" id="ui-5">オフライン中もスキャン継続でき、復帰後に自動送信される</label></li>
+      <li><label><input type="checkbox" id="ui-6">現場モードが PWA としてホーム画面から全画面起動する</label></li>
+      <li><label><input type="checkbox" id="ui-7">検品待ち一覧を納期・配送先・優先度で絞り込める</label></li>
+    </ul>
+    <details><summary>後回しにする項目</summary><div class="body"><p>SPA フレームワーク全面移行、多言語対応、WCAG 準拠監査、Web Push、帳票 PDF デザイン刷新</p></div></details>
+  </div>
+</section>
+
+<!-- ============ スキル導入 ============ -->
+<section class="tab" id="tab-skl" style="--accent:#0d9488">
+  <div class="card">
+    <h2>Agent Skills 導入・適用計画</h2>
+    <p>公開スキル(anthropic 16 / openai 30 / awesome-copilot 43 = 89 件)から <b>14 件を厳選</b>し、<b>prj3 専用スキル 4 件を自作</b>する。導入数より「確実に使う場面がある少数」に絞り、生成物の流儀をプロジェクト規約に固定するのが方針。</p>
+    <div class="flow">
+      <span>セキュリティ監査 (先行)</span><i>→</i><span>UI 改善と並行導入</span><i>→</i><span>専用スキル自作</span><i>→</i><span>各計画フェーズで適用</span><i>→</i><span>四半期ごとに上流更新確認</span>
+    </div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card" style="--accent:#0d9488">
+      <h2>採用スキル(14 件)</h2>
+      <table>
+        <tr><th>領域</th><th>スキル</th><th>適用先</th></tr>
+        <tr><td rowspan="5">UI 改善<br><span class="badge done">高</span></td><td class="mono">frontend-design</td><td>共通コンポーネント・現場 UI</td></tr>
+        <tr><td class="mono">theme-factory</td><td>tokens.css・ダークテーマ</td></tr>
+        <tr><td class="mono">web-design-reviewer</td><td>改修レビュー</td></tr>
+        <tr><td class="mono">playwright</td><td>検品フロー E2E</td></tr>
+        <tr><td class="mono">webapp-testing</td><td>テスト戦略</td></tr>
+        <tr><td rowspan="2">セキュリティ<br><span class="badge done">高</span></td><td class="mono">security-best-practices</td><td>API 監査(認証なし・CORS 等の是正)</td></tr>
+        <tr><td class="mono">security-threat-model</td><td>公開 POC の脅威モデリング</td></tr>
+        <tr><td rowspan="4">品質・インフラ<br><span class="badge plan">中</span></td><td class="mono">refactor</td><td>server.js ルート分割</td></tr>
+        <tr><td class="mono">terraform-azurerm-set-diff-analyzer</td><td>plan 差分検証</td></tr>
+        <tr><td class="mono">appinsights-instrumentation</td><td>API 計装強化</td></tr>
+        <tr><td class="mono">azure-resource-visualizer</td><td>構成図生成</td></tr>
+        <tr><td rowspan="3">設計・文書<br><span class="badge plan">中</span></td><td class="mono">prd / doc-coauthoring</td><td>受発注の要件詳細化・設計文書</td></tr>
+        <tr><td class="mono">web-artifacts-builder</td><td>HTML ファースト文書の品質</td></tr>
+        <tr><td class="mono">skill-creator</td><td>専用スキル作成</td></tr>
+      </table>
+      <details><summary>見送り</summary><div class="body"><p>figma / penpot(ツール未使用)、sentry(Grafana 採用)、powerbi / snowflake(対象外)、copilot-sdk / vscode-ext 系、sora / speech 等メディア系、cloudflare / netlify / vercel / render(ACA 採用済み)。docx / xlsx / pdf / pptx は Cowork 導入済み。</p></div></details>
+    </div>
+    <div class="card" style="--accent:#0d9488">
+      <h2>prj3 専用スキル(自作 4 件)</h2>
+      <table>
+        <tr><th>スキル</th><th>内容と効果</th></tr>
+        <tr><td class="mono">prj3-frontend</td><td>トークン・共通ナビ・現場 UI 基準(48/64px、フィードバック仕様)、CDN 禁止ルール。<b>画面生成が常に同じ流儀になる</b></td></tr>
+        <tr><td class="mono">prj3-db-migration</td><td>Supabase スキーマ適用手順、命名規約、追記型履歴の原則、読み取り専用ロール</td></tr>
+        <tr><td class="mono">prj3-grafana-dashboard</td><td>ダッシュボード JSON 規約、REST API 投入パターン、埋め込み URL 規約</td></tr>
+        <tr><td class="mono">prj3-deploy</td><td>Terraform → deploy-images の定型手順、secrets 管理、デプロイ後検証</td></tr>
+      </table>
+      <h3>導入方法</h3>
+<pre><code># プロジェクト共有 (推奨)
+prj3/.claude/skills/&lt;skill-name&gt;/SKILL.md
+
+# 個人利用
+~/.claude/skills/
+
+# Cowork: 設定 &gt; Capabilities から追加</code></pre>
+      <p style="font-size:.9rem">frontmatter の description に「検品」「出荷指示」などプロジェクト文脈の語を追記すると発動精度が上がる。依存ツール(playwright、gh CLI 等)は WSL2 側にインストール。</p>
+    </div>
+  </div>
+
+  <div class="card" style="--accent:#0d9488">
+    <h2>適用ロードマップと完成条件</h2>
+    <ul class="timeline">
+      <li><b>Step 1 即時(全計画の前提)</b><small>security 2 スキルで API 監査・prj3-frontend 作成</small></li>
+      <li><b>Step 2 UI 改善 Phase 1-2 と並行</b><small>frontend-design / theme-factory / web-design-reviewer・playwright で E2E 整備</small></li>
+      <li><b>Step 3 在庫計画 Phase 2 以降</b><small>prj3-db-migration 運用・refactor で server.js 分割</small></li>
+      <li><b>Step 4 Grafana Phase 2 以降</b><small>prj3-grafana-dashboard 運用・terraform 差分検証</small></li>
+      <li><b>Step 5 受発注 Phase 1</b><small>prd + doc-coauthoring で詳細要件化</small></li>
+      <li><b>Step 6 継続運用</b><small>prj3-deploy・計装強化・構成図の自動反映</small></li>
+    </ul>
+    <h3>完成条件</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="skl-1">採用スキルが .claude/skills/ に配置され、エージェントから発動する</label></li>
+      <li><label><input type="checkbox" id="skl-2">セキュリティ監査レポートが作成され、指摘が課題管理されている</label></li>
+      <li><label><input type="checkbox" id="skl-3">prj3-frontend により新規画面が共通規約で生成される</label></li>
+      <li><label><input type="checkbox" id="skl-4">主要フローの E2E テストが playwright スキル経由で実行できる</label></li>
+      <li><label><input type="checkbox" id="skl-5">server.js のリファクタリング計画が作成されている</label></li>
+      <li><label><input type="checkbox" id="skl-6">専用スキル 4 件が作成・運用されている</label></li>
+    </ul>
+    <details><summary>後回しにする項目</summary><div class="body"><p>imagegen(アイコン生成が必要になった時点)、mcp-builder(API の MCP 化)、agentic-eval、gh-cli / gh-fix-ci 等 GitHub 運用系(リポジトリ運用方針の確定後)</p></div></details>
+  </div>
+</section>
+</main>
+
+<footer>出荷検品アプリ 拡張計画ポータル — 元ドキュメント: docs/manufacturing-inventory-plan.md / manufacturing-order-plan.md / grafana-embedding-plan.md / ui-improvement-plan.md / skills-adoption-plan.md</footer>
+
+<script>
+const tabs = document.querySelectorAll('nav.tabs button');
+tabs.forEach(btn => btn.addEventListener('click', () => {
+  tabs.forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('section.tab').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  document.querySelector('nav.tabs').style.setProperty('--tab-color', btn.dataset.color);
+  history.replaceState(null, '', '#' + btn.dataset.tab);
+}));
+// URL ハッシュで直接タブを開く
+const hash = location.hash.replace('#','');
+if (hash) { const b = document.querySelector(`nav.tabs button[data-tab="${hash}"]`); if (b) b.click(); }
+// POC チェックリストを localStorage に保存
+document.addEventListener('change', e => {
+  if (e.target.matches('.check input')) {
+    localStorage.setItem('plan-' + e.target.id, e.target.checked ? '1' : '0');
+  }
+});
+document.querySelectorAll('.check input').forEach(cb => {
+  cb.checked = localStorage.getItem('plan-' + cb.id) === '1';
+});
+</script>
+</body>
+</html>

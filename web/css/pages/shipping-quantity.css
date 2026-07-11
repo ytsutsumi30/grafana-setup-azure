@@ -1,0 +1,12 @@
+.line-card { cursor: pointer; border-left: 4px solid var(--color-border); }
+.line-card.active { border-left-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface)); }
+.line-card.completed { border-left-color: var(--color-status-ok); }
+.line-card.partial { border-left-color: var(--color-status-pending); }
+.progress { height: 1.1rem; }
+#qr-reader { width: 100%; max-width: 380px; margin: 0 auto; }
+.lot-row { cursor: pointer; }
+.lot-row:hover { background: color-mix(in srgb, var(--color-border) 45%, var(--color-surface)); }
+.qty-input { max-width: 120px; }
+.add-qty-input { max-width: 100px; }
+.workflow-panel { border-left: 5px solid var(--color-primary); }
+.workflow-panel.done { border-left-color: var(--color-status-ok); }

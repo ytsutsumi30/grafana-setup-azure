@@ -1,0 +1,6 @@
+:root { --page-accent: var(--color-status-progress); --page-accent-dark: var(--color-primary-dark); }
+
+.delivery-locations-spinner {
+    width: 3rem;
+    height: 3rem;
+}

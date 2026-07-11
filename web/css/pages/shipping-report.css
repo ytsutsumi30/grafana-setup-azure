@@ -1,0 +1,155 @@
+.report-document {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1.25rem;
+}
+
+.report-page {
+  max-width: 210mm;
+  margin: 0 auto;
+  background: var(--color-surface);
+}
+
+.report-header {
+  border-bottom: 2px solid var(--color-text);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.report-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.report-mark {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.35rem 0.75rem;
+  font-weight: 700;
+}
+
+.report-section {
+  margin-top: 1rem;
+  page-break-inside: avoid;
+}
+
+.report-section h3 {
+  font-size: 1rem;
+  border-left: 4px solid var(--color-primary);
+  padding-left: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.report-table th,
+.report-table td {
+  border: 1px solid var(--color-border);
+  padding: 0.35rem 0.45rem;
+  vertical-align: top;
+}
+
+.report-table th {
+  background: color-mix(in srgb, var(--color-border), transparent 55%);
+  font-weight: 700;
+}
+
+.report-kpi {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.5rem;
+  min-height: 64px;
+}
+
+.report-kpi-label {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.report-kpi-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.report-footer {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.report-sign-box {
+  border: 1px solid var(--color-border);
+  min-height: 56px;
+  padding: 0.35rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 575.98px) {
+  .report-document {
+    padding: 0.75rem;
+  }
+
+  .report-page {
+    min-width: 720px;
+  }
+
+  .report-toolbar .btn {
+    min-height: var(--touch-target-min);
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .app-header,
+  .report-toolbar,
+  #reportLoading,
+  .m365-auth-bar,
+  .app-toast-container {
+    display: none !important;
+  }
+
+  main.container {
+    max-width: none;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .report-document {
+    display: block !important;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .report-page {
+    max-width: none;
+    margin: 0;
+  }
+
+  .report-table {
+    font-size: 8.8pt;
+  }
+
+  .report-table th,
+  .report-table td {
+    border-color: #555;
+  }
+}

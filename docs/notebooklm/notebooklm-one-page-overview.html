@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>出荷検品・製造業務 POC 1枚概要</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
+      color: #202124;
+      background: #ffffff;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .page {
+      width: 277mm;
+      min-height: 190mm;
+      padding: 4mm;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #1a73e8;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 23px;
+      color: #174ea6;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin-top: 4px;
+      color: #5f6368;
+      font-size: 11px;
+    }
+    .meta {
+      text-align: right;
+      color: #5f6368;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1.35fr 1fr;
+      gap: 8px;
+    }
+    .panel {
+      border: 1px solid #d9e2f3;
+      border-radius: 6px;
+      padding: 8px;
+      background: #fff;
+      min-height: 0;
+    }
+    .panel h2 {
+      margin: 0 0 6px;
+      font-size: 13px;
+      color: #185abc;
+      border-bottom: 1px solid #e8f0fe;
+      padding-bottom: 4px;
+    }
+    .bullets {
+      margin: 0;
+      padding-left: 16px;
+    }
+    .bullets li { margin: 0 0 4px; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .flow .step {
+      border: 1px solid #c6dafc;
+      border-radius: 5px;
+      padding: 6px;
+      background: #f8fbff;
+      min-height: 43px;
+    }
+    .step strong {
+      display: block;
+      color: #174ea6;
+      font-size: 10.5px;
+      margin-bottom: 2px;
+    }
+    .arch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .box {
+      border: 1px solid #dadce0;
+      border-radius: 5px;
+      padding: 6px;
+      background: #f8f9fa;
+      min-height: 38px;
+    }
+    .box strong {
+      display: block;
+      color: #3c4043;
+      margin-bottom: 2px;
+    }
+    .status-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 3px;
+    }
+    .status-table th,
+    .status-table td {
+      border-bottom: 1px solid #edf1f7;
+      padding: 4px 3px;
+      vertical-align: top;
+    }
+    .status-table th {
+      text-align: left;
+      color: #5f6368;
+      font-size: 9px;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 1px 6px;
+      font-size: 9px;
+      white-space: nowrap;
+    }
+    .done { background: #e6f4ea; color: #137333; }
+    .next { background: #fef7e0; color: #b06000; }
+    .risk { background: #fce8e6; color: #c5221f; }
+    .note {
+      color: #5f6368;
+      font-size: 9.5px;
+      margin-top: 6px;
+    }
+    .wide {
+      grid-column: 1 / span 3;
+    }
+    footer {
+      margin-top: 8px;
+      color: #5f6368;
+      font-size: 9px;
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #edf1f7;
+      padding-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div>
+        <h1>出荷検品・製造業務 POC 1枚概要</h1>
+        <div class="subtitle">QR・ロット・在庫・受発注・製造・トレーサビリティをつなぐ現場向け業務基盤</div>
+      </div>
+      <div class="meta">
+        NotebookLM 連携用<br>
+        更新日: 2026-07-09<br>
+        配置: AI-Memory / projects / prj3 / notebooklm
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="panel">
+        <h2>目的</h2>
+        <ul class="bullets">
+          <li>出荷検品アプリ本体の完成度を上げる。</li>
+          <li>QR とロットを軸に、入庫から出荷完了後の修正まで追跡する。</li>
+          <li>業務イベント単位で監査ログを残す。</li>
+          <li>製造業向けに受発注、在庫、棚卸、製造、OCR、監視へ拡張する。</li>
+        </ul>
+        <div class="note">POC 方針: まず画面側制御を優先し、API 認証とバリデーションは段階的に厳格化する。</div>
+      </div>
+
+      <div class="panel">
+        <h2>業務フロー</h2>
+        <div class="flow">
+          <div class="step"><strong>発注・入庫</strong>発注から入庫予定を作成し、QR/ロット単位で入庫。</div>
+          <div class="step"><strong>在庫管理</strong>在庫残高、在庫移動、状態、ロケーションを追跡。</div>
+          <div class="step"><strong>受注・出荷</strong>受注から出荷指示を生成し、数量とロットを確定。</div>
+          <div class="step"><strong>QR 検品</strong>確定済みロット引当を正として QR 検品し、完了判定。</div>
+          <div class="step"><strong>棚卸</strong>実在庫をカウントし、差異を監査ログ付きで反映。</div>
+          <div class="step"><strong>OCR</strong>帳票テキストから受注や入庫候補へ変換。</div>
+          <div class="step"><strong>製造</strong>材料投入、工程実績、完成品入庫をロットで接続。</div>
+          <div class="step"><strong>トレース</strong>QR、ロット、伝票、製造指図を横断検索。</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>技術構成</h2>
+        <div class="arch">
+          <div class="box"><strong>Frontend</strong>静的 HTML、Vanilla JS、PWA、M365 ログイン UI。</div>
+          <div class="box"><strong>API</strong>Node.js / Express。業務 API と監査ログ。</div>
+          <div class="box"><strong>DB</strong>Supabase PostgreSQL。ロット、QR、在庫、伝票。</div>
+          <div class="box"><strong>Hosting</strong>Azure Container Apps。japaneast。</div>
+          <div class="box"><strong>Auth</strong>M365 ログイン、Bearer token 運用へ移行。</div>
+          <div class="box"><strong>Monitoring</strong>Grafana Cloud 最小監視。</div>
+        </div>
+      </div>
+
+      <div class="panel wide">
+        <h2>実装状況と次アクション</h2>
+        <table class="status-table">
+          <thead>
+            <tr><th>領域</th><th>状況</th><th>主な成果</th><th>次アクション</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>在庫・ロット・QR</td><td><span class="badge done">画面/API 実装済み</span></td><td>在庫基盤画面、残高、移動、QR 照会。</td><td>状態遷移と棚卸差異の画面統合。</td></tr>
+            <tr><td>発注・入庫</td><td><span class="badge done">画面/API 実装済み</span></td><td>発注、入庫予定、QR/ロット入庫。</td><td>入庫 NG 理由分類と受入検査項目。</td></tr>
+            <tr><td>受注・出荷指示</td><td><span class="badge done">画面/API 実装済み</span></td><td>受注作成、出荷指示生成、出荷数量画面連携。</td><td>複数品目・複数ロットの操作性レビュー。</td></tr>
+            <tr><td>出荷検品</td><td><span class="badge next">改善継続</span></td><td>PPS、QR 検品、履歴、帳票、監査ログ。</td><td>完了後修正、理由入力、監査ビュー強化。</td></tr>
+            <tr><td>棚卸</td><td><span class="badge next">API 実装済み</span></td><td>棚卸セッション、差異承認、在庫反映。</td><td>棚卸画面の実装。</td></tr>
+            <tr><td>OCR / 製造 / トレース</td><td><span class="badge next">基盤実装済み</span></td><td>OCR 取込、製造指図、横断トレース。</td><td>画面統合と現場レビュー。</td></tr>
+            <tr><td>認証・監視</td><td><span class="badge risk">本番前強化</span></td><td>M365 ログイン、Grafana Cloud KPI API。</td><td>更新系 API の Bearer token 厳格化、監視ダッシュボード連携。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>NotebookLM 推奨投入: notebooklm-combined-source.pdf + notebooklm-prompts.md + notebooklm-review-briefing.md</span>
+      <span>禁止: Terraform state、tfvars、Supabase 接続情報、アクセストークン、秘密鍵</span>
+    </footer>
+  </main>
+</body>
+</html>

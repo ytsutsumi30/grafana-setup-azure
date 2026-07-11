@@ -1,0 +1,7 @@
+:root { --page-accent: var(--color-status-pending); --page-accent-dark: var(--color-status-hold); }
+.badge-component-type { font-size: 0.85rem; padding: 0.3rem 0.6rem; }
+
+.product-components-spinner {
+    width: 3rem;
+    height: 3rem;
+}

@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+*.log
+.env
+.env.*
+secrets
+ssl
+backups
+backup-*
+*.pem
+*.key
+*.crt
+.DS_Store

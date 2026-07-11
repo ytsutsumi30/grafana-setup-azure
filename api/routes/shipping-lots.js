@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../lib/db');
 const logger = require('../lib/logger');
+const { recordAuditEvent } = require('../lib/audit');
 
 // 明細の対象製品のロット一覧(出荷可能な在庫)
 router.get('/:lineId/lots', async (req, res) => {
@@ -111,6 +112,29 @@ router.post('/:lineId/allocate', async (req, res) => {
              SET shipped_quantity = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
             [newShipped, newStatus, lineId]);
 
+        await recordAuditEvent(client, req, {
+            shipping_instruction_id: line.shipping_instruction_id,
+            line_id: line.id,
+            allocation_id: alloc.rows[0].id,
+            event_type: 'quantity_confirmed',
+            event_status: 'success',
+            product_id: line.product_id,
+            lot_id: lot.id,
+            lot_number,
+            quantity: qty,
+            before_data: {
+                line_shipped_quantity: line.shipped_quantity,
+                line_status: line.status,
+                lot_quantity: lot.quantity
+            },
+            after_data: {
+                line_shipped_quantity: newShipped,
+                line_status: newStatus,
+                lot_quantity: newLotQty
+            },
+            comment: 'ロット別出荷数量を確定'
+        });
+
         await client.query('COMMIT');
         res.status(201).json({
             allocation: alloc.rows[0],
@@ -160,6 +184,28 @@ router.delete('/allocations/:id', async (req, res) => {
             [newShipped, newStatus, line.id]);
         // 割り当てを取消
         await client.query("UPDATE shipping_lot_allocations SET status = 'cancelled' WHERE id = $1", [id]);
+        await recordAuditEvent(client, req, {
+            shipping_instruction_id: line.shipping_instruction_id,
+            line_id: line.id,
+            allocation_id: a.id,
+            event_type: 'lot_allocation_cancelled',
+            event_status: 'success',
+            product_id: a.product_id,
+            lot_id: a.lot_inventory_id,
+            lot_number: a.lot_number,
+            quantity: a.shipped_quantity,
+            before_data: {
+                allocation_status: a.status,
+                line_shipped_quantity: line.shipped_quantity,
+                line_status: line.status
+            },
+            after_data: {
+                allocation_status: 'cancelled',
+                line_shipped_quantity: newShipped,
+                line_status: newStatus
+            },
+            comment: 'ロット引当を取消'
+        });
         await client.query('COMMIT');
         res.json({ success: true, line: { id: line.id, shipped_quantity: newShipped, status: newStatus } });
     } catch (error) {

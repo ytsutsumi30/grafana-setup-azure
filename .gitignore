@@ -31,6 +31,7 @@ infra/main.json
 backups/
 backup-*/
 web-backup-*/
+review-evidence/
 supabase-project.json
 
 # OS/editor

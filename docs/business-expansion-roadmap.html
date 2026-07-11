@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出荷検品アプリ 業務拡張ロードマップ</title>
+<style>
+:root {
+  --bg: #f6f8fb;
+  --panel: #ffffff;
+  --text: #1f2937;
+  --muted: #64748b;
+  --line: #d9e2ec;
+  --blue: #2563eb;
+  --green: #16a34a;
+  --amber: #d97706;
+  --purple: #7c3aed;
+  --red: #dc2626;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", "Hiragino Sans", Meiryo, sans-serif;
+  line-height: 1.65;
+}
+header {
+  background: #0f172a;
+  color: #fff;
+  padding: 28px 32px;
+}
+header h1 { margin: 0 0 6px; font-size: 1.7rem; }
+header p { margin: 0; color: #cbd5e1; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 18px 56px; }
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+h2 { margin: 0 0 12px; font-size: 1.2rem; }
+h3 { margin: 18px 0 8px; font-size: 1rem; }
+.muted { color: var(--muted); }
+.grid { display: grid; gap: 14px; }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.card {
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--blue);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+.card.green { border-left-color: var(--green); }
+.card.amber { border-left-color: var(--amber); }
+.card.purple { border-left-color: var(--purple); }
+.card.red { border-left-color: var(--red); }
+.card h3 { margin-top: 0; }
+.flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  min-height: 82px;
+}
+.step b { display: block; color: #0f172a; }
+.step small { color: var(--muted); }
+.phase {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+.phase:first-child { border-top: none; }
+.phase-id {
+  font-weight: 700;
+  color: var(--blue);
+}
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: #eef2f7; }
+code {
+  background: #eef2f7;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: Consolas, "Courier New", monospace;
+}
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: .78rem;
+  font-weight: 700;
+  background: #dbeafe;
+  color: #1e40af;
+}
+.note {
+  background: #fff7ed;
+  border-left: 4px solid var(--amber);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+@media (max-width: 720px) {
+  header { padding: 22px 18px; }
+  .phase { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>出荷検品アプリ 業務拡張ロードマップ</h1>
+  <p>出荷検品を核に、受注・発注・入庫・在庫・棚卸・製造指図・トレーサビリティ・監視へ段階拡張する計画</p>
+</header>
+
+<main>
+  <section>
+    <h2>基本方針</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>出荷検品を参照実装にする</h3>
+        <p>複数品目、複数ロット、QR 個体、監査ログ、履歴、HTML 帳票の実装を他業務へ横展開する。</p>
+      </div>
+      <div class="card green">
+        <h3>在庫台帳を先に固める</h3>
+        <p>受注、発注、入庫、棚卸、製造指図はすべて在庫へ接続するため、在庫・ロット・QR 共通基盤を最初に作る。</p>
+      </div>
+      <div class="card amber">
+        <h3>POC は段階実装</h3>
+        <p>ERP 全体を一度に作らず、業務価値が見える単位でフェーズを切る。承認、会計、EDI は後回しにする。</p>
+      </div>
+      <div class="card purple">
+        <h3>日本語 + HTML First</h3>
+        <p>基本ドキュメントは日本語。図表が必要な構成図、業務フロー、ロードマップは HTML First で作成する。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>業務全体フロー</h2>
+    <div class="flow">
+      <div class="step"><b>受注</b><small>得意先、受注明細、受注残</small></div>
+      <div class="step"><b>出荷指示</b><small>既存フローへ接続</small></div>
+      <div class="step"><b>ロット引当</b><small>品目別、ロット別数量</small></div>
+      <div class="step"><b>PPS / QR 検品</b><small>OK、NG、重複、数量入力</small></div>
+      <div class="step"><b>出荷完了</b><small>履歴、帳票、監査ログ</small></div>
+    </div>
+    <br>
+    <div class="flow">
+      <div class="step"><b>発注</b><small>仕入先、発注明細、発注残</small></div>
+      <div class="step"><b>入庫予定</b><small>発注明細から生成</small></div>
+      <div class="step"><b>QR 入庫検品</b><small>合格、保留、不合格</small></div>
+      <div class="step"><b>在庫反映</b><small>ロット、QR、保管場所</small></div>
+      <div class="step"><b>納品書 OCR</b><small>発注明細と照合</small></div>
+    </div>
+    <br>
+    <div class="flow">
+      <div class="step"><b>製造指図</b><small>BOM 展開</small></div>
+      <div class="step"><b>部品 QR 消費</b><small>材料ロットを記録</small></div>
+      <div class="step"><b>工程 QR 打刻</b><small>開始、完了、数量</small></div>
+      <div class="step"><b>完成品ロット</b><small>製品ロット採番</small></div>
+      <div class="step"><b>完成品入庫</b><small>在庫へ反映</small></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>実装フェーズ</h2>
+    <div class="phase">
+      <div class="phase-id">Phase 0</div>
+      <div><b>現状整理と設計確定</b><br><span class="muted">既存 DB、docs/plans.html、出荷検品実装の棚卸</span></div>
+      <div>DB 統合方針、業務イベント方針、最初の実装対象を確定</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 1</div>
+      <div><b>在庫・ロット・QR 共通基盤</b><br><span class="muted">locations / inventory_transactions / inventory_balances / operation_events</span></div>
+      <div>全業務が参照する追記型在庫台帳を作る</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 2</div>
+      <div><b>発注・入庫</b><br><span class="muted">purchase_orders / receiving_orders / QR 入庫検品</span></div>
+      <div>発注から入庫予定、QR 入庫、在庫反映までを作る</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 3</div>
+      <div><b>受注・出荷指示生成</b><br><span class="muted">sales_orders から既存 shipping_instructions へ接続</span></div>
+      <div>受注残と出荷検品をつなぐ</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 4</div>
+      <div><b>棚卸</b><br><span class="muted">QR 棚卸、未スキャン、不明 QR、差異確認</span></div>
+      <div>承認後に在庫調整へ反映する</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 5</div>
+      <div><b>OCR 取込</b><br><span class="muted">注文書 OCR、納品書 OCR、確認修正画面</span></div>
+      <div>読み取り結果を確認後に受注・照合へ接続</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 6</div>
+      <div><b>製造指図・工程実績</b><br><span class="muted">work_orders / operation_results / material_consumptions</span></div>
+      <div>部品消費と完成品入庫を在庫履歴へ接続</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 7</div>
+      <div><b>トレーサビリティ</b><br><span class="muted">ロット正展開、逆展開、横断検索</span></div>
+      <div>製品ロットから部品ロット、部品ロットから出荷先を追跡</div>
+    </div>
+    <div class="phase">
+      <div class="phase-id">Phase 8</div>
+      <div><b>Grafana Cloud / 監視</b><br><span class="muted">技術監視 + 業務メトリクス</span></div>
+      <div>出荷、入庫、棚卸、受注残、発注残、工程遅延を監視</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>優先順位</h2>
+    <table>
+      <thead><tr><th>順位</th><th>領域</th><th>理由</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>在庫・ロット・QR 共通基盤</td><td>受発注、入庫、棚卸、製造指図のすべてが在庫に接続するため。</td></tr>
+        <tr><td>2</td><td>発注・入庫</td><td>在庫を増やす入口であり、出荷検品の QR スキャン設計を流用しやすい。</td></tr>
+        <tr><td>3</td><td>受注・出荷指示生成</td><td>既存の出荷検品フローへ接続でき、販売側の業務フローを閉じやすい。</td></tr>
+        <tr><td>4</td><td>棚卸</td><td>QR と在庫台帳の整合性を現場で検証できる。</td></tr>
+        <tr><td>5</td><td>製造指図</td><td>BOM、部品消費、完成品入庫が絡むため、在庫基盤が安定してから着手する。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>直近 4 週間</h2>
+    <div class="grid cols-4">
+      <div class="card"><h3>Week 1</h3><p>DB 棚卸、<code>inventory</code> と <code>lot_inventory</code> の統合方針、Phase 1 スキーマ確定。</p></div>
+      <div class="card green"><h3>Week 2</h3><p><code>locations</code>、<code>inventory_transactions</code>、<code>inventory_balances</code> を追加し、再計算スクリプトを作成。</p></div>
+      <div class="card amber"><h3>Week 3</h3><p>発注・入庫 MVP の DB/API を追加し、入庫予定生成と QR 入庫検品を作る。</p></div>
+      <div class="card purple"><h3>Week 4</h3><p>発注一覧、入庫予定、QR 入庫検品画面、レビュー用データと API 通し実行を整備。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>関連文書</h2>
+    <table>
+      <tbody>
+        <tr><th>詳細ロードマップ</th><td><code>docs/business-expansion-roadmap.md</code></td></tr>
+        <tr><th>Phase 1 詳細</th><td><code>docs/inventory-foundation-phase1-plan.md</code></td></tr>
+        <tr><th>旧統合ビュー</th><td><code>docs/plans.html</code></td></tr>
+        <tr><th>在庫・棚卸計画</th><td><code>docs/manufacturing-inventory-plan.md</code></td></tr>
+        <tr><th>受発注・製造計画</th><td><code>docs/manufacturing-order-plan.md</code></td></tr>
+        <tr><th>ドキュメント方針</th><td><code>docs/documentation-policy.md</code></td></tr>
+      </tbody>
+    </table>
+    <p class="note">この HTML は説明・レビュー向けの HTML First 資料です。実装詳細は Markdown 文書を正とします。</p>
+  </section>
+</main>
+</body>
+</html>

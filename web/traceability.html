@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>トレーサビリティ - 出荷検品システム</title>
+  <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+  <link href="css/tokens.css" rel="stylesheet">
+  <link href="css/components.css" rel="stylesheet">
+  <link href="css/pages/traceability.css" rel="stylesheet">
+  <script src="js/m365-auth.js?v=202607070030"></script>
+</head>
+<body data-page="traceability" data-layout="auto">
+  <main class="container-fluid px-3 pb-4">
+    <section class="app-card card">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-xl-6">
+            <label for="traceSearch" class="form-label">ロット番号 / QRコード / 伝票番号 / 指図番号</label>
+            <input id="traceSearch" class="form-control form-control-lg" type="search" placeholder="例: LOT / QR / PO / SO / SHIP / WO">
+          </div>
+          <div class="col-8 col-md-5 col-xl-3">
+            <label for="traceType" class="form-label">直接照会</label>
+            <select id="traceType" class="form-select form-select-lg">
+              <option value="search">横断検索</option>
+              <option value="lot">ロット</option>
+              <option value="qr">QR</option>
+              <option value="document">伝票・指図</option>
+            </select>
+          </div>
+          <div class="col-4 col-md-3 col-xl-2 d-grid">
+            <button id="traceSearchButton" class="btn btn-primary btn-lg" type="button">
+              <i class="fas fa-search me-1"></i>検索
+            </button>
+          </div>
+          <div class="col-12 col-md-4 col-xl-1 d-grid">
+            <button id="traceClearButton" class="btn btn-outline-secondary btn-lg" type="button" title="クリア">
+              <i class="fas fa-eraser"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="row g-3">
+      <section class="col-12 col-xl-4">
+        <div class="app-card card h-100">
+          <div class="card-header bg-white d-flex align-items-center justify-content-between">
+            <h2 class="h6 mb-0"><i class="fas fa-magnifying-glass-chart me-1"></i>検索結果</h2>
+            <span id="traceResultCount" class="badge badge-pending">0件</span>
+          </div>
+          <div id="traceResults" class="list-group list-group-flush">
+            <div class="text-muted small p-3">検索条件を入力してください</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="col-12 col-xl-8">
+        <div id="traceEmpty" class="app-card card">
+          <div class="card-body text-center py-5 text-muted">
+            <i class="fas fa-route fa-2x mb-3"></i>
+            <div>検索結果を選択すると、入庫、在庫、製造、出荷、監査イベントを時系列で確認できます。</div>
+          </div>
+        </div>
+
+        <div id="traceDetail" class="d-none">
+          <section class="app-card card">
+            <div class="card-body">
+              <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                <div>
+                  <h2 class="h5 mb-1" id="traceDetailTitle"></h2>
+                  <div class="text-muted small" id="traceDetailMeta"></div>
+                </div>
+                <span id="traceDetailBadge" class="status-badge badge-progress">照会中</span>
+              </div>
+              <div class="row g-2 mt-3" id="traceKpis"></div>
+            </div>
+          </section>
+
+          <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timelinePane" type="button" role="tab">時系列</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="lots-tab" data-bs-toggle="tab" data-bs-target="#traceLotsPane" type="button" role="tab">ロット/QR</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventoryPane" type="button" role="tab">在庫移動</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documentsPane" type="button" role="tab">伝票・指図</button>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="timelinePane" role="tabpanel" tabindex="0">
+              <div id="traceTimeline"></div>
+            </div>
+            <div class="tab-pane fade" id="traceLotsPane" role="tabpanel" tabindex="0">
+              <div id="traceLots"></div>
+            </div>
+            <div class="tab-pane fade" id="inventoryPane" role="tabpanel" tabindex="0">
+              <div id="traceInventory"></div>
+            </div>
+            <div class="tab-pane fade" id="documentsPane" role="tabpanel" tabindex="0">
+              <div id="traceDocuments"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pages/traceability.js"></script>
+</body>
+</html>

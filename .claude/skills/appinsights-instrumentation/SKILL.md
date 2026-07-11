@@ -1,48 +1,27 @@
 ---
 name: appinsights-instrumentation
-description: 'Instrument a webapp to send useful telemetry data to Azure App Insights'
+description: AzureホストのWebアプリにApplication Insightsのテレメトリ計装を追加・強化するとき。「App Insightsを入れて」「テレメトリ/分散トレースを追加して」「カスタムイベント・メトリクスを送りたい」「可用性監視を設定して」等。Grafana/Prometheus系の監視、一般的なログ設計、Azure以外のホスティングには使わない。
 ---
 
-# AppInsights instrumentation
+# App Insights 計装
 
-This skill enables sending telemetry data of a webapp to Azure App Insights for better observability of the app's health.
+## DO(やること)
 
-## When to use this skill
+1. (言語, フレームワーク, ホスティング)の3点を特定する。コードから推定しつつ、ホスティング先(App Service code/container・Container Apps・ローカル等)は必ずユーザーに確認する。
+2. ASP.NET Core + App Service なら自動計装を優先: `references/AUTO.md`。
+3. それ以外は手動計装:
+   - リソース作成: 既存Bicepがあれば `examples/appinsights.bicep` を参考に追記 / なければ `scripts/appinsights.ps1` のAzure CLI。リソースグループはアプリ本体と同じ場所を推奨。
+   - コード修正: ASP.NET Core→`references/ASPNETCORE.md` / Node.js→`references/NODEJS.md` / Python→`references/PYTHON.md`。
 
-Use this skill when the user wants to enable telemetry for their webapp.
+## DON'T(やらないこと)
 
-## Prerequisites
+- ホスティング先を確認せずに計装方式を決めない。
+- 接続文字列のハードコード(環境変数・アプリ設定を使う)。
+- Grafana/Prometheus監視の設計(スコープ外。prj3のモニタリングUIは prj3-frontend のGrafana埋め込み規約)。
 
-The app in the workspace must be one of these kinds
+## OUTPUT FORMAT(出力の型)
 
-- An ASP.NET Core app hosted in Azure
-- A Node.js app hosted in Azure
-
-## Guidelines
-
-### Collect context information
-
-Find out the (programming language, application framework, hosting) tuple of the application the user is trying to add telemetry support in. This determines how the application can be instrumented. Read the source code to make an educated guess. Confirm with the user on anything you don't know. You must always ask the user where the application is hosted (e.g. on a personal computer, in an Azure App Service as code, in an Azure App Service as container, in an Azure Container App, etc.). 
-
-### Prefer auto-instrument if possible
-
-If the app is a C# ASP.NET Core app hosted in Azure App Service, use [AUTO guide](references/AUTO.md) to help user auto-instrument the app.
-
-### Manually instrument
-
-Manually instrument the app by creating the AppInsights resource and update the app's code. 
-
-#### Create AppInsights resource
-
-Use one of the following options that fits the environment.
-
-- Add AppInsights to existing Bicep template. See [examples/appinsights.bicep](examples/appinsights.bicep) for what to add. This is the best option if there are existing Bicep template files in the workspace.
-- Use Azure CLI. See [scripts/appinsights.ps1](scripts/appinsights.ps1) for what Azure CLI command to execute to create the App Insights resource.
-
-No matter which option you choose, recommend the user to create the App Insights resource in a meaningful resource group that makes managing resources easier. A good candidate will be the same resource group that contains the resources for the hosted app in Azure.
-
-#### Modify application code
-
-- If the app is an ASP.NET Core app, see [ASPNETCORE guide](references/ASPNETCORE.md) for how to modify the C# code.
-- If the app is a Node.js app, see [NODEJS guide](references/NODEJS.md) for how to modify the JavaScript/TypeScript code.
-- If the app is a Python app, see [PYTHON guide](references/PYTHON.md) for how to modify the Python code.
+1. 判定した3点セット(言語 / FW / ホスティング)と選択した計装方式
+2. リソース作成手順(Bicep差分 or CLIコマンド)
+3. コード変更の差分
+4. 検証手順(ポータルのLive Metrics / ログでテレメトリ到達を確認する方法)

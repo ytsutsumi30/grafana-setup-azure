@@ -38,6 +38,7 @@ services:
       M365_AUTH_CLIENT_ID: ""
       M365_AUTH_SCOPES: "User.Read"
       M365_AUTH_ALLOWED_DOMAINS: ""
+      RATE_LIMIT_MAX: "${RATE_LIMIT_MAX:-1000}"
       # セキュリティ運用フラグ(既定は POC 維持)
       WRITE_AUTH_MODE: "${WRITE_AUTH_MODE:-off}"       # off | warn | enforce
       ADMIN_API_TOKEN: "${ADMIN_API_TOKEN:-}"          # 危険EP/enforce時の管理者トークン
@@ -84,4 +85,3 @@ services:
 
 volumes:
   postgres-data:
-

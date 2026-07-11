@@ -1,81 +1,28 @@
 ---
-name: "security-threat-model"
-description: "Repository-grounded threat modeling that enumerates trust boundaries, assets, attacker capabilities, abuse paths, and mitigations, and writes a concise Markdown threat model. Trigger only when the user explicitly asks to threat model a codebase or path, enumerate threats/abuse paths, or perform AppSec threat modeling. Do not trigger for general architecture summaries, code review, or non-security design work."
+name: security-threat-model
+description: ユーザーが明示的に脅威モデリングを求めたときのみ発火。「このリポジトリ/パスを脅威モデリングして」「脅威・悪用経路を列挙して」「AppSec観点の脅威モデルを作って」等。一般的なアーキテクチャ要約・コードレビュー・非セキュリティ設計では発火しない。
 ---
 
-# Threat Model Source Code Repo
+# Threat Model(リポジトリ根拠の脅威モデリング)
 
-Deliver an actionable AppSec-grade threat model that is specific to the repository or a project path, not a generic checklist. Anchor every architectural claim to evidence in the repo and keep assumptions explicit. Prioritizing realistic attacker goals and concrete impacts over generic checklists.
+## DO(やること)
 
-## Quick start
+1. スコープ確定: 対象パス・用途・デプロイ形態・公開範囲・認証前提を収集(不明点は仮定として明示)。手順・出力契約は `references/prompt-template.md` に従う(可能な限りそのまま使用)。
+2. システムモデル抽出: コンポーネント・データストア・外部連携・実行形態・エントリポイントを特定し、ランタイムと CI/開発ツール/テストを分離。根拠のない主張をしない。
+3. 信頼境界(プロトコル・認証・暗号化・検証・レート制限を付記)・リスクを駆動する資産・攻撃者能力を列挙(非能力も明示して過大評価を防ぐ)。
+4. 脅威は「攻撃者ゴール→悪用経路」(窃取・権限昇格・完全性侵害・DoS)で少数精鋭に列挙し、資産・境界に紐付け。
+5. 尤度×影響(low/med/high+短い根拠)で優先度付けし、ランキングを左右する仮定を明示。
+6. 最終化前にユーザー確認: 主要な仮定を要約し、1〜3問(所有者・環境・規模・デプロイ形態・認証認可・公開範囲・データ機微度・マルチテナント)を質問して回答を待つ。回答不能なら残存仮定と影響を記載。
+7. 緩和策は既存(根拠つき)と推奨を区別し、具体的な場所(コンポーネント・境界・エントリポイント)と制御種別で提示。未解決の仮定に依存する推奨は条件付きと明記。
+8. 品質チェック(全エントリポイント網羅 / 全境界の脅威反映 / ランタイムとCIの分離 / ユーザー回答の反映 / 仮定の明示 / 出力契約準拠)後にファイル出力。
 
-1) Collect (or infer) inputs:
-- Repo root path and any in-scope paths.
-- Intended usage, deployment model, internet exposure, and auth expectations (if known).
-- Any existing repository summary or architecture spec.
-- Use prompts in `references/prompt-template.md` to generate a repository summary.
-- Follow the required output contract in `references/prompt-template.md`. Use it verbatim when possible.
+## DON'T(やらないこと)
 
-## Workflow
+- リポジトリに証拠のないコンポーネント・フロー・制御の主張。
+- 汎用チェックリストの流用、脅威の水増し。
+- ユーザー確認(手順6)を省略した最終レポート提出。
 
-### 1) Scope and extract the system model
-- Identify primary components, data stores, and external integrations from the repo summary.
-- Identify how the system runs (server, CLI, library, worker) and its entrypoints.
-- Separate runtime behavior from CI/build/dev tooling and from tests/examples.
-- Map the in-scope locations to those components and exclude out-of-scope items explicitly.
-- Do not claim components, flows, or controls without evidence.
+## OUTPUT FORMAT(出力の型)
 
-### 2) Derive boundaries, assets, and entry points
-- Enumerate trust boundaries as concrete edges between components, noting protocol, auth, encryption, validation, and rate limiting.
-- List assets that drive risk (data, credentials, models, config, compute resources, audit logs).
-- Identify entry points (endpoints, upload surfaces, parsers/decoders, job triggers, admin tooling, logging/error sinks).
-
-### 3) Calibrate assets and attacker capabilities
-- List the assets that drive risk (credentials, PII, integrity-critical state, availability-critical components, build artifacts).
-- Describe realistic attacker capabilities based on exposure and intended usage.
-- Explicitly note non-capabilities to avoid inflated severity.
-
-
-### 4) Enumerate threats as abuse paths
-- Prefer attacker goals that map to assets and boundaries (exfiltration, privilege escalation, integrity compromise, denial of service).
-- Classify each threat and tie it to impacted assets.
-- Keep the number of threats small but high quality.
-
-### 5) Prioritize with explicit likelihood and impact reasoning
-- Use qualitative likelihood and impact (low/medium/high) with short justifications.
-- Set overall priority (critical/high/medium/low) using likelihood x impact, adjusted for existing controls.
-- State which assumptions most influence the ranking.
-
-### 6) Validate service context and assumptions with the user
-- Summarize key assumptions that materially affect threat ranking or scope, then ask the user to confirm or correct them.
-- Ask 1–3 targeted questions to resolve missing context (service owner and environment, scale/users, deployment model, authn/authz, internet exposure, data sensitivity, multi-tenancy).
-- Pause and wait for user feedback before producing the final report.
-- If the user declines or can’t answer, state which assumptions remain and how they influence priority.
-
-### 7) Recommend mitigations and focus paths
-- Distinguish existing mitigations (with evidence) from recommended mitigations.
-- Tie mitigations to concrete locations (component, boundary, or entry point) and control types (authZ checks, input validation, schema enforcement, sandboxing, rate limits, secrets isolation, audit logging).
-- Prefer specific implementation hints over generic advice (e.g., "enforce schema at gateway for upload payloads" vs "validate inputs").
-- Base recommendations on validated user context; if assumptions remain unresolved, mark recommendations as conditional.
-
-### 8) Run a quality check before finalizing
-- Confirm all discovered entrypoints are covered.
-- Confirm each trust boundary is represented in threats.
-- Confirm runtime vs CI/dev separation.
-- Confirm user clarifications (or explicit non-responses) are reflected.
-- Confirm assumptions and open questions are explicit.
-- Confirm that the format of the report matches closely the required output format defined in prompt template: `references/prompt-template.md`
-- Write the final Markdown to a file named `<repo-or-dir-name>-threat-model.md` (use the basename of the repo root, or the in-scope directory if you were asked to model a subpath).
-
-
-## Risk prioritization guidance (illustrative, not exhaustive)
-- High: pre-auth RCE, auth bypass, cross-tenant access, sensitive data exfiltration, key or token theft, model or config integrity compromise, sandbox escape.
-- Medium: targeted DoS of critical components, partial data exposure, rate-limit bypass with measurable impact, log/metrics poisoning that affects detection.
-- Low: low-sensitivity info leaks, noisy DoS with easy mitigation, issues requiring unlikely preconditions.
-
-## References
-
-- Output contract and full prompt template: `references/prompt-template.md`
-- Optional controls/asset list: `references/security-controls-and-assets.md`
-
-Only load the reference files you need. Keep the final result concise, grounded, and reviewable.
+- `references/prompt-template.md` の出力契約に準拠した Markdown。ファイル名 `<repo-or-dir-name>-threat-model.md`
+- 優先度目安: High=事前認証RCE・認証バイパス・テナント越境・機密流出・鍵窃取・サンドボックス脱出 / Med=重要部の標的DoS・部分暴露・検知に影響するログ汚染 / Low=低機微リーク・容易に緩和可能なDoS・成立条件が非現実的なもの

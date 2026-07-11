@@ -8,6 +8,91 @@ const logger = require('../lib/logger');
 
 const router = express.Router();
 
+router.get('/balances', async (req, res) => {
+    try {
+        const { product_id, lot_number, location_code, inventory_status } = req.query;
+        const params = [];
+        const conditions = [];
+        if (product_id) {
+            params.push(product_id);
+            conditions.push(`ib.product_id = $${params.length}`);
+        }
+        if (lot_number) {
+            params.push(`%${lot_number}%`);
+            conditions.push(`ib.lot_number ILIKE $${params.length}`);
+        }
+        if (location_code) {
+            params.push(location_code);
+            conditions.push(`ib.location_code = $${params.length}`);
+        }
+        if (inventory_status) {
+            params.push(inventory_status);
+            conditions.push(`ib.inventory_status = $${params.length}`);
+        }
+        const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        const result = await pool.query(`
+            SELECT ib.*,
+                   p.product_code,
+                   p.product_name,
+                   qu.qr_code,
+                   loc.location_name
+            FROM inventory_balances ib
+            JOIN products p ON p.id = ib.product_id
+            LEFT JOIN qr_units qu ON qu.id = ib.qr_unit_id
+            LEFT JOIN locations loc ON loc.id = ib.location_id
+            ${where}
+            ORDER BY p.product_code, ib.lot_number NULLS LAST, ib.location_code NULLS LAST, ib.inventory_status
+        `, params);
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching inventory balances:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/transactions', async (req, res) => {
+    try {
+        const { product_id, lot_number, source_type, transaction_type } = req.query;
+        const params = [];
+        const conditions = [];
+        if (product_id) {
+            params.push(product_id);
+            conditions.push(`it.product_id = $${params.length}`);
+        }
+        if (lot_number) {
+            params.push(`%${lot_number}%`);
+            conditions.push(`it.lot_number ILIKE $${params.length}`);
+        }
+        if (source_type) {
+            params.push(source_type);
+            conditions.push(`it.source_type = $${params.length}`);
+        }
+        if (transaction_type) {
+            params.push(transaction_type);
+            conditions.push(`it.transaction_type = $${params.length}`);
+        }
+        const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        const result = await pool.query(`
+            SELECT it.*,
+                   p.product_code,
+                   p.product_name,
+                   qu.qr_code,
+                   loc.location_name
+            FROM inventory_transactions it
+            JOIN products p ON p.id = it.product_id
+            LEFT JOIN qr_units qu ON qu.id = it.qr_unit_id
+            LEFT JOIN locations loc ON loc.id = it.location_id
+            ${where}
+            ORDER BY it.occurred_at DESC, it.id DESC
+            LIMIT 200
+        `, params);
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching inventory transactions:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 router.get('/', async (req, res) => {
     try {
         const result = await pool.query(`

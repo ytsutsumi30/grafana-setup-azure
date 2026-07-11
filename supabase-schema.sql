@@ -804,6 +804,339 @@ INSERT INTO lot_inventory (product_id, lot_number, quantity, manufacturing_date,
 ON CONFLICT (product_id, lot_number) DO NOTHING;
 
 -- 権限設定
+-- 出荷指示の複数製品対応 + ロット別出荷数
+-- 1 出荷指示 = 1〜N 製品(明細)。各明細 = 1〜N ロットから出荷数を割り当て。
+-- 既存の単一製品 shipping_instructions は 1 明細として backfill する。
+
+-- 出荷指示明細(1指示=N製品)
+CREATE TABLE IF NOT EXISTS shipping_instruction_lines (
+    id SERIAL PRIMARY KEY,
+    shipping_instruction_id INTEGER NOT NULL REFERENCES shipping_instructions(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    quantity INTEGER NOT NULL,                 -- 指示数量
+    shipped_quantity INTEGER NOT NULL DEFAULT 0, -- 出荷済み合計(ロット引当の合計)
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, partial, completed
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (shipping_instruction_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sil_instruction ON shipping_instruction_lines(shipping_instruction_id);
+
+-- ロット別出荷数の割り当て(QRスキャンで特定したロットからの出荷数)
+CREATE TABLE IF NOT EXISTS shipping_lot_allocations (
+    id SERIAL PRIMARY KEY,
+    shipping_instruction_line_id INTEGER NOT NULL REFERENCES shipping_instruction_lines(id) ON DELETE CASCADE,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id),
+    lot_number VARCHAR(50) NOT NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    shipped_quantity INTEGER NOT NULL,         -- このロットからの出荷数
+    operator_name VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'shipped', -- shipped, cancelled
+    scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sla_line ON shipping_lot_allocations(shipping_instruction_line_id);
+
+-- 既存の単一製品 shipping_instructions を 1 明細として backfill(未登録のもののみ)
+INSERT INTO shipping_instruction_lines (shipping_instruction_id, product_id, quantity)
+SELECT si.id, si.product_id, si.quantity
+FROM shipping_instructions si
+WHERE si.product_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM shipping_instruction_lines l
+    WHERE l.shipping_instruction_id = si.id AND l.product_id = si.product_id
+  );
+-- QR 個体 ID 管理テーブル
+-- ロット番号スキャン互換を維持しつつ、箱・パレット・個品などの QR 管理単位を扱う。
+
+CREATE TABLE IF NOT EXISTS qr_units (
+    id SERIAL PRIMARY KEY,
+    qr_code VARCHAR(255) UNIQUE NOT NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50) NOT NULL,
+    quantity INTEGER,
+    unit_type VARCHAR(50) DEFAULT 'unit',
+    status VARCHAR(20) DEFAULT 'available',
+    location VARCHAR(100),
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_scanned_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE picking_records ADD COLUMN IF NOT EXISTS qr_code VARCHAR(255);
+ALTER TABLE picking_records ADD COLUMN IF NOT EXISTS scan_source VARCHAR(50) DEFAULT 'lot_number_compat';
+
+CREATE INDEX IF NOT EXISTS idx_qr_units_qr_code ON qr_units(qr_code);
+CREATE INDEX IF NOT EXISTS idx_qr_units_product_lot ON qr_units(product_id, lot_number);
+CREATE INDEX IF NOT EXISTS idx_qr_units_status ON qr_units(status);
+CREATE INDEX IF NOT EXISTS idx_picking_records_qr_code ON picking_records(qr_code);
+CREATE INDEX IF NOT EXISTS idx_picking_records_scan_source ON picking_records(scan_source);
+
+COMMENT ON TABLE qr_units IS 'QR 個体 ID 管理単位。ロット番号とは別に、箱・パレット・個品など現物 QR を管理する。';
+COMMENT ON COLUMN picking_records.qr_code IS 'スキャン入力が QR 個体 ID の場合の QR コード。ロット番号互換スキャンでは入力値を保持する場合がある。';
+COMMENT ON COLUMN picking_records.scan_source IS 'qr_unit: qr_units 解決、lot_number_compat: 既存ロット番号互換。';
+
+-- 出荷検品 業務イベント監査ログ
+
+CREATE TABLE IF NOT EXISTS shipping_audit_events (
+    id SERIAL PRIMARY KEY,
+    shipping_instruction_id INTEGER REFERENCES shipping_instructions(id) ON DELETE SET NULL,
+    line_id INTEGER REFERENCES shipping_instruction_lines(id) ON DELETE SET NULL,
+    allocation_id INTEGER REFERENCES shipping_lot_allocations(id) ON DELETE SET NULL,
+    event_type VARCHAR(80) NOT NULL,
+    event_status VARCHAR(30) NOT NULL DEFAULT 'success',
+    product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+    lot_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    qr_code VARCHAR(255),
+    quantity INTEGER,
+    before_data JSONB,
+    after_data JSONB,
+    reason_code VARCHAR(80),
+    comment TEXT,
+    user_id VARCHAR(255),
+    user_email VARCHAR(255),
+    user_name VARCHAR(255),
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_shipping_audit_instruction ON shipping_audit_events(shipping_instruction_id);
+CREATE INDEX IF NOT EXISTS idx_shipping_audit_event_type ON shipping_audit_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_shipping_audit_occurred_at ON shipping_audit_events(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_shipping_audit_qr_code ON shipping_audit_events(qr_code);
+CREATE INDEX IF NOT EXISTS idx_shipping_audit_lot_number ON shipping_audit_events(lot_number);
+
+COMMENT ON TABLE shipping_audit_events IS '出荷検品の業務イベント監査ログ。数量確定、PPS、QR スキャン、完了後修正、帳票出力などを記録する。';
+
+-- Phase 1: 在庫・ロット・QR 共通基盤
+CREATE TABLE IF NOT EXISTS locations (
+    id SERIAL PRIMARY KEY,
+    location_code VARCHAR(50) UNIQUE NOT NULL,
+    location_name VARCHAR(255) NOT NULL,
+    area_name VARCHAR(100),
+    location_type VARCHAR(50) DEFAULT 'warehouse',
+    is_active BOOLEAN DEFAULT true,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE lot_inventory ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;
+ALTER TABLE lot_inventory ADD COLUMN IF NOT EXISTS inventory_status VARCHAR(30) DEFAULT 'available';
+ALTER TABLE qr_units ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;
+ALTER TABLE qr_units ADD COLUMN IF NOT EXISTS current_quantity INTEGER;
+
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id SERIAL PRIMARY KEY,
+    transaction_type VARCHAR(50) NOT NULL,
+    transaction_status VARCHAR(30) NOT NULL DEFAULT 'posted',
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    quantity_delta INTEGER NOT NULL,
+    quantity_after INTEGER,
+    source_type VARCHAR(80),
+    source_id INTEGER,
+    source_line_id INTEGER,
+    reason_code VARCHAR(80),
+    comment TEXT,
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory_balances (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    inventory_status VARCHAR(30) NOT NULL DEFAULT 'available',
+    quantity INTEGER NOT NULL DEFAULT 0,
+    last_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE qr_units ADD COLUMN IF NOT EXISTS last_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_balances_key
+ON inventory_balances (
+    product_id,
+    COALESCE(lot_number, ''),
+    COALESCE(qr_unit_id, 0),
+    COALESCE(location_code, ''),
+    inventory_status
+);
+
+CREATE TABLE IF NOT EXISTS operation_events (
+    id SERIAL PRIMARY KEY,
+    event_domain VARCHAR(50) NOT NULL,
+    event_type VARCHAR(80) NOT NULL,
+    event_status VARCHAR(30) NOT NULL DEFAULT 'success',
+    product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    qr_code VARCHAR(255),
+    quantity INTEGER,
+    source_type VARCHAR(80),
+    source_id INTEGER,
+    source_line_id INTEGER,
+    before_data JSONB,
+    after_data JSONB,
+    reason_code VARCHAR(80),
+    comment TEXT,
+    user_id VARCHAR(255),
+    user_email VARCHAR(255),
+    user_name VARCHAR(255),
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_locations_code ON locations(location_code);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_product ON inventory_transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_lot ON inventory_transactions(lot_number);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_source ON inventory_transactions(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_occurred ON inventory_transactions(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_inventory_balances_product ON inventory_balances(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_balances_lot ON inventory_balances(lot_number);
+CREATE INDEX IF NOT EXISTS idx_inventory_balances_location ON inventory_balances(location_code);
+CREATE INDEX IF NOT EXISTS idx_operation_events_domain_type ON operation_events(event_domain, event_type);
+CREATE INDEX IF NOT EXISTS idx_operation_events_source ON operation_events(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_operation_events_occurred ON operation_events(occurred_at);
+
+GRANT ALL PRIVILEGES ON TABLE locations TO production_user;
+GRANT ALL PRIVILEGES ON TABLE inventory_transactions TO production_user;
+GRANT ALL PRIVILEGES ON TABLE inventory_balances TO production_user;
+GRANT ALL PRIVILEGES ON TABLE operation_events TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE locations_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE inventory_transactions_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE inventory_balances_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE operation_events_id_seq TO production_user;
+
+-- Phase 2: 発注・入庫 MVP
+CREATE TABLE IF NOT EXISTS suppliers (
+    id SERIAL PRIMARY KEY,
+    supplier_code VARCHAR(50) UNIQUE NOT NULL,
+    supplier_name VARCHAR(255) NOT NULL,
+    address TEXT,
+    phone VARCHAR(50),
+    contact_person VARCHAR(100),
+    email VARCHAR(255),
+    notes TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id SERIAL PRIMARY KEY,
+    purchase_order_no VARCHAR(50) UNIQUE NOT NULL,
+    supplier_id INTEGER REFERENCES suppliers(id) ON DELETE RESTRICT,
+    order_date DATE DEFAULT CURRENT_DATE,
+    expected_date DATE,
+    status VARCHAR(30) DEFAULT 'draft',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
+    id SERIAL PRIMARY KEY,
+    purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    ordered_quantity INTEGER NOT NULL,
+    received_quantity INTEGER NOT NULL DEFAULT 0,
+    unit_price DECIMAL(12,2),
+    expected_date DATE,
+    status VARCHAR(30) DEFAULT 'ordered',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS receiving_orders (
+    id SERIAL PRIMARY KEY,
+    receiving_order_no VARCHAR(50) UNIQUE NOT NULL,
+    purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+    supplier_id INTEGER REFERENCES suppliers(id) ON DELETE RESTRICT,
+    expected_date DATE,
+    status VARCHAR(30) DEFAULT 'pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS receiving_order_lines (
+    id SERIAL PRIMARY KEY,
+    receiving_order_id INTEGER NOT NULL REFERENCES receiving_orders(id) ON DELETE CASCADE,
+    purchase_order_line_id INTEGER REFERENCES purchase_order_lines(id) ON DELETE SET NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    expected_quantity INTEGER NOT NULL,
+    received_quantity INTEGER NOT NULL DEFAULT 0,
+    accepted_quantity INTEGER NOT NULL DEFAULT 0,
+    rejected_quantity INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(30) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS receiving_results (
+    id SERIAL PRIMARY KEY,
+    receiving_order_id INTEGER NOT NULL REFERENCES receiving_orders(id) ON DELETE CASCADE,
+    receiving_order_line_id INTEGER REFERENCES receiving_order_lines(id) ON DELETE SET NULL,
+    purchase_order_line_id INTEGER REFERENCES purchase_order_lines(id) ON DELETE SET NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50) NOT NULL,
+    qr_code VARCHAR(255),
+    received_quantity INTEGER NOT NULL,
+    accepted_quantity INTEGER NOT NULL DEFAULT 0,
+    rejected_quantity INTEGER NOT NULL DEFAULT 0,
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    inspection_status VARCHAR(30) DEFAULT 'accepted',
+    reason_code VARCHAR(80),
+    comment TEXT,
+    received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_purchase_order_lines_po ON purchase_order_lines(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_receiving_orders_po ON receiving_orders(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_receiving_orders_status ON receiving_orders(status);
+CREATE INDEX IF NOT EXISTS idx_receiving_order_lines_order ON receiving_order_lines(receiving_order_id);
+CREATE INDEX IF NOT EXISTS idx_receiving_results_order ON receiving_results(receiving_order_id);
+CREATE INDEX IF NOT EXISTS idx_receiving_results_qr ON receiving_results(qr_code);
+
+INSERT INTO suppliers (supplier_code, supplier_name, contact_person, notes)
+VALUES ('SUP-REVIEW-001', '現場レビュー用仕入先', 'review', '発注・入庫 MVP 確認用')
+ON CONFLICT (supplier_code) DO NOTHING;
+
+GRANT ALL PRIVILEGES ON TABLE suppliers TO production_user;
+GRANT ALL PRIVILEGES ON TABLE purchase_orders TO production_user;
+GRANT ALL PRIVILEGES ON TABLE purchase_order_lines TO production_user;
+GRANT ALL PRIVILEGES ON TABLE receiving_orders TO production_user;
+GRANT ALL PRIVILEGES ON TABLE receiving_order_lines TO production_user;
+GRANT ALL PRIVILEGES ON TABLE receiving_results TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE suppliers_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE purchase_orders_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE purchase_order_lines_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE receiving_orders_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE receiving_order_lines_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE receiving_results_id_seq TO production_user;
+
 -- 製品構成部品テーブル（QR検品用）
 CREATE TABLE IF NOT EXISTS product_components (
     id SERIAL PRIMARY KEY,
@@ -880,3 +1213,366 @@ ORDER BY
     END;
 
 COMMIT;
+
+-- Phase 3: 受注・出荷指示生成
+CREATE TABLE IF NOT EXISTS sales_orders (
+    id SERIAL PRIMARY KEY,
+    sales_order_no VARCHAR(50) UNIQUE NOT NULL,
+    customer_name VARCHAR(255) NOT NULL,
+    order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    requested_ship_date DATE,
+    shipping_location_id INTEGER REFERENCES shipping_locations(id),
+    delivery_location_id INTEGER REFERENCES delivery_locations(id),
+    priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+    status VARCHAR(30) NOT NULL DEFAULT 'confirmed',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sales_order_lines (
+    id SERIAL PRIMARY KEY,
+    sales_order_id INTEGER NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    ordered_quantity INTEGER NOT NULL,
+    shipped_quantity INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(30) NOT NULL DEFAULT 'confirmed',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE shipping_instructions
+    ADD COLUMN IF NOT EXISTS sales_order_id INTEGER REFERENCES sales_orders(id) ON DELETE SET NULL;
+
+ALTER TABLE shipping_instruction_lines
+    ADD COLUMN IF NOT EXISTS sales_order_line_id INTEGER REFERENCES sales_order_lines(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_sales_orders_status ON sales_orders(status);
+CREATE INDEX IF NOT EXISTS idx_sales_orders_requested_ship ON sales_orders(requested_ship_date);
+CREATE INDEX IF NOT EXISTS idx_sales_order_lines_order ON sales_order_lines(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_shipping_instructions_sales_order ON shipping_instructions(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_shipping_instruction_lines_sales_line ON shipping_instruction_lines(sales_order_line_id);
+
+INSERT INTO sales_orders
+    (sales_order_no, customer_name, requested_ship_date, shipping_location_id, delivery_location_id, priority, status, notes)
+SELECT 'SO-REVIEW-001', 'POC 顧客', CURRENT_DATE + INTERVAL '2 days',
+       (SELECT id FROM shipping_locations ORDER BY id LIMIT 1),
+       (SELECT id FROM delivery_locations ORDER BY id LIMIT 1),
+       'normal', 'confirmed', 'Phase 3 受注サンプル'
+WHERE EXISTS (SELECT 1 FROM shipping_locations)
+  AND EXISTS (SELECT 1 FROM delivery_locations)
+  AND NOT EXISTS (SELECT 1 FROM sales_orders WHERE sales_order_no = 'SO-REVIEW-001');
+
+INSERT INTO sales_order_lines (sales_order_id, product_id, ordered_quantity, notes)
+SELECT so.id, p.id, 2, 'Phase 3 受注明細サンプル'
+FROM sales_orders so
+CROSS JOIN LATERAL (SELECT id FROM products ORDER BY id LIMIT 1) p
+WHERE so.sales_order_no = 'SO-REVIEW-001'
+  AND NOT EXISTS (
+    SELECT 1 FROM sales_order_lines sol
+    WHERE sol.sales_order_id = so.id AND sol.product_id = p.id
+  );
+
+GRANT ALL PRIVILEGES ON sales_orders TO production_user;
+GRANT ALL PRIVILEGES ON sales_order_lines TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE sales_orders_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE sales_order_lines_id_seq TO production_user;
+
+-- Phase 4: 棚卸
+CREATE TABLE IF NOT EXISTS inventory_count_sessions (
+    id SERIAL PRIMARY KEY,
+    count_no VARCHAR(50) UNIQUE NOT NULL,
+    count_name VARCHAR(255) NOT NULL,
+    location_code VARCHAR(50),
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    approved_at TIMESTAMP,
+    approved_by VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory_count_lines (
+    id SERIAL PRIMARY KEY,
+    inventory_count_session_id INTEGER NOT NULL REFERENCES inventory_count_sessions(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    qr_code VARCHAR(255),
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    expected_quantity INTEGER NOT NULL DEFAULT 0,
+    counted_quantity INTEGER,
+    variance_quantity INTEGER,
+    count_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    reason_code VARCHAR(80),
+    comment TEXT,
+    counted_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory_adjustments (
+    id SERIAL PRIMARY KEY,
+    inventory_count_session_id INTEGER REFERENCES inventory_count_sessions(id) ON DELETE SET NULL,
+    inventory_count_line_id INTEGER REFERENCES inventory_count_lines(id) ON DELETE SET NULL,
+    inventory_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(50),
+    qr_code VARCHAR(255),
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    expected_quantity INTEGER NOT NULL,
+    counted_quantity INTEGER NOT NULL,
+    adjustment_quantity INTEGER NOT NULL,
+    reason_code VARCHAR(80),
+    comment TEXT,
+    approved_by VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_count_sessions_status ON inventory_count_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_inventory_count_lines_session ON inventory_count_lines(inventory_count_session_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_count_lines_qr ON inventory_count_lines(qr_code);
+CREATE INDEX IF NOT EXISTS idx_inventory_count_lines_lot ON inventory_count_lines(lot_number);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_count_lines_key
+ON inventory_count_lines (
+    inventory_count_session_id,
+    product_id,
+    COALESCE(lot_number, ''),
+    COALESCE(qr_unit_id, 0),
+    COALESCE(location_code, '')
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_adjustments_session ON inventory_adjustments(inventory_count_session_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_adjustments_transaction ON inventory_adjustments(inventory_transaction_id);
+
+INSERT INTO inventory_count_sessions (count_no, count_name, location_code, status, notes)
+VALUES ('COUNT-REVIEW-001', 'POC 棚卸サンプル', NULL, 'draft', 'Phase 4 棚卸サンプル')
+ON CONFLICT (count_no) DO NOTHING;
+
+GRANT ALL PRIVILEGES ON inventory_count_sessions TO production_user;
+GRANT ALL PRIVILEGES ON inventory_count_lines TO production_user;
+GRANT ALL PRIVILEGES ON inventory_adjustments TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE inventory_count_sessions_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE inventory_count_lines_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE inventory_adjustments_id_seq TO production_user;
+
+-- Phase 5: OCR 取込
+CREATE TABLE IF NOT EXISTS ocr_documents (
+    id SERIAL PRIMARY KEY,
+    document_no VARCHAR(80) UNIQUE NOT NULL,
+    document_type VARCHAR(40) NOT NULL,
+    source_engine VARCHAR(80) DEFAULT 'manual',
+    source_file_name VARCHAR(255),
+    raw_text TEXT NOT NULL,
+    normalized_text TEXT,
+    confidence NUMERIC(5,2),
+    extraction_status VARCHAR(30) NOT NULL DEFAULT 'parsed',
+    extracted_data JSONB DEFAULT '{}'::jsonb,
+    linked_source_type VARCHAR(80),
+    linked_source_id INTEGER,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ocr_document_lines (
+    id SERIAL PRIMARY KEY,
+    ocr_document_id INTEGER NOT NULL REFERENCES ocr_documents(id) ON DELETE CASCADE,
+    line_no INTEGER NOT NULL,
+    product_code VARCHAR(80),
+    product_name VARCHAR(255),
+    product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+    quantity INTEGER,
+    unit_price NUMERIC(12,2),
+    amount NUMERIC(12,2),
+    lot_number VARCHAR(80),
+    raw_line TEXT,
+    match_status VARCHAR(30) NOT NULL DEFAULT 'unmatched',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ocr_business_matches (
+    id SERIAL PRIMARY KEY,
+    ocr_document_id INTEGER NOT NULL REFERENCES ocr_documents(id) ON DELETE CASCADE,
+    ocr_document_line_id INTEGER REFERENCES ocr_document_lines(id) ON DELETE CASCADE,
+    match_type VARCHAR(60) NOT NULL,
+    target_type VARCHAR(80),
+    target_id INTEGER,
+    target_line_id INTEGER,
+    match_score NUMERIC(5,2) NOT NULL DEFAULT 0,
+    match_status VARCHAR(30) NOT NULL DEFAULT 'candidate',
+    match_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ocr_documents_type ON ocr_documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_ocr_documents_status ON ocr_documents(extraction_status);
+CREATE INDEX IF NOT EXISTS idx_ocr_document_lines_document ON ocr_document_lines(ocr_document_id);
+CREATE INDEX IF NOT EXISTS idx_ocr_document_lines_product_code ON ocr_document_lines(product_code);
+CREATE INDEX IF NOT EXISTS idx_ocr_business_matches_document ON ocr_business_matches(ocr_document_id);
+CREATE INDEX IF NOT EXISTS idx_ocr_business_matches_target ON ocr_business_matches(target_type, target_id);
+
+-- OCR feedback: user corrections are operational data and are accessed only by the API.
+CREATE TABLE IF NOT EXISTS ocr_feedbacks (
+    id BIGSERIAL PRIMARY KEY,
+    engine VARCHAR(50) NOT NULL,
+    original_text TEXT NOT NULL,
+    corrected_text TEXT NOT NULL,
+    confidence DOUBLE PRECISION,
+    accuracy DOUBLE PRECISION NOT NULL,
+    image_hash VARCHAR(64),
+    document_type VARCHAR(50) NOT NULL DEFAULT 'unknown',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ocr_feedbacks_confidence_range CHECK (confidence IS NULL OR confidence BETWEEN 0 AND 100),
+    CONSTRAINT ocr_feedbacks_accuracy_range CHECK (accuracy BETWEEN 0 AND 100)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ocr_feedbacks_engine ON ocr_feedbacks (engine);
+CREATE INDEX IF NOT EXISTS idx_ocr_feedbacks_document_type ON ocr_feedbacks (document_type);
+CREATE INDEX IF NOT EXISTS idx_ocr_feedbacks_created_at ON ocr_feedbacks (created_at DESC);
+
+GRANT ALL PRIVILEGES ON ocr_feedbacks TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE ocr_feedbacks_id_seq TO production_user;
+
+INSERT INTO ocr_documents
+    (document_no, document_type, source_engine, raw_text, normalized_text, confidence, extraction_status, extracted_data, notes)
+VALUES
+    ('OCR-REVIEW-001', 'sales_order', 'sample', '注文番号: OCR-SO-001
+顧客名: POC 顧客
+希望出荷日: 2026-07-20
+PROD001 製品A 2
+PROD002 製品B 1', '注文番号: OCR-SO-001
+顧客名: POC 顧客
+希望出荷日: 2026-07-20
+PROD001 製品A 2
+PROD002 製品B 1', 90.00, 'parsed', '{"sales_order_no":"OCR-SO-001","customer_name":"POC 顧客","requested_ship_date":"2026-07-20"}'::jsonb, 'Phase 5 OCR サンプル')
+ON CONFLICT (document_no) DO NOTHING;
+
+GRANT ALL PRIVILEGES ON ocr_documents TO production_user;
+GRANT ALL PRIVILEGES ON ocr_document_lines TO production_user;
+GRANT ALL PRIVILEGES ON ocr_business_matches TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE ocr_documents_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE ocr_document_lines_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE ocr_business_matches_id_seq TO production_user;
+
+-- Phase 6: 製造指図・工程実績
+CREATE TABLE IF NOT EXISTS manufacturing_processes (
+    id SERIAL PRIMARY KEY,
+    process_code VARCHAR(50) UNIQUE NOT NULL,
+    process_name VARCHAR(255) NOT NULL,
+    process_order INTEGER NOT NULL DEFAULT 1,
+    standard_minutes INTEGER,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS manufacturing_orders (
+    id SERIAL PRIMARY KEY,
+    work_order_no VARCHAR(50) UNIQUE NOT NULL,
+    production_plan_id INTEGER REFERENCES production_plans(id) ON DELETE SET NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    planned_quantity INTEGER NOT NULL,
+    completed_quantity INTEGER NOT NULL DEFAULT 0,
+    due_date DATE,
+    finished_lot_number VARCHAR(80),
+    status VARCHAR(30) NOT NULL DEFAULT 'released',
+    notes TEXT,
+    released_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS manufacturing_order_operations (
+    id SERIAL PRIMARY KEY,
+    manufacturing_order_id INTEGER NOT NULL REFERENCES manufacturing_orders(id) ON DELETE CASCADE,
+    process_id INTEGER NOT NULL REFERENCES manufacturing_processes(id) ON DELETE RESTRICT,
+    operation_seq INTEGER NOT NULL,
+    planned_quantity INTEGER NOT NULL,
+    started_quantity INTEGER NOT NULL DEFAULT 0,
+    completed_quantity INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    operator_name VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (manufacturing_order_id, operation_seq)
+);
+
+CREATE TABLE IF NOT EXISTS manufacturing_material_consumptions (
+    id SERIAL PRIMARY KEY,
+    manufacturing_order_id INTEGER NOT NULL REFERENCES manufacturing_orders(id) ON DELETE CASCADE,
+    product_component_id INTEGER REFERENCES product_components(id) ON DELETE SET NULL,
+    component_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(80),
+    qr_code VARCHAR(255),
+    consumed_quantity INTEGER NOT NULL,
+    inventory_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL,
+    consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    operator_name VARCHAR(255),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS manufacturing_receipts (
+    id SERIAL PRIMARY KEY,
+    manufacturing_order_id INTEGER NOT NULL REFERENCES manufacturing_orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
+    qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
+    lot_number VARCHAR(80) NOT NULL,
+    qr_code VARCHAR(255),
+    received_quantity INTEGER NOT NULL,
+    location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    location_code VARCHAR(50),
+    inventory_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL,
+    received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    operator_name VARCHAR(255),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturing_orders_status ON manufacturing_orders(status);
+CREATE INDEX IF NOT EXISTS idx_manufacturing_orders_product ON manufacturing_orders(product_id);
+CREATE INDEX IF NOT EXISTS idx_manufacturing_operations_order ON manufacturing_order_operations(manufacturing_order_id);
+CREATE INDEX IF NOT EXISTS idx_manufacturing_consumptions_order ON manufacturing_material_consumptions(manufacturing_order_id);
+CREATE INDEX IF NOT EXISTS idx_manufacturing_consumptions_lot ON manufacturing_material_consumptions(lot_number);
+CREATE INDEX IF NOT EXISTS idx_manufacturing_receipts_order ON manufacturing_receipts(manufacturing_order_id);
+CREATE INDEX IF NOT EXISTS idx_manufacturing_receipts_lot ON manufacturing_receipts(lot_number);
+
+INSERT INTO manufacturing_processes (process_code, process_name, process_order, standard_minutes)
+VALUES
+    ('PROC-ASSY', '組立', 1, 30),
+    ('PROC-QC', '工程内検査', 2, 15),
+    ('PROC-PACK', '製造梱包', 3, 10)
+ON CONFLICT (process_code) DO UPDATE SET
+    process_name = EXCLUDED.process_name,
+    process_order = EXCLUDED.process_order,
+    standard_minutes = EXCLUDED.standard_minutes,
+    updated_at = CURRENT_TIMESTAMP;
+
+GRANT ALL PRIVILEGES ON manufacturing_processes TO production_user;
+GRANT ALL PRIVILEGES ON manufacturing_orders TO production_user;
+GRANT ALL PRIVILEGES ON manufacturing_order_operations TO production_user;
+GRANT ALL PRIVILEGES ON manufacturing_material_consumptions TO production_user;
+GRANT ALL PRIVILEGES ON manufacturing_receipts TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_processes_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_orders_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_order_operations_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_material_consumptions_id_seq TO production_user;
+GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_receipts_id_seq TO production_user;

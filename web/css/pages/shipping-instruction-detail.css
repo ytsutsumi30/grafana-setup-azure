@@ -1,0 +1,230 @@
+.detail-hero {
+  border-left: 5px solid var(--color-primary);
+}
+
+.detail-meta {
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.detail-kpi {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  min-height: 72px;
+  padding: 0.65rem;
+}
+
+.detail-kpi-label {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.detail-kpi-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.detail-next-action {
+  border-left: 5px solid var(--color-primary);
+}
+
+.detail-next-action.success {
+  border-left-color: var(--color-status-ok);
+}
+
+.detail-next-action.warning {
+  border-left-color: var(--color-status-pending);
+}
+
+.detail-next-action.info {
+  border-left-color: var(--color-primary);
+}
+
+.detail-next-action .btn {
+  min-height: var(--touch-target-min);
+}
+
+.detail-line-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  min-height: 100%;
+  padding: 0.85rem;
+}
+
+.detail-line-card.complete {
+  border-color: var(--color-status-ok);
+}
+
+.detail-line-card.warning {
+  border-color: var(--color-status-pending);
+}
+
+.detail-lot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  margin: 0.15rem;
+  background: color-mix(in srgb, var(--color-primary), transparent 90%);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.detail-lot-chip.complete {
+  background: color-mix(in srgb, var(--color-status-ok), transparent 88%);
+  border-color: color-mix(in srgb, var(--color-status-ok), transparent 45%);
+}
+
+.detail-lot-chip.warning {
+  background: color-mix(in srgb, var(--color-status-pending), transparent 82%);
+  border-color: color-mix(in srgb, var(--color-status-pending), transparent 35%);
+}
+
+.detail-timeline {
+  border-left: 3px solid var(--color-primary);
+  margin-left: 0.75rem;
+  padding-left: 1rem;
+}
+
+.detail-step {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.detail-step::before {
+  content: "";
+  position: absolute;
+  left: calc(-1rem - 7px);
+  top: 0.35rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-border);
+  border: 2px solid var(--color-surface);
+}
+
+.detail-step.complete::before {
+  background: var(--color-status-ok);
+}
+
+.detail-step.active::before {
+  background: var(--color-primary);
+}
+
+.detail-action-row .btn,
+#refreshButton {
+  min-height: var(--touch-target-min);
+}
+
+.detail-scan-cards {
+  display: none;
+}
+
+.detail-scan-card {
+  border: 1px solid var(--color-border);
+  border-left: 5px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: 0.75rem;
+  margin: 0.75rem;
+}
+
+.detail-scan-card.ok {
+  border-left-color: var(--color-status-ok);
+}
+
+.detail-scan-card.warn {
+  border-left-color: var(--color-status-pending);
+}
+
+.detail-scan-card.ng {
+  border-left-color: var(--color-status-ng);
+}
+
+.detail-scan-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+  font-size: 0.86rem;
+}
+
+.detail-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1020;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  padding: 0.75rem;
+  margin-top: 1rem;
+}
+
+.detail-action-bar.show {
+  display: flex;
+}
+
+.detail-primary-action {
+  min-height: var(--touch-target-field);
+  min-width: 160px;
+  font-weight: 700;
+}
+
+.detail-secondary-action {
+  min-height: var(--touch-target-min);
+  min-width: 120px;
+}
+
+@media (max-width: 575.98px) {
+  .detail-kpi-value {
+    font-size: 1.1rem;
+  }
+
+  .detail-line-card {
+    padding: 0.75rem;
+  }
+
+  #nextActionButtons {
+    width: 100%;
+  }
+
+  #nextActionButtons .btn {
+    flex: 1 1 100%;
+  }
+
+  .detail-timeline {
+    margin-left: 0.35rem;
+    padding-left: 0.85rem;
+  }
+
+  body[data-page="shipping-instruction-detail"] .table-responsive {
+    display: none;
+  }
+
+  .detail-scan-cards {
+    display: block;
+  }
+
+  .detail-action-bar {
+    left: 0;
+    right: 0;
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    border-radius: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detail-primary-action,
+  .detail-secondary-action {
+    width: 100%;
+  }
+}

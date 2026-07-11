@@ -1,318 +1,147 @@
 /**
- * OCRフィードバックAPIルート
- * 
- * ユーザー修正を学習データとして蓄積
+ * OCRフィードバックAPI。入力検証・共有DBプール・共通ロガーを使用する。
+ * フィードバック本文と学習データは業務情報を含み得るため、参照APIは管理者限定。
  */
-
 const express = require('express');
-const router = express.Router();
-const { Pool } = require('pg');
+const Joi = require('joi');
+const sharedPool = require('../lib/db');
+const sharedLogger = require('../lib/logger');
 
-// PostgreSQL接続プール
-const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'admin',
-  password: process.env.DB_PASSWORD || 'admin123',
-  database: process.env.DB_NAME || 'shipping_db'
+const feedbackSchema = Joi.object({
+  engine: Joi.string().trim().max(50).required(),
+  originalText: Joi.string().max(20000).required(),
+  correctedText: Joi.string().max(20000).required(),
+  confidence: Joi.number().min(0).max(100).allow(null),
+  imageHash: Joi.string().trim().max(64).pattern(/^[a-fA-F0-9]+$/).allow('', null),
+  documentType: Joi.string().trim().max(50).default('unknown')
 });
 
-/**
- * POST /api/ocr-feedback/submit
- * 
- * フィードバックを送信
- * 
- * Body:
- * {
- *   "engine": "tesseract-enhanced",
- *   "originalText": "OCRで抽出されたテキスト",
- *   "correctedText": "ユーザーが修正したテキスト",
- *   "confidence": 85.5,
- *   "imageHash": "abc123...",
- *   "documentType": "invoice"
- * }
- */
-router.post('/submit', async (req, res) => {
-  try {
-    const {
-      engine,
-      originalText,
-      correctedText,
-      confidence,
-      imageHash,
-      documentType = 'unknown'
-    } = req.body;
-    
-    if (!engine || !originalText || !correctedText) {
-      return res.status(400).json({
-        success: false,
-        error: '必須パラメータが不足しています'
-      });
-    }
-    
-    // 精度計算
-    const accuracy = calculateAccuracy(originalText, correctedText);
-    
-    // DBに保存
-    const query = `
-      INSERT INTO ocr_feedbacks (
-        engine, original_text, corrected_text, confidence, accuracy,
-        image_hash, document_type, created_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      RETURNING id
-    `;
-    
-    const values = [
-      engine,
-      originalText,
-      correctedText,
-      confidence,
-      accuracy,
-      imageHash,
-      documentType
-    ];
-    
-    const result = await pool.query(query, values);
-    
-    console.log(`[OCR Feedback] 保存完了: ID=${result.rows[0].id}, accuracy=${accuracy.toFixed(2)}%`);
-    
-    res.json({
-      success: true,
-      feedbackId: result.rows[0].id,
-      accuracy
-    });
-    
-  } catch (error) {
-    console.error('[OCR Feedback] エラー:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'フィードバック送信中にエラーが発生しました'
-    });
-  }
+const statsQuerySchema = Joi.object({
+  engine: Joi.string().trim().max(50),
+  documentType: Joi.string().trim().max(50),
+  days: Joi.number().integer().min(1).max(366).default(30)
 });
 
-/**
- * GET /api/ocr-feedback/stats
- * 
- * フィードバック統計を取得
- */
-router.get('/stats', async (req, res) => {
-  try {
-    const { engine, documentType, days = 30 } = req.query;
-    
-    let query = `
-      SELECT
-        engine,
-        document_type,
-        COUNT(*) as total_feedbacks,
-        AVG(accuracy) as avg_accuracy,
-        AVG(confidence) as avg_confidence,
-        MIN(created_at) as first_feedback,
-        MAX(created_at) as last_feedback
-      FROM ocr_feedbacks
-      WHERE created_at >= NOW() - INTERVAL '${parseInt(days)} days'
-    `;
-    
-    const conditions = [];
-    const values = [];
-    
-    if (engine) {
-      conditions.push(`engine = $${values.length + 1}`);
-      values.push(engine);
-    }
-    
-    if (documentType) {
-      conditions.push(`document_type = $${values.length + 1}`);
-      values.push(documentType);
-    }
-    
-    if (conditions.length > 0) {
-      query += ' AND ' + conditions.join(' AND ');
-    }
-    
-    query += ' GROUP BY engine, document_type ORDER BY avg_accuracy DESC';
-    
-    const result = await pool.query(query, values);
-    
-    res.json({
-      success: true,
-      stats: result.rows.map(row => ({
-        engine: row.engine,
-        documentType: row.document_type,
-        totalFeedbacks: parseInt(row.total_feedbacks),
-        avgAccuracy: parseFloat(row.avg_accuracy).toFixed(2),
-        avgConfidence: parseFloat(row.avg_confidence).toFixed(2),
-        firstFeedback: row.first_feedback,
-        lastFeedback: row.last_feedback
-      }))
-    });
-    
-  } catch (error) {
-    console.error('[OCR Feedback] 統計取得エラー:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || '統計取得中にエラーが発生しました'
-    });
-  }
+const trainingQuerySchema = Joi.object({
+  minAccuracy: Joi.number().min(0).max(100).default(90),
+  limit: Joi.number().integer().min(1).max(500).default(100)
 });
 
-/**
- * GET /api/ocr-feedback/improvements
- * 
- * よくある修正パターンを取得
- */
-router.get('/improvements', async (req, res) => {
-  try {
-    const { limit = 20 } = req.query;
-    
-    // よくある誤認識パターンを抽出
-    const query = `
-      WITH corrections AS (
-        SELECT
-          original_text,
-          corrected_text,
-          COUNT(*) as frequency
-        FROM ocr_feedbacks
-        WHERE original_text != corrected_text
-        GROUP BY original_text, corrected_text
-        HAVING COUNT(*) >= 2
-      )
-      SELECT *
-      FROM corrections
-      ORDER BY frequency DESC
-      LIMIT $1
-    `;
-    
-    const result = await pool.query(query, [parseInt(limit)]);
-    
-    res.json({
-      success: true,
-      patterns: result.rows.map(row => ({
-        from: row.original_text,
-        to: row.corrected_text,
-        frequency: parseInt(row.frequency)
-      }))
-    });
-    
-  } catch (error) {
-    console.error('[OCR Feedback] パターン取得エラー:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'パターン取得中にエラーが発生しました'
-    });
-  }
-});
+function invalid(res, details) {
+  return res.status(400).json({ success: false, error: 'Invalid request', details: details.map((detail) => detail.message) });
+}
 
-/**
- * GET /api/ocr-feedback/training-data
- * 
- * 学習データとして使用可能なフィードバックを取得
- */
-router.get('/training-data', async (req, res) => {
-  try {
-    const { minAccuracy = 90, limit = 100 } = req.query;
-    
-    const query = `
-      SELECT
-        id,
-        engine,
-        original_text,
-        corrected_text,
-        confidence,
-        accuracy,
-        image_hash,
-        document_type,
-        created_at
-      FROM ocr_feedbacks
-      WHERE accuracy >= $1
-      ORDER BY created_at DESC
-      LIMIT $2
-    `;
-    
-    const result = await pool.query(query, [parseFloat(minAccuracy), parseInt(limit)]);
-    
-    res.json({
-      success: true,
-      count: result.rows.length,
-      trainingData: result.rows
-    });
-    
-  } catch (error) {
-    console.error('[OCR Feedback] 学習データ取得エラー:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || '学習データ取得中にエラーが発生しました'
-    });
-  }
-});
-
-/**
- * 精度計算 (文字レベル)
- */
 function calculateAccuracy(original, corrected) {
   const distance = levenshteinDistance(original, corrected);
   const maxLen = Math.max(original.length, corrected.length);
-  
-  if (maxLen === 0) return 100;
-  
-  return ((maxLen - distance) / maxLen) * 100;
+  return maxLen === 0 ? 100 : ((maxLen - distance) / maxLen) * 100;
 }
 
-/**
- * Levenshtein距離
- */
 function levenshteinDistance(str1, str2) {
-  const matrix = [];
-  
-  for (let i = 0; i <= str2.length; i++) {
-    matrix[i] = [i];
-  }
-  
-  for (let j = 0; j <= str1.length; j++) {
-    matrix[0][j] = j;
-  }
-  
-  for (let i = 1; i <= str2.length; i++) {
-    for (let j = 1; j <= str1.length; j++) {
-      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        );
-      }
+  let previous = Array.from({ length: str1.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= str2.length; row += 1) {
+    const current = [row];
+    for (let column = 1; column <= str1.length; column += 1) {
+      current[column] = str2[row - 1] === str1[column - 1]
+        ? previous[column - 1]
+        : Math.min(previous[column - 1] + 1, current[column - 1] + 1, previous[column] + 1);
     }
+    previous = current;
   }
-  
-  return matrix[str2.length][str1.length];
+  return previous[str1.length];
 }
 
-/**
- * テーブル初期化SQL
- */
-const initTableSQL = `
-CREATE TABLE IF NOT EXISTS ocr_feedbacks (
-  id SERIAL PRIMARY KEY,
-  engine VARCHAR(50) NOT NULL,
-  original_text TEXT NOT NULL,
-  corrected_text TEXT NOT NULL,
-  confidence FLOAT,
-  accuracy FLOAT,
-  image_hash VARCHAR(64),
-  document_type VARCHAR(50),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_engine (engine),
-  INDEX idx_document_type (document_type),
-  INDEX idx_created_at (created_at)
-);
-`;
+module.exports = function createOcrFeedbackRoutes({ pool = sharedPool, logger = sharedLogger, requireAdmin = (_req, _res, next) => next() } = {}) {
+  const router = express.Router();
 
-// アプリ起動時にテーブルを作成
-pool.query(initTableSQL).catch(err => {
-  console.warn('[OCR Feedback] テーブル作成警告:', err.message);
-});
+  router.post('/submit', async (req, res) => {
+    const { value, error } = feedbackSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
+    if (error) return invalid(res, error.details);
 
-module.exports = router;
+    try {
+      const accuracy = calculateAccuracy(value.originalText, value.correctedText);
+      const result = await pool.query(
+        `INSERT INTO ocr_feedbacks (
+          engine, original_text, corrected_text, confidence, accuracy, image_hash, document_type
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [value.engine, value.originalText, value.correctedText, value.confidence, accuracy, value.imageHash, value.documentType]
+      );
+      logger.info('OCR feedback saved', { feedbackId: result.rows[0].id, engine: value.engine, accuracy });
+      return res.status(201).json({ success: true, feedbackId: result.rows[0].id, accuracy });
+    } catch (error) {
+      logger.error('OCR feedback save failed', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Failed to save OCR feedback' });
+    }
+  });
+
+  router.get('/stats', requireAdmin, async (req, res) => {
+    const { value, error } = statsQuerySchema.validate(req.query, { abortEarly: false, convert: true });
+    if (error) return invalid(res, error.details);
+    try {
+      const values = [value.days];
+      const conditions = ["created_at >= NOW() - make_interval(days => $1::int)"];
+      if (value.engine) { values.push(value.engine); conditions.push(`engine = $${values.length}`); }
+      if (value.documentType) { values.push(value.documentType); conditions.push(`document_type = $${values.length}`); }
+      const result = await pool.query(
+        `SELECT engine, document_type, COUNT(*)::int AS total_feedbacks,
+                AVG(accuracy) AS avg_accuracy, AVG(confidence) AS avg_confidence,
+                MIN(created_at) AS first_feedback, MAX(created_at) AS last_feedback
+           FROM ocr_feedbacks WHERE ${conditions.join(' AND ')}
+          GROUP BY engine, document_type ORDER BY avg_accuracy DESC`,
+        values
+      );
+      return res.json({ success: true, stats: result.rows.map((row) => ({
+        engine: row.engine,
+        documentType: row.document_type,
+        totalFeedbacks: row.total_feedbacks,
+        avgAccuracy: Number(row.avg_accuracy).toFixed(2),
+        avgConfidence: row.avg_confidence === null ? null : Number(row.avg_confidence).toFixed(2),
+        firstFeedback: row.first_feedback,
+        lastFeedback: row.last_feedback
+      })) });
+    } catch (error) {
+      logger.error('OCR feedback statistics failed', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Failed to load OCR feedback statistics' });
+    }
+  });
+
+  router.get('/improvements', requireAdmin, async (req, res) => {
+    const { value, error } = trainingQuerySchema.validate(req.query, { abortEarly: false, convert: true });
+    if (error) return invalid(res, error.details);
+    try {
+      const result = await pool.query(
+        `WITH corrections AS (
+           SELECT original_text, corrected_text, COUNT(*)::int AS frequency
+             FROM ocr_feedbacks WHERE original_text <> corrected_text
+            GROUP BY original_text, corrected_text HAVING COUNT(*) >= 2
+         ) SELECT original_text, corrected_text, frequency
+             FROM corrections ORDER BY frequency DESC LIMIT $1`,
+        [value.limit]
+      );
+      return res.json({ success: true, patterns: result.rows.map((row) => ({ from: row.original_text, to: row.corrected_text, frequency: row.frequency })) });
+    } catch (error) {
+      logger.error('OCR feedback improvements failed', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Failed to load OCR feedback improvements' });
+    }
+  });
+
+  router.get('/training-data', requireAdmin, async (req, res) => {
+    const { value, error } = trainingQuerySchema.validate(req.query, { abortEarly: false, convert: true });
+    if (error) return invalid(res, error.details);
+    try {
+      const result = await pool.query(
+        `SELECT id, engine, original_text, corrected_text, confidence, accuracy, image_hash, document_type, created_at
+           FROM ocr_feedbacks WHERE accuracy >= $1 ORDER BY created_at DESC LIMIT $2`,
+        [value.minAccuracy, value.limit]
+      );
+      return res.json({ success: true, count: result.rows.length, trainingData: result.rows });
+    } catch (error) {
+      logger.error('OCR feedback training data failed', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Failed to load OCR training data' });
+    }
+  });
+
+  return router;
+};
+
+module.exports.calculateAccuracy = calculateAccuracy;

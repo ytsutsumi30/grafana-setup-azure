@@ -16,7 +16,12 @@ locals {
       name  = "supabase-db-password"
       value = var.supabase_db_password
     }
-    ], var.enable_aws_textract ? [
+    ], var.admin_api_token != "" ? [
+    {
+      name  = "admin-api-token"
+      value = var.admin_api_token
+    }
+    ] : [], var.enable_aws_textract ? [
     {
       name  = "aws-access-key-id"
       value = var.aws_access_key_id
@@ -147,7 +152,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "DB_SSL_REJECT_UNAUTHORIZED"
-        value = "false"
+        value = "true"
       }
       env {
         name  = "AWS_REGION"
@@ -185,6 +190,18 @@ resource "azurerm_container_app" "api" {
         name  = "M365_AUTH_ALLOWED_DOMAINS"
         value = var.m365_auth_allowed_domains
       }
+      env {
+        name  = "WRITE_AUTH_MODE"
+        value = lower(var.write_auth_mode)
+      }
+
+      dynamic "env" {
+        for_each = var.admin_api_token != "" ? toset(["ADMIN_API_TOKEN"]) : toset([])
+        content {
+          name        = env.value
+          secret_name = "admin-api-token"
+        }
+      }
 
       dynamic "env" {
         for_each = var.enable_aws_textract ? toset(["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]) : toset([])
@@ -217,6 +234,13 @@ resource "azurerm_container_app" "api" {
   }
 
   lifecycle {
+    precondition {
+      condition = lower(var.write_auth_mode) != "enforce" || var.m365_auth_enabled || (
+        length(var.admin_api_token) >= 32 && !startswith(var.admin_api_token, "REPLACE_")
+      )
+      error_message = "write_auth_mode=enforce requires M365 authentication or an ADMIN_API_TOKEN of at least 32 non-placeholder characters."
+    }
+
     ignore_changes = [
       template[0].container[0].image,
       registry,
