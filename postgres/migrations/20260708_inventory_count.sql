@@ -77,9 +77,14 @@ INSERT INTO inventory_count_sessions (count_no, count_name, location_code, statu
 VALUES ('COUNT-REVIEW-001', 'POC 棚卸サンプル', NULL, 'draft', 'Phase 4 棚卸サンプル')
 ON CONFLICT (count_no) DO NOTHING;
 
-GRANT ALL PRIVILEGES ON inventory_count_sessions TO production_user;
-GRANT ALL PRIVILEGES ON inventory_count_lines TO production_user;
-GRANT ALL PRIVILEGES ON inventory_adjustments TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE inventory_count_sessions_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE inventory_count_lines_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE inventory_adjustments_id_seq TO production_user;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'production_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE inventory_count_sessions TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE inventory_count_lines TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE inventory_adjustments TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE inventory_count_sessions_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE inventory_count_lines_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE inventory_adjustments_id_seq TO production_user;
+    END IF;
+END $$;

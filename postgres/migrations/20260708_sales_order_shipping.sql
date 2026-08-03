@@ -60,7 +60,12 @@ WHERE so.sales_order_no = 'SO-REVIEW-001'
     WHERE sol.sales_order_id = so.id AND sol.product_id = p.id
   );
 
-GRANT ALL PRIVILEGES ON sales_orders TO production_user;
-GRANT ALL PRIVILEGES ON sales_order_lines TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE sales_orders_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE sales_order_lines_id_seq TO production_user;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'production_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE sales_orders TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE sales_order_lines TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE sales_orders_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE sales_order_lines_id_seq TO production_user;
+    END IF;
+END $$;

@@ -14,6 +14,33 @@
 
 ## 実行方法
 
+アプリ全体の改善候補選定、優先順位付け、実装、記録は `docs/app-improvement-loop.md` と `.agents/skills/app-improvement-loop/SKILL.md` に定義する。すべてのアプリ改善で、以下の画面検証を完了条件に含める。
+
+### UI改善・実装・検証ループ
+
+改善候補の選定から実装、検証、記録までの全体手順は `docs/ui-improvement-loop.md` と `.agents/skills/ui-improvement-loop/SKILL.md` に定義する。以下は実装後の機械検証サブループである。
+
+`web/` 配下のHTML/CSS/JSを変更した後は、対象画面を指定して以下を実行する。
+
+```bash
+TARGET_PAGE=shipping-instructions bash scripts/verify-ui-change.sh
+```
+
+このコマンドはdev stack起動、対象画面のHTTP 200、Playwrightによるスクリーンショット保存とconsole error 0、HTTPスモーク、API構文検査、関連APIテストを順に確認する。スクリーンショットは `artifacts/ui-verification/` に保存される。
+失敗した場合は原因を修正し、最初から再実行する。Codexでの最大試行回数は3回とする。追加のAPIテストは `RELATED_TESTS` で指定できる。
+
+```bash
+TARGET_PAGE=pps RELATED_TESTS='tests/api/contract.test.js tests/api/pps-undo.test.js' \
+  bash scripts/verify-ui-change.sh
+```
+
+初回だけ、リポジトリ直下でPlaywrightとChromiumを導入する。
+
+```bash
+npm install
+npx playwright install chromium
+```
+
 ### スモーク(最速の回帰ガード)
 
 ```bash

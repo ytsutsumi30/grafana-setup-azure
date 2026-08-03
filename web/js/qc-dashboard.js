@@ -5,6 +5,12 @@ let controlChart = null;
 let histogramChart = null;
 let scatterChart = null;
 
+function formatMetric(value, digits, fallback = '--') {
+    if (value === null || value === undefined || value === '') return fallback;
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toFixed(digits) : fallback;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeCharts();
     loadParetoData();
@@ -362,9 +368,9 @@ async function loadControlChartData() {
             controlChart.update();
 
             // 統計情報更新
-            document.getElementById('control-ucl').textContent = data.ucl.toFixed(2);
-            document.getElementById('control-cl').textContent = data.cl.toFixed(2);
-            document.getElementById('control-lcl').textContent = data.lcl.toFixed(2);
+            document.getElementById('control-ucl').textContent = formatMetric(data.ucl, 2);
+            document.getElementById('control-cl').textContent = formatMetric(data.cl, 2);
+            document.getElementById('control-lcl').textContent = formatMetric(data.lcl, 2);
 
             // 状態表示
             const statusHtml = data.in_control
@@ -405,9 +411,9 @@ async function loadHistogramData() {
             histogramChart.update();
 
             // 統計量更新
-            document.getElementById('histogram-mean').textContent = data.mean.toFixed(2);
-            document.getElementById('histogram-std').textContent = data.std.toFixed(2);
-            document.getElementById('histogram-range').textContent = data.range.toFixed(2);
+            document.getElementById('histogram-mean').textContent = formatMetric(data.mean, 2);
+            document.getElementById('histogram-std').textContent = formatMetric(data.std, 2);
+            document.getElementById('histogram-range').textContent = formatMetric(data.range, 2);
         }
     } catch (error) {
         console.error('loadHistogramData error:', error);
@@ -432,7 +438,7 @@ async function loadScatterData() {
             scatterChart.update();
 
             // 相関係数更新
-            document.getElementById('scatter-correlation').textContent = data.correlation.toFixed(3);
+            document.getElementById('scatter-correlation').textContent = formatMetric(data.correlation, 3);
 
             let correlationType = '';
             const r = Math.abs(data.correlation);

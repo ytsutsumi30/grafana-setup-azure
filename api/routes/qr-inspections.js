@@ -206,20 +206,8 @@ router.patch('/:id/complete', async (req, res) => {
         const status = isComplete ? 'completed' : 'failed';
         const passedQuantity = isComplete ? inspection.quantity : 0;
 
-        // 在庫を更新（検品合格の場合のみ）
+        // 在庫控除はロット引当確定、または互換ピッキング完了時に一度だけ行う。
         let newStock = inspection.current_stock_before;
-        if (isComplete && passedQuantity > 0) {
-            const stockResult = await pool.query(`
-                UPDATE inventory 
-                SET current_stock = current_stock - $1,
-                    available_stock = available_stock - $1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE product_id = $2
-                RETURNING current_stock
-            `, [passedQuantity, inspection.product_id]);
-
-            newStock = stockResult.rows[0]?.current_stock || inspection.current_stock_before;
-        }
 
         // QR検品記録を完了
         const result = await pool.query(`

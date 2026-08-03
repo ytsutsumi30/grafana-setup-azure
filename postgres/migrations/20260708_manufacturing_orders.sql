@@ -102,13 +102,18 @@ ON CONFLICT (process_code) DO UPDATE SET
     standard_minutes = EXCLUDED.standard_minutes,
     updated_at = CURRENT_TIMESTAMP;
 
-GRANT ALL PRIVILEGES ON manufacturing_processes TO production_user;
-GRANT ALL PRIVILEGES ON manufacturing_orders TO production_user;
-GRANT ALL PRIVILEGES ON manufacturing_order_operations TO production_user;
-GRANT ALL PRIVILEGES ON manufacturing_material_consumptions TO production_user;
-GRANT ALL PRIVILEGES ON manufacturing_receipts TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_processes_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_orders_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_order_operations_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_material_consumptions_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_receipts_id_seq TO production_user;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'production_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE manufacturing_processes TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE manufacturing_orders TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE manufacturing_order_operations TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE manufacturing_material_consumptions TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE manufacturing_receipts TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_processes_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_orders_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_order_operations_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_material_consumptions_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE manufacturing_receipts_id_seq TO production_user;
+    END IF;
+END $$;

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     id SERIAL PRIMARY KEY,
     transaction_type VARCHAR(50) NOT NULL,
     transaction_status VARCHAR(30) NOT NULL DEFAULT 'posted',
+    inventory_status VARCHAR(30) NOT NULL DEFAULT 'available',
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     lot_inventory_id INTEGER REFERENCES lot_inventory(id) ON DELETE SET NULL,
     qr_unit_id INTEGER REFERENCES qr_units(id) ON DELETE SET NULL,
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS inventory_balances (
     location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
     location_code VARCHAR(50),
     inventory_status VARCHAR(30) NOT NULL DEFAULT 'available',
-    quantity INTEGER NOT NULL DEFAULT 0,
+    quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     last_transaction_id INTEGER REFERENCES inventory_transactions(id) ON DELETE SET NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -122,11 +123,16 @@ FROM locations loc
 WHERE loc.location_code = qu.location
   AND qu.location_id IS NULL;
 
-GRANT ALL PRIVILEGES ON TABLE locations TO production_user;
-GRANT ALL PRIVILEGES ON TABLE inventory_transactions TO production_user;
-GRANT ALL PRIVILEGES ON TABLE inventory_balances TO production_user;
-GRANT ALL PRIVILEGES ON TABLE operation_events TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE locations_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE inventory_transactions_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE inventory_balances_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE operation_events_id_seq TO production_user;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'production_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE locations TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE inventory_transactions TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE inventory_balances TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE operation_events TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE locations_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE inventory_transactions_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE inventory_balances_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE operation_events_id_seq TO production_user;
+    END IF;
+END $$;

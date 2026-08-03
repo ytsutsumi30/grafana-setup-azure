@@ -36,7 +36,7 @@ router.get('/shipment-realtime', async (req, res) => {
             queue_status AS (
                 SELECT COUNT(*) as waiting_count
                 FROM shipping_instructions
-                WHERE shipment_status = 'pending'
+                WHERE status = 'pending'
             )
             SELECT
                 ti.*,

@@ -19,6 +19,20 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: production_pass
+    volumes:
+      - ./postgres/migrations/20260718_inventory_ledger_integrity.sql:/migration.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - psql -h postgres -U production_user -d production_db -v ON_ERROR_STOP=1 -1 -f /migration.sql
+    restart: "no"
+
   api:
     build:
       context: ./api
@@ -55,8 +69,8 @@ services:
       MS_TENANT_ID: "${MS_TENANT_ID:-}"                 # 社内テナントID(common も可)
       TZ: Asia/Tokyo
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "3002:3001"
     healthcheck:
@@ -71,6 +85,7 @@ services:
     container_name: shipping-inspection-web
     environment:
       API_UPSTREAM: http://api:3001
+      GRAFANA_UPSTREAM: http://grafana:3000
       TZ: Asia/Tokyo
     depends_on:
       api:
@@ -82,6 +97,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: shipping-inspection-grafana
+    environment:
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_SERVER_ROOT_URL: "http://localhost:8080/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      TZ: Asia/Tokyo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3003:3000"
 
 volumes:
   postgres-data:

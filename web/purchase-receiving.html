@@ -6,15 +6,24 @@
   <title>発注・入庫 - 出荷検品システム</title>
   <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
-  <link href="css/tokens.css" rel="stylesheet">
-  <link href="css/components.css" rel="stylesheet">
-  <link href="css/pages/purchase-receiving.css" rel="stylesheet">
+  <link href="css/tokens.css?v=2026080104" rel="stylesheet">
+  <link href="css/components.css?v=2026080104" rel="stylesheet">
+  <link href="css/pages/purchase-receiving.css?v=2026080104" rel="stylesheet">
   <script src="js/m365-auth.js?v=202607070030"></script>
 </head>
 <body data-page="purchase-receiving" data-layout="auto">
   <main class="container-fluid px-3 pb-4">
-    <section class="app-card card">
+    <section class="app-card card order-entry-panel" aria-labelledby="purchaseEntryTitle">
       <div class="card-body">
+        <div class="section-heading mb-3">
+          <div>
+            <h2 id="purchaseEntryTitle" class="h6 mb-1"><i class="fas fa-file-circle-plus me-2"></i>発注登録</h2>
+            <p class="small text-muted mb-0">仕入先と1件以上の品目明細から入庫予定を作成します。</p>
+          </div>
+          <a class="btn btn-outline-secondary" href="inventory-foundation.html">
+            <i class="fas fa-warehouse me-1"></i>在庫基盤
+          </a>
+        </div>
         <div class="row g-2 align-items-end">
           <div class="col-12 col-lg-4">
             <label for="poSupplier" class="form-label">仕入先</label>
@@ -34,24 +43,37 @@
             </button>
           </div>
         </div>
-        <div class="row g-2 align-items-end mt-1">
-          <div class="col-12 col-lg-5">
-            <label for="poProduct" class="form-label">品目</label>
-            <select id="poProduct" class="form-select form-select-lg"></select>
-          </div>
-          <div class="col-8 col-lg-3">
-            <label for="poQuantity" class="form-label">数量</label>
-            <input id="poQuantity" class="form-control form-control-lg" type="number" min="1" step="1" value="1">
-          </div>
-          <div class="col-4 col-lg-2 d-grid">
-            <button id="createPoButton" class="btn btn-primary btn-lg" type="button">
-              <i class="fas fa-file-circle-plus me-1"></i>発注
+        <div class="order-line-editor mt-3">
+          <div class="order-line-toolbar">
+            <div>
+              <h3 class="h6 mb-0">発注明細</h3>
+              <span id="poLineSummary" class="small text-muted" aria-live="polite">1品目 / 合計1</span>
+            </div>
+            <button id="addPoLineButton" class="btn btn-outline-primary" type="button">
+              <i class="fas fa-plus me-1"></i>品目追加
             </button>
           </div>
-          <div class="col-12 col-lg-2 d-grid">
-            <a class="btn btn-outline-secondary btn-lg" href="inventory-foundation.html">
-              <i class="fas fa-warehouse me-1"></i>在庫基盤
-            </a>
+          <div id="purchaseOrderLines" class="order-line-list">
+            <div class="order-line-row" data-order-line>
+              <span class="order-line-index" aria-hidden="true">1</span>
+              <div class="order-line-product">
+                <label for="poProduct" class="form-label">品目</label>
+                <select id="poProduct" class="form-select form-select-lg" data-line-product></select>
+              </div>
+              <div class="order-line-quantity">
+                <label for="poQuantity" class="form-label">数量</label>
+                <input id="poQuantity" class="form-control form-control-lg" data-line-quantity type="number" min="1" step="1" value="1">
+              </div>
+              <button class="btn btn-outline-danger order-line-remove" data-remove-line type="button" title="明細を削除" aria-label="明細を削除" disabled>
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="order-entry-actions">
+            <span class="small text-muted"><i class="fas fa-circle-info me-1"></i>登録後、全明細を含む入庫予定を自動生成します。</span>
+            <button id="createPoButton" class="btn btn-primary btn-field" type="button">
+              <i class="fas fa-file-circle-plus me-1"></i>発注を登録
+            </button>
           </div>
         </div>
       </div>
@@ -60,7 +82,7 @@
     <section class="row g-2 mb-3" id="receivingKpis"></section>
 
     <div class="row g-3">
-      <section class="col-12 col-xl-4">
+      <section id="receivingQueue" class="col-12 col-xl-4 workbench-queue">
         <div class="app-card card">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h2 class="h6 mb-0"><i class="fas fa-file-invoice me-1"></i>発注</h2>
@@ -82,7 +104,8 @@
         </div>
       </section>
 
-      <section class="col-12 col-xl-8">
+      <section id="receivingWorkspace" class="col-12 col-xl-8 workbench-workspace">
+        <div id="receivingDetailState" class="app-state d-none" role="status" aria-live="polite"></div>
         <div id="receivingEmpty" class="app-card card">
           <div class="card-body text-center py-5 text-muted">
             <i class="fas fa-clipboard-list fa-2x mb-3"></i>
@@ -93,18 +116,30 @@
         <div id="receivingDetail" class="d-none">
           <section class="app-card card">
             <div class="card-body">
+              <button id="receivingBackButton" class="btn btn-outline-secondary mobile-back-button" type="button">
+                <i class="fas fa-arrow-left me-1"></i>入庫予定一覧
+              </button>
               <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
                   <h2 id="receivingTitle" class="h5 mb-1"></h2>
                   <div id="receivingMeta" class="text-muted small"></div>
                 </div>
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex gap-2 flex-wrap align-items-start">
                   <span id="receivingStatus" class="status-badge badge-pending">未選択</span>
-                  <button id="completeReceivingButton" class="btn btn-success" type="button">
-                    <i class="fas fa-circle-check me-1"></i>入庫完了
-                  </button>
+                  <div class="receiving-completion-control">
+                    <button id="completeReceivingButton" class="btn btn-success w-100" type="button" disabled>
+                      <i class="fas fa-circle-check me-1"></i>入庫完了
+                    </button>
+                    <div id="completeReceivingHint" class="receiving-completion-hint small text-muted mt-1" aria-live="polite"></div>
+                  </div>
                 </div>
               </div>
+              <ol id="receivingProcess" class="process-strip process-strip-four mt-3" aria-label="入庫工程">
+                <li data-process-step="ordered">発注登録</li>
+                <li data-process-step="pending">入庫予定</li>
+                <li data-process-step="in_progress">入庫登録</li>
+                <li data-process-step="received">入庫完了</li>
+              </ol>
             </div>
           </section>
 
@@ -119,11 +154,13 @@
             </section>
 
             <section class="col-12 col-lg-5">
-              <div class="app-card card">
-                <div class="card-header bg-white">
+              <div id="receivingScannerPanel" class="app-card card receiving-scanner" data-scan-state="idle">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
                   <h3 class="h6 mb-0"><i class="fas fa-qrcode me-1"></i>入庫スキャン入力</h3>
+                  <span id="receivingScannerStatus" class="receiving-scanner-status is-idle" role="status" aria-live="polite"><i class="fas fa-circle"></i>入力待ち</span>
                 </div>
                 <div class="card-body">
+                  <div id="scanAvailabilityHint" class="alert alert-info py-2 d-none" role="status"></div>
                   <label for="scanLine" class="form-label">明細</label>
                   <select id="scanLine" class="form-select form-select-lg mb-2"></select>
                   <label for="scanQr" class="form-label">QRコード</label>
@@ -146,6 +183,17 @@
                     <option value="on_hold">保留</option>
                     <option value="rejected">不合格</option>
                   </select>
+                  <div id="scanReasonGroup" class="d-none">
+                    <label for="scanReason" class="form-label mt-2">理由分類</label>
+                    <select id="scanReason" class="form-select form-select-lg">
+                      <option value="">選択してください</option>
+                      <option value="package_damage">梱包・外観損傷</option>
+                      <option value="quantity_mismatch">数量不一致</option>
+                      <option value="label_error">ラベル・QR不備</option>
+                      <option value="quality_issue">品質不良</option>
+                      <option value="other">その他</option>
+                    </select>
+                  </div>
                   <label for="scanComment" class="form-label mt-2">コメント</label>
                   <input id="scanComment" class="form-control form-control-lg" type="text" placeholder="任意">
                   <div class="d-grid mt-3">
@@ -169,8 +217,41 @@
     </div>
   </main>
 
+  <div class="modal fade" id="completeReceivingModal" tabindex="-1" aria-labelledby="completeReceivingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="completeReceivingModalLabel">
+            <i class="fas fa-circle-check me-2"></i>入庫完了の確認
+          </h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+        </div>
+        <div class="modal-body">
+          <p>次の入庫予定を完了します。入庫数量と対象を確認してください。</p>
+          <dl class="row mb-3">
+            <dt class="col-5">入庫予定</dt>
+            <dd id="completeReceivingOrderNo" class="col-7 receiving-code"></dd>
+            <dt class="col-5">仕入先</dt>
+            <dd id="completeReceivingSupplier" class="col-7"></dd>
+            <dt class="col-5">入庫数量</dt>
+            <dd id="completeReceivingQuantity" class="col-7 mb-0"></dd>
+          </dl>
+          <div class="alert alert-warning mb-0" role="alert">
+            完了後はこの画面から入庫実績を追加できません。
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelCompleteReceivingButton" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">戻る</button>
+          <button id="confirmCompleteReceivingButton" type="button" class="btn btn-success">
+            <i class="fas fa-circle-check me-1"></i>入庫完了を確定
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-  <script src="js/layout.js"></script>
-  <script src="js/pages/purchase-receiving.js"></script>
+  <script src="js/layout.js?v=2026080104"></script>
+  <script src="js/pages/purchase-receiving.js?v=2026080104"></script>
 </body>
 </html>

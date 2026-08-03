@@ -28,6 +28,9 @@
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
+  "overrides": {
+    "rimraf": "6.1.2"
+  },
   "engines": {
     "node": ">=20.0.0"
   },

@@ -17,3 +17,44 @@
 .sales-line.complete {
   border-left-color: var(--color-status-ok);
 }
+
+.order-entry-panel {
+  border-top: 3px solid var(--color-primary);
+}
+
+#salesOrderList {
+  max-height: calc(100vh - 14rem);
+  overflow-y: auto;
+}
+
+#salesOrderList .list-group-item.active {
+  background: var(--color-status-progress-soft);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.sales-detail-actions {
+  align-items: center;
+}
+
+@media (max-width: 1199.98px) {
+  #salesOrderList {
+    max-height: 24rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .sales-detail-actions {
+    width: 100%;
+  }
+
+  .sales-detail-actions .btn {
+    flex: 1 1 100%;
+  }
+
+  .process-strip li {
+    min-height: 3.25rem;
+    font-size: 0.68rem;
+  }
+}

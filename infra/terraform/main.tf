@@ -151,8 +151,10 @@ resource "azurerm_container_app" "api" {
         value = "true"
       }
       env {
-        name  = "DB_SSL_REJECT_UNAUTHORIZED"
-        value = "true"
+        name = "DB_SSL_REJECT_UNAUTHORIZED"
+        # Supabase Session Pooler presents a certificate chain that is not
+        # trusted by the Container Apps image's default CA bundle.
+        value = "false"
       }
       env {
         name  = "AWS_REGION"

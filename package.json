@@ -1,0 +1,10 @@
+{
+  "name": "shipping-inspection-poc-test-tools",
+  "private": true,
+  "scripts": {
+    "test:console": "node tests/smoke/console-check.js"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

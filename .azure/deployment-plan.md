@@ -1,9 +1,9 @@
 # Azure Deployment Plan
 
-> **Status:** Execution Prepared - Waiting for Supabase/Azure Credentials
+> **Status:** Deployed
 
 Generated: 2026-06-29
-Updated: 2026-06-29
+Updated: 2026-08-01
 
 ---
 
@@ -33,11 +33,11 @@ Updated: 2026-06-29
 | Public entrypoint | Azure Container Apps `web` app |
 | API exposure | Internal Container App where possible |
 
-Pending:
+稼働コンテキスト:
 
-- Azure subscription ID/name.
-- Supabase personal access token and organization ID, or authenticated Supabase CLI/API context.
-- Supabase DB password for the new project.
+- Azure subscription: `a5106b35-61fe-44cb-8f74-9f5f5a738ef4`
+- Supabase project ref: `ffhgeppjrcylrufcqbep`
+- Azure resource group: `rg-shipping-inspection-poc`
 
 ---
 
@@ -46,7 +46,7 @@ Pending:
 | Component | Type | Technology | Path |
 |-----------|------|------------|------|
 | `web` | Static frontend | HTML/CSS/JS served by nginx | `/home/tsutsumi/grafana-setup-azure/web` |
-| `api` | API Service | Node.js 18 / Express / pg | `/home/tsutsumi/grafana-setup-azure/api` |
+| `api` | API Service | Node.js 20 / Express / pg | `/home/tsutsumi/grafana-setup-azure/api` |
 | `postgres` | Database schema | PostgreSQL SQL migrations/seeds | `/home/tsutsumi/grafana-setup-azure/postgres`, `/home/tsutsumi/grafana-setup-azure/api/migrations` |
 | `grafana` | Optional monitoring | Grafana | Deferred |
 | `prometheus` | Optional monitoring | Prometheus | Deferred |
@@ -83,11 +83,11 @@ Pending:
 
 ---
 
-## 6. Provisioning Limit Checklist
+## 6. Provisioning Inventory
 
-Not completed because Azure subscription is not confirmed.
+Azure subscription と `japaneast` の対象リソースを確認済み。
 
-Planned Azure inventory:
+Deployed Azure inventory:
 
 | Resource Type | Number to Deploy | Notes |
 |---------------|------------------|-------|
@@ -97,7 +97,7 @@ Planned Azure inventory:
 | `Microsoft.OperationalInsights/workspaces` | 1 | Log Analytics |
 | `Microsoft.Insights/components` | 1 | Application Insights |
 
-Quota validation must be run after subscription confirmation and before deployment.
+Terraform、ACR、Container Apps、RBAC の事前検証とデプロイ後確認を完了した。
 
 ---
 
@@ -137,13 +137,10 @@ Quota validation must be run after subscription confirmation and before deployme
 
 ## 9. Next Steps
 
-1. Provide or configure Supabase access: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_ORG_ID`, and `SUPABASE_DB_PASSWORD`.
-2. Create Supabase project with `scripts/create-supabase-project.sh`.
-3. Apply `supabase-schema.sql` to Supabase.
-4. Confirm Azure subscription.
-5. Run Azure quota validation for `japaneast`.
-6. Deploy Azure resources and images.
-7. Validate web URL, `/api/db-test`, products, shipping instructions, and QR inspection flow.
+1. M365 認証済みブラウザで在庫、入庫、受注、出荷の業務 API を最終確認する。
+2. 本番移行前に Supabase の CA 検証を有効化する。
+3. AWS SDK のサポート期限に備え、2027 年 1 月までに API runtime を Node.js 22 へ更新する。
+4. Grafana Cloud 最小監視を導入する。
 
 ## 10. Terraform Primary Path
 
@@ -157,3 +154,77 @@ Public web endpoint: `https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36
 Internal API FQDN: `shipping-inspection-poc-api.internal.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io`
 
 Validated endpoints: `/health`, `/api/health`, `/api/db-test`, `/api/products`, `/api/shipping-instructions`, `/api/inspectors`.
+
+## 12. Validation Proof (2026-07-17)
+
+| Check | Command | Result |
+|-------|---------|--------|
+| Azure context | `az account show` | Pass: subscription `a5106b35-61fe-44cb-8f74-9f5f5a738ef4` |
+| Terraform syntax | `terraform -chdir=infra/terraform validate` | Pass |
+| Terraform outputs | `terraform -chdir=infra/terraform output -json` | Pass: `japaneast`, expected ACR and Container Apps |
+| Local application verification | `TARGET_PAGE=purchase-receiving RELATED_TESTS='tests/api/contract.test.js tests/ui/purchase-receiving.test.js' bash scripts/verify-ui-change.sh` | Pass: HTTP 200, console error 0, smoke pass, 48 tests pass |
+| ACR connectivity | `az acr check-health -n crstezvvdoshippinginspectionpoc --yes --ignore-errors` | Pass: Docker, DNS, challenge endpoint and token checks |
+| Container Apps state | `az containerapp show` / `az containerapp env list` | Pass: environment, API and web are `Succeeded`; apps are `Running` |
+| ACR pull RBAC | `az role assignment list` for both system-assigned identities | Pass: `AcrPull` confirmed for API and web |
+| Static RBAC definition | `rg -n 'azurerm_role_assignment|AcrPull' infra/terraform -g '*.tf'` | Pass: API and web role assignments defined |
+| Template resolution | Search for unresolved `{{ .Env.* }}` in Terraform | Pass: none found |
+
+## 13. Deployment Result (2026-07-17)
+
+| Component | Image | Ready revision | Result |
+|-----------|-------|----------------|--------|
+| API | `shipping-inspection-api:receiving-ui-20260717-000058` | `shipping-inspection-poc-api--0000023` | Running |
+| Web | `shipping-inspection-web:receiving-ui-fix-20260717-001200` | `shipping-inspection-poc-web--0000026` | Running |
+
+- Initial web revision `0000025` entered `CrashLoopBackOff` because the local Grafana upstream name was not resolvable in Azure Container Apps.
+- `GRAFANA_UPSTREAM` was made environment-specific: local Compose uses `http://grafana:3000`; the ACA image uses a loopback default when Grafana is not deployed.
+- Public verification passed for `/health`, `/index.html`, `/purchase-receiving.html`, `/api/health`, and the deployed `purchase-receiving.js` marker.
+- Public Playwright verification for `purchase-receiving.html` completed with console error 0. The M365 sign-in wall displayed as configured.
+
+## 14. リリース結果 (2026-08-01)
+
+### Azure / Supabase
+
+| 対象 | 結果 |
+|------|------|
+| Terraform plan | 差分なし (`No changes`) |
+| Terraform apply | `0 added, 0 changed, 0 destroyed` |
+| Supabase | 業務機能用マイグレーション 10 本を依存順に適用 |
+| API image | `shipping-inspection-api:ui-release-20260801-032240` |
+| API digest | `sha256:531253f85254a0799ea181a9a34df376704cd4ab21c6ea961620865de8c15258` |
+| API revision | `shipping-inspection-poc-api--0000027` (`Healthy`, `Running`) |
+| Web image | `shipping-inspection-web:ui-release-20260801-032240` |
+| Web digest | `sha256:f01716f27808268d3a880c24da9588630e39e4927415f2696d3892fb1c8d0156` |
+| Web revision | `shipping-inspection-poc-web--0000028` (`Healthy`, `Running`) |
+| ACR build | API run `ce1m`、Web run `ce1n` とも成功 |
+
+- 入庫、受注、棚卸、OCR、製造、在庫台帳、QR、出荷監査で使用する対象テーブルが Supabase に存在することを確認した。
+- `production_user` が存在しない Supabase 環境でも適用できるよう、権限付与をロール存在時のみ実行する冪等マイグレーションへ修正した。
+- Windows 版 Azure CLI を WSL から使う場合、ACR build context を `wslpath -w` で UNC パスへ変換するよう配備スクリプトを修正した。
+- `DB_SSL_REJECT_UNAUTHORIZED=false` は POC の許容リスクとして継続する。本番移行前に CA 検証を有効化する。
+
+### 公開エンドポイント検証
+
+| パス | 未認証時の結果 | 判定 |
+|------|----------------|------|
+| `/health` | `200` | Pass |
+| `/api/health` | `200` | Pass |
+| `/index.html` | `200` | Pass |
+| `/inventory-foundation.html` | `200` | Pass |
+| `/purchase-receiving.html` | `200` | Pass |
+| `/sales-shipping.html` | `200` | Pass |
+| `/shipping-instructions.html` | `200` | Pass |
+| 業務 API | `401` | Pass: M365 認証必須の想定どおりで、`500` は再現しない |
+
+### リリース前品質ゲート
+
+| チェック | 結果 |
+|----------|------|
+| API、契約、統合、UI、Service Worker テスト | `87/87` Pass |
+| ローカル主要 12 画面 console check | error 0、すべて Pass |
+| API production dependency audit | `0 vulnerabilities` |
+| Git staged diff check | Pass |
+| staged secret scan | 検出なし |
+| Git 除外 | `terraform.tfvars`、Terraform state、`supabase-project.json`、`.codex/` を除外 |
+
+公開 URL: `https://shipping-inspection-poc-web.lemonmushroom-c9d1cf36.japaneast.azurecontainerapps.io`

@@ -5,9 +5,12 @@
  */
 :root {
   /* ブランド */
-  --color-primary: #0d6efd;
-  --color-primary-dark: #0a58ca;
+  --color-primary: #175cd3;
+  --color-primary-dark: #1849a9;
   --color-primary-contrast: #ffffff;
+  --color-accent: #087a66;
+  --color-header-bg: #101828;
+  --color-header-border: #344054;
 
   /* ステータス(全画面共通) */
   --color-status-ok: #198754;        /* 合格・完了 */
@@ -17,11 +20,20 @@
   --color-status-hold: #6c757d;      /* 保留・無効 */
 
   /* 面・文字 */
-  --color-bg: #f8f9fa;
+  --color-bg: #f2f4f7;
   --color-surface: #ffffff;
+  --color-surface-subtle: #f9fafb;
+  --color-surface-strong: #eaecf0;
   --color-text: #212529;
-  --color-text-muted: #6c757d;
-  --color-border: #dee2e6;
+  --color-text-strong: #101828;
+  --color-text-muted: #667085;
+  --color-border: #d0d5dd;
+  --color-border-strong: #98a2b3;
+  --color-focus-ring: rgba(23, 92, 211, 0.2);
+  --color-status-ok-soft: #ecfdf3;
+  --color-status-ng-soft: #fef3f2;
+  --color-status-pending-soft: #fffaeb;
+  --color-status-progress-soft: #eff8ff;
 
   /* タイポグラフィ */
   --font-family-base: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
@@ -31,26 +43,45 @@
   /* 現場向けタッチサイズ */
   --touch-target-min: 48px;    /* すべてのボタンの最小 */
   --touch-target-field: 64px;  /* 現場操作(OK/NG/完了)の最小 */
+  --app-header-offset: 70px;
+  --app-header-offset-mobile: 60px;
 
   /* レイアウト */
-  --radius-card: 0.75rem;
+  --radius-card: 0.5rem;
+  --radius-control: 0.375rem;
   --radius-pill: 2rem;
-  --shadow-card: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
-  --header-gradient: linear-gradient(135deg, #0d6efd, #4dabf7);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --shadow-overlay: 0 12px 28px rgba(16, 24, 40, 0.18);
+  --header-gradient: var(--color-header-bg);
+  --motion-fast: 140ms;
+  --motion-standard: 180ms;
 }
 
 [data-theme="dark"] {
   --color-primary: #4dabf7;
   --color-primary-dark: #339af0;
+  --color-accent: #5fe3c0;
+  --color-header-bg: #0c111d;
+  --color-header-border: #344054;
   --color-status-ok: #2fb380;
   --color-status-ng: #ff6b6b;
   --color-status-pending: #ffd43b;
   --color-status-progress: #3bc9db;
   --color-bg: #121417;
   --color-surface: #1e2126;
+  --color-surface-subtle: #252930;
+  --color-surface-strong: #343a40;
   --color-text: #e9ecef;
+  --color-text-strong: #f8f9fa;
   --color-text-muted: #adb5bd;
   --color-border: #343a40;
-  --shadow-card: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
-  --header-gradient: linear-gradient(135deg, #1c3d5a, #2b6cb0);
+  --color-border-strong: #667085;
+  --color-focus-ring: rgba(77, 171, 247, 0.25);
+  --color-status-ok-soft: #102c24;
+  --color-status-ng-soft: #351515;
+  --color-status-pending-soft: #332b0f;
+  --color-status-progress-soft: #102a33;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 12px 28px rgba(0, 0, 0, 0.55);
+  --header-gradient: var(--color-header-bg);
 }

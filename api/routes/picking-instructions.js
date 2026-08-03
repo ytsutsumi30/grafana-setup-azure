@@ -7,6 +7,7 @@ const pool = require('../lib/db');
 const logger = require('../lib/logger');
 const Joi = require('joi');
 const { recordAuditEvent } = require('../lib/audit');
+const { appendTransaction, InventoryLedgerError } = require('../lib/inventory-ledger');
 
 const router = express.Router();
 
@@ -773,72 +774,120 @@ router.delete('/:id/records/:recordId', async (req, res) => {
 
 // ピッキング完了（出荷指示ステータス → packing）
 router.patch('/:id/complete', async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
-        const piResult = await pool.query(
-            'SELECT * FROM picking_instructions WHERE id=$1', [id]
-        );
-        if (piResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        await client.query('BEGIN');
+        const piResult = await client.query(`
+            SELECT pi.*, si.status AS shipping_status
+            FROM picking_instructions pi
+            JOIN shipping_instructions si ON si.id = pi.shipping_instruction_id
+            WHERE pi.id = $1
+            FOR UPDATE OF pi, si
+        `, [id]);
+        if (piResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Not found' });
+        }
         const pi = piResult.rows[0];
 
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-            // ロット在庫を減算
-            const allocatedQuantity = await getActiveAllocationTotal(client, pi.shipping_instruction_id);
-            if (allocatedQuantity === 0) {
-                // 互換モードのみ在庫をここで減算する。新設計の引当済みデータは数量確定時に減算済み。
-                const records = await client.query(
-                    `SELECT product_id, lot_number, SUM(picked_quantity) as qty FROM picking_records
-                     WHERE picking_instruction_id=$1 AND status='picked'
-                     GROUP BY product_id, lot_number`, [id]
-                );
-                for (const r of records.rows) {
-                    await client.query(
-                        `UPDATE lot_inventory SET quantity = quantity - $1, updated_at=CURRENT_TIMESTAMP
-                         WHERE lot_number=$2 AND product_id=$3 AND quantity >= $1`,
-                        [parseInt(r.qty), r.lot_number, r.product_id]
-                    );
-                }
-            }
-            await client.query(`
-                UPDATE picking_instructions
-                SET status='completed', completed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
-                WHERE id=$1
-            `, [id]);
-            await client.query(
-                `UPDATE shipping_instructions SET status='packing', updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-                [pi.shipping_instruction_id]
-            );
-            await recordAuditEvent(client, req, {
-                shipping_instruction_id: pi.shipping_instruction_id,
-                event_type: 'picking_completed',
-                event_status: 'success',
-                quantity: pi.picked_quantity,
-                before_data: {
-                    picking_status: pi.status,
-                    shipping_status: 'picking'
-                },
-                after_data: {
-                    picking_status: 'completed',
-                    shipping_status: 'packing',
-                    picked_quantity: pi.picked_quantity,
-                    total_quantity: pi.total_quantity
-                },
-                comment: 'ピッキングを完了'
-            });
+        if (pi.status === 'completed') {
             await client.query('COMMIT');
-            const updated = await pool.query('SELECT * FROM picking_instructions WHERE id=$1', [id]);
-            res.json({ success: true, picking: updated.rows[0] });
-        } catch (err) {
-            await client.query('ROLLBACK');
-            throw err;
-        } finally {
-            client.release();
+            return res.json({ success: true, idempotent: true, picking: pi });
         }
+        if (pi.status !== 'in_progress' || pi.shipping_status !== 'picking') {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+                error: `ピッキング完了できない状態です (picking: ${pi.status}, shipping: ${pi.shipping_status})`,
+                code: 'INVALID_PICKING_COMPLETION_STATE'
+            });
+        }
+        if (Number(pi.picked_quantity || 0) !== Number(pi.total_quantity || 0)) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+                error: 'ピッキング数量が指示数量と一致しません',
+                picked_quantity: Number(pi.picked_quantity || 0),
+                total_quantity: Number(pi.total_quantity || 0)
+            });
+        }
+
+        // ロット在庫を減算
+        const allocatedQuantity = await getActiveAllocationTotal(client, pi.shipping_instruction_id);
+        if (allocatedQuantity === 0) {
+            // 互換モードのみ在庫をここで減算する。新設計の引当済みデータは数量確定時に減算済み。
+            const records = await client.query(
+                `SELECT product_id, lot_number, SUM(picked_quantity) as qty FROM picking_records
+                 WHERE picking_instruction_id=$1 AND status='picked'
+                 GROUP BY product_id, lot_number`, [id]
+            );
+            for (const r of records.rows) {
+                const lotResult = await client.query(`
+                    SELECT * FROM lot_inventory
+                    WHERE lot_number = $1 AND product_id = $2
+                    FOR UPDATE
+                `, [r.lot_number, r.product_id]);
+                if (!lotResult.rows.length) {
+                    throw new InventoryLedgerError('ピッキング対象ロットが見つかりません', 'LOT_INVENTORY_NOT_FOUND', 404);
+                }
+                const lot = lotResult.rows[0];
+                await appendTransaction(client, {
+                    transaction_type: 'shipping_allocation',
+                    inventory_status: 'available',
+                    product_id: Number(r.product_id),
+                    lot_inventory_id: lot.id,
+                    lot_number: r.lot_number,
+                    location_id: lot.location_id || null,
+                    location_code: lot.location || null,
+                    quantity_delta: -Number(r.qty),
+                    opening_quantity: Number(lot.quantity || 0),
+                    trust_opening_quantity: true,
+                    sync_lot_inventory: true,
+                    source_type: 'picking_instruction_legacy',
+                    source_id: Number(id),
+                    reason_code: 'legacy_picking_completion',
+                    comment: '互換ピッキング完了時に在庫を控除',
+                    created_by: pi.picker_name || 'picking-instructions-api'
+                });
+            }
+        }
+        const updated = await client.query(`
+            UPDATE picking_instructions
+            SET status='completed', completed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+            WHERE id=$1
+            RETURNING *
+        `, [id]);
+        await client.query(
+            `UPDATE shipping_instructions SET status='packing', updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+            [pi.shipping_instruction_id]
+        );
+        await recordAuditEvent(client, req, {
+            shipping_instruction_id: pi.shipping_instruction_id,
+            event_type: 'picking_completed',
+            event_status: 'success',
+            quantity: pi.picked_quantity,
+            before_data: {
+                picking_status: pi.status,
+                shipping_status: 'picking'
+            },
+            after_data: {
+                picking_status: 'completed',
+                shipping_status: 'packing',
+                picked_quantity: pi.picked_quantity,
+                total_quantity: pi.total_quantity
+            },
+            comment: 'ピッキングを完了'
+        });
+        await client.query('COMMIT');
+        res.json({ success: true, idempotent: false, picking: updated.rows[0] });
     } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
         logger.error('Error completing picking:', error);
+        if (error instanceof InventoryLedgerError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        client.release();
     }
 });
 

@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS receiving_results (
     inspection_status VARCHAR(30) DEFAULT 'accepted',
     reason_code VARCHAR(80),
     comment TEXT,
+    idempotency_key VARCHAR(120),
     received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -96,20 +97,28 @@ CREATE INDEX IF NOT EXISTS idx_receiving_orders_status ON receiving_orders(statu
 CREATE INDEX IF NOT EXISTS idx_receiving_order_lines_order ON receiving_order_lines(receiving_order_id);
 CREATE INDEX IF NOT EXISTS idx_receiving_results_order ON receiving_results(receiving_order_id);
 CREATE INDEX IF NOT EXISTS idx_receiving_results_qr ON receiving_results(qr_code);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_receiving_results_idempotency
+ON receiving_results (receiving_order_id, idempotency_key)
+WHERE idempotency_key IS NOT NULL;
 
 INSERT INTO suppliers (supplier_code, supplier_name, contact_person, notes)
 VALUES ('SUP-REVIEW-001', '現場レビュー用仕入先', 'review', '発注・入庫 MVP 確認用')
 ON CONFLICT (supplier_code) DO NOTHING;
 
-GRANT ALL PRIVILEGES ON TABLE suppliers TO production_user;
-GRANT ALL PRIVILEGES ON TABLE purchase_orders TO production_user;
-GRANT ALL PRIVILEGES ON TABLE purchase_order_lines TO production_user;
-GRANT ALL PRIVILEGES ON TABLE receiving_orders TO production_user;
-GRANT ALL PRIVILEGES ON TABLE receiving_order_lines TO production_user;
-GRANT ALL PRIVILEGES ON TABLE receiving_results TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE suppliers_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE purchase_orders_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE purchase_order_lines_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE receiving_orders_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE receiving_order_lines_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE receiving_results_id_seq TO production_user;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'production_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE suppliers TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE purchase_orders TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE purchase_order_lines TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE receiving_orders TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE receiving_order_lines TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE receiving_results TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE suppliers_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE purchase_orders_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE purchase_order_lines_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE receiving_orders_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE receiving_order_lines_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE receiving_results_id_seq TO production_user;
+    END IF;
+END $$;

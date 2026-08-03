@@ -10,6 +10,12 @@ let inspectorComparisonChart = null;
 // 自動更新タイマー
 let autoRefreshInterval = null;
 
+function formatMetric(value, digits, fallback = '--', suffix = '') {
+    if (value === null || value === undefined || value === '') return fallback;
+    const number = Number(value);
+    return Number.isFinite(number) ? `${number.toFixed(digits)}${suffix}` : fallback;
+}
+
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', () => {
     initializeCharts();
@@ -287,8 +293,8 @@ async function loadInventoryHealth() {
             row.innerHTML = `
                 <td>${item.product_code}</td>
                 <td>${item.product_name}</td>
-                <td class="text-end">${item.available_stock.toFixed(0)}</td>
-                <td class="text-end">${item.avg_daily_demand ? item.avg_daily_demand.toFixed(1) : '--'}</td>
+                <td class="text-end">${formatMetric(item.available_stock, 0, '0')}</td>
+                <td class="text-end">${formatMetric(item.avg_daily_demand, 1)}</td>
                 <td><span class="${statusClass}">${statusText}</span></td>
             `;
             tbody.appendChild(row);
@@ -337,8 +343,8 @@ async function loadStockoutRisk() {
             row.innerHTML = `
                 <td>${item.product_code}</td>
                 <td>${item.product_name}</td>
-                <td class="text-end">${item.available_stock.toFixed(0)}</td>
-                <td class="text-end">${item.days_of_stock ? item.days_of_stock.toFixed(1) + '日' : '--'}</td>
+                <td class="text-end">${formatMetric(item.available_stock, 0, '0')}</td>
+                <td class="text-end">${formatMetric(item.days_of_stock, 1, '--', '日')}</td>
                 <td><span class="${riskClass}">${riskText}</span></td>
             `;
             tbody.appendChild(row);

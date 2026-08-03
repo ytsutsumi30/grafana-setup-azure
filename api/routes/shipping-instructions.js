@@ -7,6 +7,7 @@ const pool = require('../lib/db');
 const logger = require('../lib/logger');
 const Joi = require('joi');
 const { recordAuditEvent } = require('../lib/audit');
+const { appendTransaction, InventoryLedgerError } = require('../lib/inventory-ledger');
 
 const router = express.Router();
 
@@ -425,7 +426,7 @@ router.put('/:id', async (req, res) => {
             SET instruction_id = $1, product_id = $2, quantity = $3,
                 shipping_date = $4, shipping_location_id = $5,
                 delivery_location_id = $6, customer_name = $7,
-                priority = $8, status = $9, tracking_number = $10,
+                priority = $8, status = COALESCE($9, status), tracking_number = $10,
                 notes = $11, updated_at = CURRENT_TIMESTAMP
             WHERE id = $12
             RETURNING *
@@ -438,7 +439,7 @@ router.put('/:id', async (req, res) => {
             delivery_location_id || null,
             customer_name || null,
             priority || 'normal',
-            status || 'pending',
+            status || null,
             tracking_number || null,
             notes || null,
             id
@@ -983,7 +984,7 @@ router.put('/:id', async (req, res) => {
                 delivery_location_id = $6,
                 customer_name = $7,
                 priority = $8,
-                status = $9,
+                status = COALESCE($9, status),
                 tracking_number = $10,
                 notes = $11,
                 updated_at = CURRENT_TIMESTAMP
@@ -1339,6 +1340,7 @@ router.post('/:id/post-completion-corrections', async (req, res) => {
             JOIN products p ON p.id = a.product_id
             WHERE a.id = $1
               AND l.shipping_instruction_id = $2
+              AND a.status = 'shipped'
             FOR UPDATE OF a, l
         `, [value.allocation_id, id]);
         if (allocationResult.rows.length === 0) {
@@ -1351,6 +1353,23 @@ router.post('/:id/post-completion-corrections', async (req, res) => {
         const nextQuantity = value.shipped_quantity !== undefined
             ? Number(value.shipped_quantity)
             : Number(before.shipped_quantity || 0);
+        const otherAllocations = await client.query(`
+            SELECT COALESCE(SUM(shipped_quantity), 0)::int AS total_quantity
+            FROM shipping_lot_allocations
+            WHERE shipping_instruction_line_id = $1
+              AND id <> $2
+              AND status = 'shipped'
+        `, [before.shipping_instruction_line_id, before.id]);
+        const correctedLineTotal = Number(otherAllocations.rows[0]?.total_quantity || 0) + nextQuantity;
+        if (correctedLineTotal > Number(before.line_quantity || 0)) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+                error: `修正後のロット引当合計(${correctedLineTotal})が明細指示数量(${before.line_quantity})を超えています`,
+                code: 'SHIPPING_LINE_QUANTITY_EXCEEDED',
+                corrected_total_quantity: correctedLineTotal,
+                line_quantity: Number(before.line_quantity || 0)
+            });
+        }
         let nextLotInventoryId = before.lot_inventory_id;
         if (nextLotNumber !== before.lot_number) {
             const lotResult = await client.query(`
@@ -1362,6 +1381,90 @@ router.post('/:id/post-completion-corrections', async (req, res) => {
                 LIMIT 1
             `, [before.product_id, nextLotNumber]);
             nextLotInventoryId = lotResult.rows[0]?.id || null;
+        }
+        if (!nextLotInventoryId) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: '修正先ロットが存在しません' });
+        }
+
+        const correctionLots = await client.query(`
+            SELECT *
+            FROM lot_inventory
+            WHERE id = ANY($1::int[])
+            ORDER BY id
+            FOR UPDATE
+        `, [[...new Set([before.lot_inventory_id, nextLotInventoryId].filter(Boolean))]]);
+        const lotsById = new Map(correctionLots.rows.map((lot) => [Number(lot.id), lot]));
+        const beforeLot = lotsById.get(Number(before.lot_inventory_id));
+        const nextLot = lotsById.get(Number(nextLotInventoryId));
+        if (!beforeLot || !nextLot) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: '修正対象ロットの在庫情報が見つかりません' });
+        }
+
+        const inventoryMovements = [];
+        if (Number(beforeLot.id) === Number(nextLot.id)) {
+            const adjustment = Number(before.shipped_quantity || 0) - nextQuantity;
+            if (adjustment !== 0) {
+                inventoryMovements.push(await appendTransaction(client, {
+                    transaction_type: 'inventory_adjustment',
+                    inventory_status: 'available',
+                    product_id: before.product_id,
+                    lot_inventory_id: beforeLot.id,
+                    lot_number: beforeLot.lot_number,
+                    location_id: beforeLot.location_id || null,
+                    location_code: beforeLot.location || null,
+                    quantity_delta: adjustment,
+                    opening_quantity: Number(beforeLot.quantity || 0),
+                    trust_opening_quantity: true,
+                    sync_lot_inventory: true,
+                    source_type: 'post_completion_correction',
+                    source_id: before.id,
+                    source_line_id: before.shipping_instruction_line_id,
+                    reason_code: value.reason_code,
+                    comment: value.comment || '出荷完了後の数量修正',
+                    created_by: req.auth?.email || 'shipping-instructions-api'
+                }));
+            }
+        } else {
+            inventoryMovements.push(await appendTransaction(client, {
+                transaction_type: 'inventory_adjustment',
+                inventory_status: 'available',
+                product_id: before.product_id,
+                lot_inventory_id: beforeLot.id,
+                lot_number: beforeLot.lot_number,
+                location_id: beforeLot.location_id || null,
+                location_code: beforeLot.location || null,
+                quantity_delta: Number(before.shipped_quantity || 0),
+                opening_quantity: Number(beforeLot.quantity || 0),
+                trust_opening_quantity: true,
+                sync_lot_inventory: true,
+                source_type: 'post_completion_correction_restore',
+                source_id: before.id,
+                source_line_id: before.shipping_instruction_line_id,
+                reason_code: value.reason_code,
+                comment: value.comment || '出荷完了後修正で旧ロットへ在庫を戻す',
+                created_by: req.auth?.email || 'shipping-instructions-api'
+            }));
+            inventoryMovements.push(await appendTransaction(client, {
+                transaction_type: 'inventory_adjustment',
+                inventory_status: 'available',
+                product_id: before.product_id,
+                lot_inventory_id: nextLot.id,
+                lot_number: nextLot.lot_number,
+                location_id: nextLot.location_id || null,
+                location_code: nextLot.location || null,
+                quantity_delta: -nextQuantity,
+                opening_quantity: Number(nextLot.quantity || 0),
+                trust_opening_quantity: true,
+                sync_lot_inventory: true,
+                source_type: 'post_completion_correction_apply',
+                source_id: before.id,
+                source_line_id: before.shipping_instruction_line_id,
+                reason_code: value.reason_code,
+                comment: value.comment || '出荷完了後修正で新ロットから在庫を控除',
+                created_by: req.auth?.email || 'shipping-instructions-api'
+            }));
         }
 
         const updatedAllocation = await client.query(`
@@ -1420,11 +1523,15 @@ router.post('/:id/post-completion-corrections', async (req, res) => {
         await client.query('COMMIT');
         res.json({
             success: true,
-            allocation: updatedAllocation.rows[0]
+            allocation: updatedAllocation.rows[0],
+            inventory_transactions: inventoryMovements.map((movement) => movement.transaction)
         });
     } catch (error) {
         await client.query('ROLLBACK');
         logger.error('Error applying post-completion correction:', error);
+        if (error instanceof InventoryLedgerError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
         res.status(500).json({ error: 'Internal server error' });
     } finally {
         client.release();

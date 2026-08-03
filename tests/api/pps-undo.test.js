@@ -255,3 +255,79 @@ UPDATE shipping_instructions SET status = 'shipped' WHERE id = ${fixture.shippin
     cleanupFixture(fixture);
   }
 });
+
+test('post-completion correction rejects a line quantity over-allocation without side effects', async () => {
+  const auth = await get('/api/auth/m365/config');
+  if (auth.status === 200 && auth.body.enabled && auth.body.required) {
+    const protectedResponse = await send('POST', '/api/shipping-instructions/1/post-completion-corrections', {});
+    assert.equal(protectedResponse.status, 401);
+    return;
+  }
+
+  const fixture = await createFixture();
+  try {
+    psql(`UPDATE shipping_instructions SET status = 'shipped' WHERE id = ${fixture.shippingId};`);
+    const beforeLotQuantity = Number(psql(`SELECT quantity FROM lot_inventory WHERE lot_number = '${fixture.lotNumber}';`));
+
+    const rejected = await send('POST', `/api/shipping-instructions/${fixture.shippingId}/post-completion-corrections`, {
+      allocation_id: fixture.allocationId,
+      shipped_quantity: 3,
+      reason_code: 'quantity_entry_error',
+      comment: 'contract test must reject line quantity overflow'
+    });
+    assert.equal(rejected.status, 409);
+    assert.equal(rejected.body.code, 'SHIPPING_LINE_QUANTITY_EXCEEDED');
+
+    const persisted = psql(`
+SELECT a.shipped_quantity || ',' || li.quantity || ',' || COUNT(e.id)
+FROM shipping_lot_allocations a
+JOIN lot_inventory li ON li.id = a.lot_inventory_id
+LEFT JOIN shipping_audit_events e
+  ON e.allocation_id = a.id AND e.event_type = 'post_completion_corrected'
+WHERE a.id = ${fixture.allocationId}
+GROUP BY a.shipped_quantity, li.quantity;
+`);
+    assert.equal(persisted, `2,${beforeLotQuantity},0`);
+  } finally {
+    cleanupFixture(fixture);
+  }
+});
+
+test('post-completion correction rejects a cancelled allocation without side effects', async () => {
+  const auth = await get('/api/auth/m365/config');
+  if (auth.status === 200 && auth.body.enabled && auth.body.required) {
+    const protectedResponse = await send('POST', '/api/shipping-instructions/1/post-completion-corrections', {});
+    assert.equal(protectedResponse.status, 401);
+    return;
+  }
+
+  const fixture = await createFixture();
+  try {
+    psql(`
+UPDATE shipping_instructions SET status = 'shipped' WHERE id = ${fixture.shippingId};
+UPDATE shipping_lot_allocations SET status = 'cancelled' WHERE id = ${fixture.allocationId};
+`);
+    const beforeLotQuantity = Number(psql(`SELECT quantity FROM lot_inventory WHERE lot_number = '${fixture.lotNumber}';`));
+
+    const rejected = await send('POST', `/api/shipping-instructions/${fixture.shippingId}/post-completion-corrections`, {
+      allocation_id: fixture.allocationId,
+      shipped_quantity: 1,
+      reason_code: 'quantity_entry_error',
+      comment: 'cancelled allocation must not be corrected'
+    });
+    assert.equal(rejected.status, 404);
+
+    const persisted = psql(`
+SELECT a.shipped_quantity || ',' || li.quantity || ',' || COUNT(e.id)
+FROM shipping_lot_allocations a
+JOIN lot_inventory li ON li.id = a.lot_inventory_id
+LEFT JOIN shipping_audit_events e
+  ON e.allocation_id = a.id AND e.event_type = 'post_completion_corrected'
+WHERE a.id = ${fixture.allocationId}
+GROUP BY a.shipped_quantity, li.quantity;
+`);
+    assert.equal(persisted, `2,${beforeLotQuantity},0`);
+  } finally {
+    cleanupFixture(fixture);
+  }
+});

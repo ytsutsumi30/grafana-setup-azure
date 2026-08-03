@@ -18,6 +18,8 @@ ssl/
 **/.terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
+tfplan.*
 crash.log
 crash.*.log
 *.tfvars
@@ -32,7 +34,10 @@ backups/
 backup-*/
 web-backup-*/
 review-evidence/
+artifacts/
 supabase-project.json
+.agents/
+.codex/
 
 # OS/editor
 .DS_Store

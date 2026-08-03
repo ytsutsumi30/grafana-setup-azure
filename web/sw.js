@@ -5,11 +5,11 @@
  * - API の更新系(POST/PUT/PATCH/DELETE)はキャッシュせず、失敗はアプリ側キューへ委ねる
  * キャッシュ版を上げるときは CACHE_VERSION を変更する。
  */
-const CACHE_VERSION = 'v28';
+const CACHE_VERSION = 'v34';
 const SHELL_CACHE = 'prj3-shell-' + CACHE_VERSION;
 const API_CACHE = 'prj3-api-' + CACHE_VERSION;
 
-// 事前キャッシュするアプリシェル(存在するものだけ、失敗は無視)
+// 事前キャッシュするアプリシェル。全件成功した版だけを有効化する。
 const SHELL_ASSETS = [
   '/index.html',
   '/shipping-history.html',
@@ -20,9 +20,12 @@ const SHELL_ASSETS = [
   '/purchase-receiving.html',
   '/sales-shipping.html',
   '/shipping-quantity.html',
+  '/qr-inspection.html',
   '/pps.html',
   '/css/tokens.css',
   '/css/components.css',
+  '/css/tokens.css?v=2026080104',
+  '/css/components.css?v=2026080104',
   '/css/pages/shipping-report.css',
   '/css/pages/shipping-instructions.css',
   '/css/pages/shipping-quantity.css',
@@ -36,7 +39,12 @@ const SHELL_ASSETS = [
   '/css/pages/inventory-foundation.css',
   '/css/pages/purchase-receiving.css',
   '/css/pages/sales-shipping.css',
+  '/css/pages/inventory-foundation.css?v=2026080104',
+  '/css/pages/shipping-instructions.css?v=2026080104',
+  '/css/pages/purchase-receiving.css?v=2026080104',
+  '/css/pages/sales-shipping.css?v=2026080104',
   '/js/layout.js',
+  '/js/layout.js?v=2026080104',
   '/js/pages/shipping-history.js',
   '/js/pages/shipping-instructions.js',
   '/js/pages/shipping-quantity.js',
@@ -51,20 +59,30 @@ const SHELL_ASSETS = [
   '/js/pages/inventory-foundation.js',
   '/js/pages/purchase-receiving.js',
   '/js/pages/sales-shipping.js',
+  '/js/pages/inventory-foundation.js?v=2026080104',
+  '/js/pages/shipping-instructions.js?v=2026080104',
+  '/js/pages/purchase-receiving.js?v=2026080104',
+  '/js/pages/sales-shipping.js?v=2026080104',
   '/js/m365-auth.js',
   '/js/offline-queue.js',
   '/vendor/bootstrap/css/bootstrap.min.css',
   '/vendor/bootstrap/js/bootstrap.bundle.min.js',
   '/vendor/fontawesome/css/all.min.css',
+  '/vendor/fontawesome/webfonts/fa-solid-900.woff2',
+  '/vendor/html5-qrcode/html5-qrcode.min.js',
   '/vendor/msal/msal-browser.min.js',
   '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) =>
-      Promise.allSettled(SHELL_ASSETS.map((u) => cache.add(u)))
-    ).then(() => self.skipWaiting())
+    caches.open(SHELL_CACHE)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(async (error) => {
+        await caches.delete(SHELL_CACHE);
+        throw error;
+      })
   );
 });
 

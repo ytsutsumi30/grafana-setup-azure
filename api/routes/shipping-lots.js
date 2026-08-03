@@ -8,6 +8,7 @@ const router = express.Router();
 const pool = require('../lib/db');
 const logger = require('../lib/logger');
 const { recordAuditEvent } = require('../lib/audit');
+const { appendTransaction, InventoryLedgerError } = require('../lib/inventory-ledger');
 
 // 明細の対象製品のロット一覧(出荷可能な在庫)
 router.get('/:lineId/lots', async (req, res) => {
@@ -96,13 +97,25 @@ router.post('/:lineId/allocate', async (req, res) => {
             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *
         `, [lineId, lot.id, lot_number, line.product_id, qty, operator_name || null]);
 
-        // 在庫引き当て・減算
-        const newLotQty = lot.quantity - qty;
-        await client.query(
-            `UPDATE lot_inventory SET quantity = $1,
-                 status = CASE WHEN $1 = 0 THEN 'shipped' ELSE status END,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2`, [newLotQty, lot.id]);
+        const movement = await appendTransaction(client, {
+            transaction_type: 'shipping_allocation',
+            inventory_status: 'available',
+            product_id: line.product_id,
+            lot_inventory_id: lot.id,
+            lot_number,
+            location_id: lot.location_id || null,
+            location_code: lot.location || null,
+            quantity_delta: -qty,
+            opening_quantity: Number(lot.quantity || 0),
+            trust_opening_quantity: true,
+            sync_lot_inventory: true,
+            source_type: 'shipping_lot_allocation',
+            source_id: alloc.rows[0].id,
+            source_line_id: line.id,
+            comment: 'ロット別出荷数量を在庫引当',
+            created_by: operator_name || 'shipping-lots-api'
+        });
+        const newLotQty = movement.quantity_after;
 
         // 明細の出荷済み更新・ステータス遷移
         const newShipped = line.shipped_quantity + qty;
@@ -138,6 +151,7 @@ router.post('/:lineId/allocate', async (req, res) => {
         await client.query('COMMIT');
         res.status(201).json({
             allocation: alloc.rows[0],
+            inventory_transaction: movement.transaction,
             line: { id: line.id, quantity: line.quantity, shipped_quantity: newShipped, status: newStatus,
                     remaining_quantity: line.quantity - newShipped },
             lot: { lot_number, remaining_quantity: newLotQty }
@@ -145,6 +159,9 @@ router.post('/:lineId/allocate', async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         logger.error('Error allocating lot shipment:', error);
+        if (error instanceof InventoryLedgerError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
         res.status(500).json({ error: 'Internal server error' });
     } finally {
         client.release();
@@ -164,13 +181,35 @@ router.delete('/allocations/:id', async (req, res) => {
             return res.status(404).json({ error: 'Allocation not found' });
         }
         const a = aRes.rows[0];
-        // 在庫を戻す
+        let movement = null;
         if (a.lot_inventory_id) {
-            await client.query(
-                `UPDATE lot_inventory SET quantity = quantity + $1,
-                     status = CASE WHEN status = 'shipped' THEN 'available' ELSE status END,
-                     updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-                [a.shipped_quantity, a.lot_inventory_id]);
+            const lotResult = await client.query(
+                'SELECT * FROM lot_inventory WHERE id = $1 FOR UPDATE',
+                [a.lot_inventory_id]);
+            if (!lotResult.rows.length) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: '引当元ロットが存在しないため取消できません' });
+            }
+            const lot = lotResult.rows[0];
+            movement = await appendTransaction(client, {
+                transaction_type: 'shipping_cancel',
+                inventory_status: 'available',
+                product_id: a.product_id,
+                lot_inventory_id: lot.id,
+                lot_number: a.lot_number,
+                location_id: lot.location_id || null,
+                location_code: lot.location || null,
+                quantity_delta: Number(a.shipped_quantity),
+                opening_quantity: Number(lot.quantity || 0),
+                trust_opening_quantity: true,
+                sync_lot_inventory: true,
+                source_type: 'shipping_lot_allocation_cancel',
+                source_id: a.id,
+                source_line_id: a.shipping_instruction_line_id,
+                reason_code: 'allocation_cancelled',
+                comment: 'ロット引当取消で在庫を戻す',
+                created_by: 'shipping-lots-api'
+            });
         }
         // 明細を戻す
         const lineRes = await client.query(
@@ -207,10 +246,17 @@ router.delete('/allocations/:id', async (req, res) => {
             comment: 'ロット引当を取消'
         });
         await client.query('COMMIT');
-        res.json({ success: true, line: { id: line.id, shipped_quantity: newShipped, status: newStatus } });
+        res.json({
+            success: true,
+            inventory_transaction: movement?.transaction || null,
+            line: { id: line.id, shipped_quantity: newShipped, status: newStatus }
+        });
     } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         logger.error('Error cancelling allocation:', error);
+        if (error instanceof InventoryLedgerError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
         res.status(500).json({ error: 'Internal server error' });
     } finally {
         client.release();

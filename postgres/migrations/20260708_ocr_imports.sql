@@ -72,9 +72,14 @@ PROD001 製品A 2
 PROD002 製品B 1', 90.00, 'parsed', '{"sales_order_no":"OCR-SO-001","customer_name":"POC 顧客","requested_ship_date":"2026-07-20"}'::jsonb, 'Phase 5 OCR サンプル')
 ON CONFLICT (document_no) DO NOTHING;
 
-GRANT ALL PRIVILEGES ON ocr_documents TO production_user;
-GRANT ALL PRIVILEGES ON ocr_document_lines TO production_user;
-GRANT ALL PRIVILEGES ON ocr_business_matches TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE ocr_documents_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE ocr_document_lines_id_seq TO production_user;
-GRANT ALL PRIVILEGES ON SEQUENCE ocr_business_matches_id_seq TO production_user;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'production_user') THEN
+        GRANT ALL PRIVILEGES ON TABLE ocr_documents TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE ocr_document_lines TO production_user;
+        GRANT ALL PRIVILEGES ON TABLE ocr_business_matches TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE ocr_documents_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE ocr_document_lines_id_seq TO production_user;
+        GRANT ALL PRIVILEGES ON SEQUENCE ocr_business_matches_id_seq TO production_user;
+    END IF;
+END $$;

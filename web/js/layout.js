@@ -48,13 +48,13 @@
     header.innerHTML =
       '<div class="container">' +
         '<div class="row align-items-center">' +
-          '<div class="col">' +
+          '<div class="col app-header-title">' +
             '<h1><i class="fas fa-clipboard-check me-2"></i>' + info.title + '</h1>' +
             (info.subtitle ? '<p class="subtitle">' + info.subtitle + '</p>' : '') +
           '</div>' +
           '<div class="col-auto d-flex gap-2 align-items-center">' +
-            (showHome ? '<a class="btn btn-light app-home-btn" href="index.html"><i class="fas fa-home"></i>ホーム</a>' : '') +
-            '<button class="btn btn-light app-home-btn" type="button" data-theme-toggle title="テーマ切替"><i class="fas fa-circle-half-stroke"></i></button>' +
+            (showHome ? '<a class="btn app-home-btn" href="index.html" title="ホーム"><i class="fas fa-home"></i><span class="d-none d-md-inline">ホーム</span></a>' : '') +
+            '<button class="btn app-home-btn" type="button" data-theme-toggle title="テーマ切替" aria-label="テーマ切替"><i class="fas fa-circle-half-stroke"></i></button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -70,7 +70,8 @@
     }
     if (!document.querySelector('meta[name="theme-color"]')) {
       var m = document.createElement('meta');
-      m.name = 'theme-color'; m.content = '#0d6efd';
+      m.name = 'theme-color';
+      m.content = getComputedStyle(document.documentElement).getPropertyValue('--color-header-bg').trim() || '#101828';
       document.head.appendChild(m);
     }
   }
@@ -88,13 +89,17 @@
   function setupOfflineUI() {
     var banner = document.createElement('div');
     banner.id = 'app-offline-banner';
-    banner.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;z-index:1090;' +
-      'background:var(--color-status-pending);color:#212529;text-align:center;' +
-      'padding:0.4rem 1rem;font-size:0.9rem;font-weight:600;';
+    banner.className = 'app-offline-banner';
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
     banner.innerHTML = '<i class="fas fa-wifi"></i> オフライン: 操作は継続できます。送信は復帰後に自動再送されます ' +
       '<span id="app-pending-count"></span>';
     document.body.appendChild(banner);
-    function render() { banner.style.display = navigator.onLine ? 'none' : 'block'; }
+    function render() {
+      var offline = !navigator.onLine;
+      banner.hidden = !offline;
+      document.documentElement.classList.toggle('is-offline', offline);
+    }
     window.addEventListener('online', render);
     window.addEventListener('offline', render);
     render();
@@ -138,6 +143,8 @@
     if (!document.querySelector('.app-toast-container')) {
       var c = document.createElement('div');
       c.className = 'app-toast-container';
+      c.setAttribute('aria-live', 'polite');
+      c.setAttribute('aria-atomic', 'true');
       document.body.appendChild(c);
     }
   }
@@ -182,9 +189,16 @@
   // 共通トースト(silent fail を避けるための通知)
   window.showToast = function (message, type) {
     var c = document.querySelector('.app-toast-container');
-    if (!c) { c = document.createElement('div'); c.className = 'app-toast-container'; document.body.appendChild(c); }
+    if (!c) {
+      c = document.createElement('div');
+      c.className = 'app-toast-container';
+      c.setAttribute('aria-live', 'polite');
+      c.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(c);
+    }
     var el = document.createElement('div');
     el.className = 'app-toast ' + (type === 'ok' ? 'ok' : type === 'ng' ? 'ng' : 'info');
+    el.setAttribute('role', type === 'ng' ? 'alert' : 'status');
     el.textContent = message;
     c.appendChild(el);
     setTimeout(function () { el.remove(); }, 4000);

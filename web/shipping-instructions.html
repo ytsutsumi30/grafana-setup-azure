@@ -7,67 +7,52 @@
 
     <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
-    <link href="css/tokens.css" rel="stylesheet">
-    <link href="css/components.css" rel="stylesheet">
-    <link href="css/pages/shipping-instructions.css?v=2026071001" rel="stylesheet">
+    <link href="css/tokens.css?v=2026080104" rel="stylesheet">
+    <link href="css/components.css?v=2026080104" rel="stylesheet">
+    <link href="css/pages/shipping-instructions.css?v=2026080104" rel="stylesheet">
     <script src="js/m365-auth.js?v=202607070030"></script>
 </head>
-<body data-page="shipping-instructions">
+<body data-page="shipping-instructions" data-layout="auto">
     <!-- ローディングオーバーレイ -->
     <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
-
-    <!-- ページヘッダー -->
-    <div class="page-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col">
-                    <h1><i class="fas fa-truck-loading me-2"></i>出荷指示管理</h1>
-                    <p class="mb-0">顧客への出荷指示管理</p>
-                </div>
-                <div class="col-auto">
-                    <a href="maintenance.html" class="btn btn-light btn-lg">
-                        <i class="fas fa-arrow-left me-2"></i>メンテナンスメニューに戻る
-                    </a>
-                </div>
-            </div>
+        <div class="spinner-border text-light shipping-loading-spinner" role="status">
+            <span class="visually-hidden">読み込み中</span>
         </div>
     </div>
 
     <!-- メインコンテンツ -->
-    <div class="container mb-5">
-        <!-- アクションボタン -->
-        <div class="row mb-4">
-            <div class="col">
-                <button id="createInstructionButton" class="btn btn-danger btn-lg" type="button">
-                    <i class="fas fa-plus-circle me-2"></i>新規出荷指示登録
-                </button>
-                <button id="refreshInstructionsButton" class="btn btn-outline-secondary btn-lg ms-2" type="button">
-                    <i class="fas fa-sync-alt me-2"></i>更新
-                </button>
+    <main class="container-fluid px-3 pb-4">
+        <section class="app-card card shipping-toolbar" aria-labelledby="shippingQueueTitle">
+            <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h2 id="shippingQueueTitle" class="h6 mb-1"><i class="fas fa-list-check me-2"></i>出荷指示キュー</h2>
+                    <p id="shippingSummary" class="small text-muted mb-0" aria-live="polite">出荷指示を読み込んでいます。</p>
+                </div>
+                <div class="shipping-toolbar-actions">
+                    <button id="refreshInstructionsButton" class="btn btn-outline-secondary" type="button">
+                        <i class="fas fa-sync-alt me-1"></i>更新
+                    </button>
+                    <button id="createInstructionButton" class="btn btn-primary" type="button">
+                        <i class="fas fa-plus me-1"></i>手入力で追加
+                    </button>
+                </div>
             </div>
-        </div>
+        </section>
 
         <!-- 出荷指示一覧テーブル -->
-        <div class="card">
+        <section class="app-card card shipping-list-panel">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="fas fa-list me-2"></i>出荷指示一覧</h5>
+                <h3 class="h6 mb-0"><i class="fas fa-truck-fast me-2"></i>出荷指示一覧</h3>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
+            <div class="card-body p-0 d-none d-lg-block">
+                <div class="table-responsive shipping-table-wrap">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>指示ID</th>
-                                <th>製品</th>
-                                <th>数量</th>
-                                <th>出荷日</th>
-                                <th>顧客名</th>
-                                <th>優先度</th>
-                                <th>ステータス</th>
+                                <th>出荷指示</th>
+                                <th>顧客・出荷日</th>
+                                <th>代表品目・数量</th>
+                                <th>優先度・状態</th>
                                 <th>監査注意</th>
                                 <th>出荷進捗</th>
                                 <th>操作</th>
@@ -75,7 +60,7 @@
                         </thead>
                         <tbody id="instructionsTableBody">
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-5">
+                                <td colspan="7" class="text-center text-muted py-5">
                                     <div class="spinner-border" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
@@ -86,8 +71,11 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
+            <div id="instructionsMobileList" class="shipping-mobile-list d-lg-none">
+                <div class="text-muted text-center p-4">データを読み込んでいます...</div>
+            </div>
+        </section>
+    </main>
 
     <!-- 出荷指示登録・編集モーダル -->
     <div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
@@ -97,7 +85,7 @@
                     <h5 class="modal-title" id="instructionModalLabel">
                         <i class="fas fa-truck-loading me-2"></i><span id="modalTitle">新規出荷指示登録</span>
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="閉じる"></button>
                 </div>
                 <div class="modal-body">
                     <form id="instructionForm">
@@ -160,12 +148,9 @@
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="status" class="form-label">ステータス</label>
-                                <select class="form-select" id="status">
-                                    <option value="pending">未処理</option>
-                                    <option value="processing">処理中</option>
-                                    <option value="shipped">出荷済</option>
-                                    <option value="delivered">配送完了</option>
-                                </select>
+                                <input type="hidden" id="status" value="pending">
+                                <div id="statusDisplay" class="shipping-status-readonly" role="status">未処理</div>
+                                <div class="form-text">状態は出荷数入力、PPS、QR検品、出荷完了の各操作から更新されます。</div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="trackingNumber" class="form-label">トラッキング番号</label>
@@ -183,7 +168,7 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times me-2"></i>キャンセル
                     </button>
-                    <button id="saveInstructionButton" type="button" class="btn btn-danger">
+                    <button id="saveInstructionButton" type="button" class="btn btn-primary">
                         <i class="fas fa-save me-2"></i>保存
                     </button>
                 </div>
@@ -193,8 +178,8 @@
 
     <!-- Bootstrap JS -->
     <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-    <script src="js/layout.js"></script>
+    <script src="js/layout.js?v=2026080104"></script>
 
-    <script src="js/pages/shipping-instructions.js?v=2026071001"></script>
+    <script src="js/pages/shipping-instructions.js?v=2026080104"></script>
 </body>
 </html>

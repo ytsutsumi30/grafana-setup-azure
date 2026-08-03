@@ -27,6 +27,11 @@ jobs:
         working-directory: api
         run: npm ci
 
+      - name: Install browser test dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
       - name: Check API syntax
         working-directory: api
         run: npm run check:syntax
@@ -56,10 +61,27 @@ jobs:
           BASE: http://localhost:8080
         run: bash tests/smoke/smoke.sh
 
-      - name: Run API contract tests
+      - name: Run API and database integration tests
         env:
           BASE: http://localhost:8080
-        run: node --test tests/api/contract.test.js
+        run: >-
+          node --test
+          tests/api/contract.test.js
+          tests/api/pps-undo.test.js
+          tests/integration/inventory-ledger.test.js
+          tests/integration/picking-complete-idempotency.test.js
+          tests/integration/receiving-qr-identity.test.js
+          tests/smoke/console-check.unit.test.js
+
+      - name: Run browser UI tests
+        env:
+          BASE: http://localhost:8080
+        run: node --test tests/ui/*.test.js
+
+      - name: Verify browser console and API responses
+        env:
+          BASE: http://localhost:8080
+        run: node tests/smoke/console-check.js
 
       - name: Dump Docker logs on failure
         if: failure()

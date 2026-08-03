@@ -29,7 +29,20 @@ router.get('/balances', async (req, res) => {
             params.push(inventory_status);
             conditions.push(`ib.inventory_status = $${params.length}`);
         }
-        const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        // ロット集約残高が作られた後はそれを物理在庫の正とし、内訳QR残高との二重計上を避ける。
+        conditions.push(`NOT (
+            ib.qr_unit_id IS NOT NULL
+            AND EXISTS (
+                SELECT 1
+                FROM inventory_balances aggregate_balance
+                WHERE aggregate_balance.product_id = ib.product_id
+                  AND COALESCE(aggregate_balance.lot_number, '') = COALESCE(ib.lot_number, '')
+                  AND COALESCE(aggregate_balance.location_code, '') = COALESCE(ib.location_code, '')
+                  AND aggregate_balance.inventory_status = ib.inventory_status
+                  AND aggregate_balance.qr_unit_id IS NULL
+            )
+        )`);
+        const where = `WHERE ${conditions.join(' AND ')}`;
         const result = await pool.query(`
             SELECT ib.*,
                    p.product_code,
